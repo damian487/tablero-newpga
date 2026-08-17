@@ -1008,9 +1008,51 @@ function renderCombos(){
   head+='<div style="display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 12px">';
   head+='<select id="cbCombo" class="fsel">'+lista.map((cb,i)=>`<option value="${i}">${cb.nombre}</option>`).join('')+'</select>';
   head+='<select id="cbMetric" class="fsel"><option value="cli">Métrica: Clientes con combo</option><option value="u">Métrica: Unidades (Gillette+asociado)</option><option value="imp">Métrica: Importe $</option></select>';
-  head+='</div><div id="cbMeta"></div><div id="cbSum"></div><div id="cbBox"></div>';
+  head+='</div><div id="cbDonas" style="display:flex;gap:14px;flex-wrap:wrap;margin:2px 0 16px"></div><div id="cbMeta"></div><div id="cbSum"></div><div id="cbBox"></div>';
   card.innerHTML=head; p.appendChild(card);
-  const box=card.querySelector('#cbBox'), sumEl=card.querySelector('#cbSum'), metaEl=card.querySelector('#cbMeta'), selC=card.querySelector('#cbCombo'), selM=card.querySelector('#cbMetric');
+  const box=card.querySelector('#cbBox'), sumEl=card.querySelector('#cbSum'), metaEl=card.querySelector('#cbMeta'), selC=card.querySelector('#cbCombo'), selM=card.querySelector('#cbMetric'), donasEl=card.querySelector('#cbDonas');
+  const CB_PALETTE=['var(--accent)','var(--accent2)','var(--good)','var(--warn2)','var(--bad)','#8e6fce','#d18a3f','var(--muted)'];
+  function cbNombreCorto(n){ return n.replace(/^Combo\s*/,''); }
+  function cbMetricVal(cb,m){ return m==='u'?cb.total.acumU : m==='imp'?cb.total.acumImp : cb.combosAcumulados; }
+  function donutSVG(slices,size,thick){
+    const total=slices.reduce((s,x)=>s+x.value,0)||1;
+    const r=(size-thick)/2, c=size/2, circ=2*Math.PI*r;
+    let off=0, paths='';
+    slices.forEach(s=>{
+      const len=(s.value/total)*circ;
+      paths+=`<circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${s.color}" stroke-width="${thick}" stroke-dasharray="${len.toFixed(2)} ${(circ-len).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 ${c} ${c})" opacity="${s.dim?0.25:1}"/>`;
+      off+=len;
+    });
+    return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">${paths}</svg>`;
+  }
+  function donaCard(titulo,slices,selId){
+    const total=slices.reduce((s,x)=>s+x.value,0);
+    const sel=slices.find(s=>s.id===selId);
+    const size=112,thick=17;
+    const svg=donutSVG(slices.map(s=>({value:s.value,color:s.color,dim:selId!=null && s.id!==selId})),size,thick);
+    const centerBig=AR.format(sel? sel.value : total), centerSmall=sel? cbNombreCorto(sel.nombre).slice(0,14) : 'total';
+    const legend=slices.map(s=>{
+      const activo=s.id===selId;
+      const pct=total? Math.round(1000*s.value/total)/10 : 0;
+      return `<div style="display:flex;align-items:center;gap:5px;font-size:10px;color:${activo?'var(--ink)':'var(--muted)'};font-weight:${activo?'700':'400'}"><span style="width:7px;height:7px;border-radius:50%;background:${s.color};display:inline-block;flex:none"></span>${cbNombreCorto(s.nombre)} · ${AR.format(s.value)}${total?' ('+pct+'%)':''}</div>`;
+    }).join('');
+    return `<div class="supcard" style="min-width:250px;flex:1"><h3>${titulo}</h3><div style="display:flex;gap:12px;align-items:center;margin-top:4px">
+      <div style="position:relative;width:${size}px;height:${size}px;flex:none">${svg}<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;pointer-events:none">
+        <div class="num" style="font-size:17px;font-weight:800;color:var(--ink);line-height:1.1">${centerBig}</div>
+        <div style="font-size:9px;color:var(--muted);max-width:70px;line-height:1.1">${centerSmall}</div></div></div>
+      <div style="display:flex;flex-direction:column;gap:3px;min-width:0">${legend}</div></div></div>`;
+  }
+  function drawDonas(){
+    const m=selM.value, selIdx=parseInt(selC.value,10);
+    const conId=lista.map((cb,i)=>({...cb,id:i}));
+    const autoList=conId.filter(cb=>cb.canal==='Autoservicios');
+    const almList=conId.filter(cb=>cb.canal!=='Autoservicios');
+    const slicesFn=arr=>arr.map((cb,k)=>({id:cb.id, nombre:cb.nombre, value:cbMetricVal(cb,m), color:CB_PALETTE[k%CB_PALETTE.length]}));
+    donasEl.innerHTML =
+      donaCard('Total de combos', slicesFn(conId), selIdx) +
+      donaCard('Combos en Autoservicios', slicesFn(autoList), autoList.some(c=>c.id===selIdx)?selIdx:null) +
+      donaCard('Combos en Almacenes', slicesFn(almList), almList.some(c=>c.id===selIdx)?selIdx:null);
+  }
   function draw(){
     const cb=lista[parseInt(selC.value,10)], m=selM.value, fechas=cb.fechas||[];
     metaEl.innerHTML=`<div class="note">Canal: ${cb.canal} · descuento ${cb.descuentoPct}% · vigente desde ${fd(cb.desde)} · condición: ${cb.condicion}</div>`;
@@ -1038,7 +1080,8 @@ function renderCombos(){
     h+=`<td class="num">${acc(cb.total,m)}</td></tr>`;
     h+='</tbody></table></div>'; box.innerHTML=h;
   }
-  selC.onchange=draw; selM.onchange=draw; draw();
+  function drawAll(){ drawDonas(); draw(); }
+  selC.onchange=drawAll; selM.onchange=drawAll; drawAll();
 }
 
 /* ---------- PANEL: Ruta / No compradores ---------- */
