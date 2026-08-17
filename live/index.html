@@ -2532,7 +2532,12 @@ async function askBot(pregunta){
   const digest = buildBotDigest();
   let pw=''; try{ pw=sessionStorage.getItem('gpw')||''; }catch(_){ }
   const res = await fetch(BOT_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json','X-Dashboard-Password':pw},body:JSON.stringify({pregunta:pregunta,digest:digest})});
-  if(!res.ok){ const t=await res.text().catch(()=>''); throw new Error('HTTP '+res.status+(t?': '+t.slice(0,180):'')); }
+  if(!res.ok){
+    const t=await res.text().catch(()=>'');
+    let parsed=null; try{ parsed=JSON.parse(t); }catch(_){ }
+    if(parsed && parsed.error) throw new Error(parsed.error);
+    throw new Error('HTTP '+res.status+(t?': '+t.slice(0,180):''));
+  }
   const j = await res.json();
   if(j && j.error) throw new Error(j.error);
   const texto = j && j.respuesta;
