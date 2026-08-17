@@ -896,14 +896,14 @@ function renderInfaltables(){
 function renderVentaDia(){
   const p=document.getElementById('p-ventadia'); p.innerHTML='';
   const I=DATA.intradia;
-  if(!I || !I.fecha){ p.innerHTML='<div class="card"><div class="ctitle"><h2>Venta del Día</h2></div><p style="color:var(--muted)">Sin datos de venta intradía todavía. Se arma con las actualizaciones automáticas de 10:30 a 16:00.</p></div>'; return; }
+  if(!I || !I.fecha){ p.innerHTML='<div class="card"><div class="ctitle"><h2>Venta del Día</h2></div><p style="color:var(--muted)">Sin datos de venta intradía todavía. Se arma con las actualizaciones automáticas de 10:00 a 16:00.</p></div>'; return; }
   const card=el('div','card');
   let vsHtml='';
   if(I.vsAyerMismaHora){
     const v=I.vsAyerMismaHora; const up=v.diff>=0;
     vsHtml=`<div class="supcard"><h3>Vs. ayer a las ${v.hhmm}</h3><div class="big num" style="color:${up?'var(--good)':'var(--bad)'}">${up?'+':''}${peso(v.diff)}</div><div class="who">${v.diffPct!=null?((up?'+':'')+v.diffPct+'%'):''} · ayer: ${peso(v.venta)}</div></div>`;
   }
-  card.innerHTML=`<div class="ctitle"><h2>Venta del Día</h2><span class="hint">${fdate(I.fecha)} · última actualización ${I.hhmm}hs · se actualiza automáticamente cada 30 min (10:30 a 16:00)</span></div>
+  card.innerHTML=`<div class="ctitle"><h2>Venta del Día</h2><span class="hint">${fdate(I.fecha)} · última actualización ${I.hhmm}hs · se actualiza automáticamente cada 30 min (10:00 a 16:00)</span></div>
     <div class="kpitiles" style="grid-template-columns:repeat(${I.vsAyerMismaHora?4:3},1fr)">
       <div class="supcard"><h3>Venta acumulada</h3><div class="big num" style="color:var(--accent)">${peso(I.venta)}</div><div class="who">con IVA · neta</div></div>
       <div class="supcard"><h3>Clientes con compra</h3><div class="big num">${AR.format(I.ccc)}</div><div class="who">CCC del día</div></div>
@@ -2287,7 +2287,7 @@ function renderMiDia(cod){
         ${sinDatosHoy?'<span class="md-chip warn">esperando datos de hoy</span>':`<span class="md-chip ${ccHoy>=objHoy?'good':'bad'}">${ccHoy>=objHoy?'✓ cumplido':'faltan '+AR.format(Math.max(0,objHoy-ccHoy))}</span>`}
       </div>`;
     if(sinDatosHoy){
-      h+='<span class="md-hint" style="margin-top:10px">Todavía no se cargaron ventas hoy · se actualiza solo cada 30 min (10:30 a 16:00). Última venta cargada: '+fdate(ultimaFechaDatos)+'.</span>';
+      h+='<span class="md-hint" style="margin-top:10px">Todavía no se cargaron ventas hoy · se actualiza solo cada 30 min (10:00 a 16:00). Última venta cargada: '+fdate(ultimaFechaDatos)+'.</span>';
     }
     if(rdV){
       h+=`<div class="md-stat3">
