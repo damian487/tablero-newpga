@@ -2491,6 +2491,9 @@ if(miVendParam){
   document.getElementById('kpis').parentElement.style.display='none';
   document.querySelector('main').style.display='none';
   document.getElementById('miDia').style.display='block';
+  const botFabEl=document.getElementById('botFab'), botPanelEl=document.getElementById('botPanel');
+  if(botFabEl) botFabEl.style.display='none';
+  if(botPanelEl) botPanelEl.style.display='none';
   renderMiDia(miVendParam);
 }else{
   renderAll();
