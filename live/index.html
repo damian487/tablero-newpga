@@ -2450,29 +2450,28 @@ if(miVendParam){
 const BOT_ENDPOINT = 'https://tablero-newpga-worker.damian-8ad.workers.dev/api/bot';
 
 function buildBotDigest(){
+  // Le mandamos al bot PRACTICAMENTE TODO lo que tiene el tablero (no solo un resumen recortado)
+  // para que pueda responder cualquier consulta - articulo mas vendido, vendedor con menos
+  // cobertura, devoluciones, ruta, matinal, accion, combos, infaltables, fichas, evolucion, etc.
+  // Se excluye solo mapaClientes (coordenadas, no aporta nada a una consulta de texto y es pesado).
   const d = DATA;
-  const vendedores = (d.porVendedor||[]).filter(v=>!v.mayorista).map(v=>({
-    cod:v.cod, nombre:v.nombre, supervisor:v.supervisor, universo:v.universo, ccc:v.ccc,
-    cobertura:v.cobertura, venta:v.venta, lineas:v.lineas, alerta:v.alerta
-  }));
-  const equipos = (d.porSupervisor||[]).filter(s=>s.supervisor && s.supervisor.indexOf('N/A')!==0);
-  const concurso = d.concurso ? {
-    nombre:'Concurso Nubi', vigencia:d.concurso.vigencia, diasRestantes:d.concurso.diasRestantes, marcas:d.concurso.marcas,
-    sellout:d.concurso.sellout, selloutPorEquipo:d.concurso.selloutPorEquipo, cobertura:d.concurso.cobertura,
-    porVendedor:(d.concurso.porVendedor||[]).map(v=>({cod:v.cod,nombre:v.nombre,supervisor:v.supervisor,meta:v.meta,ccc:v.ccc,faltan:v.faltan,prioridad:v.prioridad}))
-  } : null;
-  const combos = (d.combos && d.combos.lista) ? d.combos.lista.map(c=>({
-    nombre:c.nombre, canal:c.canal, combosHoy:c.combosHoy, combosAcumulados:c.combosAcumulados,
-    vendedoresConVenta:(c.porVendedor||[]).map(v=>v.nombre)
-  })) : [];
-  const metaCoberturaAgosto = d.metaAgosto ? {
-    vigenciaDesde:d.metaAgosto.vigenciaDesde, vigenciaHasta:d.metaAgosto.vigenciaHasta, semanas:d.metaAgosto.semanas
-  } : null;
-  return {
-    hoy:d.meta.ultimaFecha, empresa:d.meta.empresa, proveedor:d.meta.proveedor, universoTotal:d.meta.universoTotal,
-    kpisDelMes:d.kpis, equipos, vendedores, concurso, combos, metaCoberturaAgosto,
-    historicoMensual:d.historicoMensual||[]
-  };
+  const EXCLUIR = {mapaClientes:1};
+  const digest = {};
+  for(const k in d){ if(!EXCLUIR[k]) digest[k]=d[k]; }
+  // el intradia crudo trae fotos historicas (grafico de tendencia) poco utiles para el bot y
+  // pesadas - se reemplaza por un resumen (ventaDelDia) igual que antes.
+  if(d.intradia){
+    digest.ventaDelDia = {
+      fecha:d.intradia.fecha, ultimaActualizacion:d.intradia.hhmm, venta:d.intradia.venta, ventaBruta:d.intradia.ventaBruta,
+      devoluciones:d.intradia.devoluciones, ccc:d.intradia.ccc, lineas:d.intradia.lineas, ticket:d.intradia.ticket,
+      vsAyerMismaHora:d.intradia.vsAyerMismaHora,
+      porVendedor:(d.intradia.porVendedor||[]).map(v=>({cod:v.cod,nombre:v.nombre,supervisor:v.supervisor,venta:v.venta,ccc:v.ccc})),
+      porSupervisor:d.intradia.porSupervisor||[]
+    };
+    delete digest.intradia;
+  }
+  digest.hoy = d.meta.ultimaFecha;
+  return digest;
 }
 
 async function askBot(pregunta){
