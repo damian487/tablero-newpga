@@ -2,35 +2,47 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 :root{
-  --ground:#eef1f5; --surface:#ffffff; --surface2:#f6f8fb; --ink:#16202e; --muted:#5c6b80;
+  --ground:#e4e9f1; --surface:#ffffff; --surface2:#f6f8fb; --ink:#16202e; --muted:#5c6b80;
   --border:#dde3ec; --accent:#0b7285; --accent2:#12a4bd; --accent-soft:#e2f2f5;
   --good:#17915c; --good-soft:#e3f3ec; --warn:#b3790f; --warn-soft:#f8efd8; --warn2:#e8890c;
   --bad:#c0442e; --bad-soft:#f8e6e2; --accent2-rgb:18,164,189;
   --shadow:0 1px 2px rgba(20,32,46,.04),0 3px 10px rgba(20,32,46,.05);
+  --blob1:rgba(0,87,168,.10); --blob2:rgba(41,182,246,.11); --blob3:rgba(255,199,44,.11);
   --r:12px;
 }
 @media (prefers-color-scheme:dark){
   :root{
-    --ground:#0d1219; --surface:#151d28; --surface2:#1b2530; --ink:#e6edf5; --muted:#93a2b6;
+    --ground:#0a0e15; --surface:#151d28; --surface2:#1b2530; --ink:#e6edf5; --muted:#93a2b6;
     --border:#26303d; --accent:#19a2b8; --accent2:#38c5da; --accent-soft:#123038;
     --good:#33b57e; --good-soft:#12291f; --warn:#d99f2b; --warn-soft:#2b2413; --warn2:#f2973a; --bad:#e26a52; --bad-soft:#2e1a15; --accent2-rgb:56,197,218;
     --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.35);
+    --blob1:rgba(41,182,246,.09); --blob2:rgba(0,87,168,.14); --blob3:rgba(255,199,44,.05);
   }
 }
 :root[data-theme="dark"]{
-  --ground:#0d1219; --surface:#151d28; --surface2:#1b2530; --ink:#e6edf5; --muted:#93a2b6;
+  --ground:#0a0e15; --surface:#151d28; --surface2:#1b2530; --ink:#e6edf5; --muted:#93a2b6;
   --border:#26303d; --accent:#19a2b8; --accent2:#38c5da; --accent-soft:#123038;
   --good:#33b57e; --good-soft:#12291f; --warn:#d99f2b; --warn-soft:#2b2413; --warn2:#f2973a; --bad:#e26a52; --bad-soft:#2e1a15; --accent2-rgb:56,197,218;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.35);
+  --blob1:rgba(41,182,246,.09); --blob2:rgba(0,87,168,.14); --blob3:rgba(255,199,44,.05);
 }
 :root[data-theme="light"]{
-  --ground:#eef1f5; --surface:#ffffff; --surface2:#f6f8fb; --ink:#16202e; --muted:#5c6b80;
+  --ground:#e4e9f1; --surface:#ffffff; --surface2:#f6f8fb; --ink:#16202e; --muted:#5c6b80;
   --border:#dde3ec; --accent:#0b7285; --accent2:#12a4bd; --accent-soft:#e2f2f5;
   --good:#17915c; --good-soft:#e3f3ec; --warn:#b3790f; --warn-soft:#f8efd8; --warn2:#e8890c; --bad:#c0442e; --bad-soft:#f8e6e2; --accent2-rgb:18,164,189;
   --shadow:0 1px 2px rgba(20,32,46,.04),0 3px 10px rgba(20,32,46,.05);
+  --blob1:rgba(0,87,168,.10); --blob2:rgba(41,182,246,.11); --blob3:rgba(255,199,44,.11);
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--ground);color:var(--ink);
+body{margin:0;color:var(--ink);
+  background-color:var(--ground);
+  background-image:
+    radial-gradient(640px circle at -10% -14%, var(--blob1), transparent 60%),
+    radial-gradient(560px circle at 108% 4%, var(--blob2), transparent 60%),
+    radial-gradient(600px circle at -12% 66%, var(--blob3), transparent 60%),
+    radial-gradient(640px circle at 112% 96%, var(--blob1), transparent 60%);
+  background-repeat:no-repeat;
+  background-attachment:fixed,fixed,fixed,fixed;
   font-family:ui-sans-serif,system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased;}
 .num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
