@@ -724,6 +724,36 @@ function renderCanales(){
     subs.forEach(c2=>{ ah+=`<tr><td class="submarca">${c2.canal||'(sin subsegmento)'}</td><td class="num">${AR.format(c2.universo)}</td><td class="num">${AR.format(c2.ccc)}</td><td><div class="cov"><span class="pct num">${pct(c2.cobertura)}</span><span class="track"><span class="fill" style="width:${Math.min(100,c2.cobertura||0)}%;background:${covColor(c2.cobertura)}"></span></span></div></td><td class="num">${peso(c2.venta)}</td></tr>`; });
   });
   ah+='</tbody></table></div>';ap.innerHTML+=ah;p.appendChild(ap);
+
+  // apertura por supervisor y vendedor, dentro de cada canal agrupado
+  if(DATA.porCanalVendedor){
+    const cv=el('div','card');
+    cv.appendChild(el('div','ctitle','<h2>Apertura por supervisor y vendedor</h2><span class="hint">dentro del canal seleccionado</span>'));
+    const canalesCV=orden.filter(g=>(DATA.porCanalVendedor[g]||[]).length);
+    let sh='<div style="margin-bottom:10px"><select id="cvCanalSel" class="fsel">'+canalesCV.map(g=>`<option value="${g}">Canal: ${g}</option>`).join('')+'</select></div><div id="cvBox"></div>';
+    cv.innerHTML+=sh; p.appendChild(cv);
+    const selCV=cv.querySelector('#cvCanalSel'), boxCV=cv.querySelector('#cvBox');
+    function drawCV(){
+      const arr=DATA.porCanalVendedor[selCV.value]||[];
+      const bySup={}; arr.forEach(v=>{ const s=v.supervisor||'(sin equipo)'; if(!bySup[s]) bySup[s]={universo:0,ccc:0,venta:0,vend:[]}; bySup[s].universo+=v.universo; bySup[s].ccc+=v.ccc; bySup[s].venta+=v.venta; bySup[s].vend.push(v); });
+      const sups=Object.keys(bySup).sort((a,b)=>bySup[b].venta-bySup[a].venta);
+      let tot={universo:0,ccc:0,venta:0};
+      let h='<div class="twrap"><table><thead><tr><th>Supervisor / Vendedor</th><th>Universo</th><th>CCC</th><th>% Cobertura</th><th>Venta $ (c/IVA)</th></tr></thead><tbody>';
+      sups.forEach(s=>{
+        const g=bySup[s]; tot.universo+=g.universo; tot.ccc+=g.ccc; tot.venta+=g.venta;
+        const cob=g.universo>0?Math.round(1000*g.ccc/g.universo)/10:0;
+        h+=`<tr class="subhead"><td>Equipo ${s}</td><td class="num">${AR.format(g.universo)}</td><td class="num">${AR.format(g.ccc)}</td><td class="num">${pct(cob)}</td><td class="num">${peso(g.venta)}</td></tr>`;
+        g.vend.slice().sort((a,b)=>b.venta-a.venta).forEach(v=>{
+          h+=`<tr><td class="name">${v.nombre}</td><td class="num">${AR.format(v.universo)}</td><td class="num">${AR.format(v.ccc)}</td><td><div class="cov"><span class="pct num">${pct(v.cobertura)}</span><span class="track"><span class="fill" style="width:${Math.min(100,v.cobertura||0)}%;background:${covColor(v.cobertura)}"></span></span></div></td><td class="num">${peso(v.venta)}</td></tr>`;
+        });
+      });
+      const totCob=tot.universo>0?Math.round(1000*tot.ccc/tot.universo)/10:0;
+      h+=`<tr class="grandtotal"><td>TOTAL ${selCV.value}</td><td class="num">${AR.format(tot.universo)}</td><td class="num">${AR.format(tot.ccc)}</td><td class="num">${pct(totCob)}</td><td class="num">${peso(tot.venta)}</td></tr>`;
+      h+='</tbody></table></div>';
+      boxCV.innerHTML=h;
+    }
+    selCV.onchange=drawCV; drawCV();
+  }
 }
 
 /* ---------- PANEL: Marcas & productos ---------- */
