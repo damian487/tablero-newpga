@@ -816,9 +816,9 @@ function renderMarcas(){
       if(f&&f.familias){
         if(kind==='fam'){
           const fa=f.familias.find(x=>x.familia===item);
-          if(fa){ venta=fa.venta; clientes=fa.clientes; }
+          if(fa){ venta=(fa.ventaNeta!=null?fa.ventaNeta:fa.venta); clientes=fa.clientes; }
         } else {
-          f.familias.forEach(fa=>{ (fa.marcas||[]).forEach(m=>{ if(m.marca===item){ venta+=m.venta; clientes+=m.clientes; } }); });
+          f.familias.forEach(fa=>{ (fa.marcas||[]).forEach(m=>{ if(m.marca===item){ venta+=(m.ventaNeta!=null?m.ventaNeta:m.venta); clientes+=m.clientes; } }); });
         }
       }
       if(venta===0 && clientes===0) return;
