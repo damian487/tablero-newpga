@@ -791,6 +791,61 @@ function renderMarcas(){
     box.innerHTML=html;
   }
   sel.onchange=draw; draw();
+
+  // apertura por supervisor y vendedor: detalle de una familia o marca puntual
+  const cv=el('div','card');
+  cv.appendChild(el('div','ctitle','<h2>Apertura por supervisor y vendedor</h2><span class="hint">detalle de una familia o marca puntual</span>'));
+  let cvh='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">';
+  cvh+='<select id="cvKind" class="fsel"><option value="fam">Ver: Familias</option><option value="mar">Ver: Marcas</option></select>';
+  cvh+='<select id="cvItem" class="fsel"></select>';
+  cvh+='</div><div id="cvBox2"></div>';
+  cv.innerHTML+=cvh; p.appendChild(cv);
+  const selKind=cv.querySelector('#cvKind'), selItem=cv.querySelector('#cvItem'), boxCV2=cv.querySelector('#cvBox2');
+  function fillItems(){
+    const list=(selKind.value==='fam')?DATA.porFamilia:DATA.porMarca;
+    const cur=selItem.value;
+    selItem.innerHTML=list.map(x=>{const nm=x.familia||x.marca; return `<option value="${nm}">${nm}</option>`;}).join('');
+    if(cur && list.some(x=>(x.familia||x.marca)===cur)) selItem.value=cur;
+  }
+  function drawCV2(){
+    const kind=selKind.value, item=selItem.value;
+    const bySup={};
+    (DATA.porVendedor||[]).filter(v=>!v.mayorista).forEach(v=>{
+      const f=DATA.fichas&&DATA.fichas[v.cod];
+      let venta=0, clientes=0;
+      if(f&&f.familias){
+        if(kind==='fam'){
+          const fa=f.familias.find(x=>x.familia===item);
+          if(fa){ venta=fa.venta; clientes=fa.clientes; }
+        } else {
+          f.familias.forEach(fa=>{ (fa.marcas||[]).forEach(m=>{ if(m.marca===item){ venta+=m.venta; clientes+=m.clientes; } }); });
+        }
+      }
+      if(venta===0 && clientes===0) return;
+      const s=v.supervisor||'(sin equipo)';
+      if(!bySup[s]) bySup[s]={venta:0,clientes:0,vend:[]};
+      bySup[s].venta+=venta; bySup[s].clientes+=clientes;
+      bySup[s].vend.push({nombre:v.nombre,venta,clientes});
+    });
+    const sups=Object.keys(bySup).sort((a,b)=>bySup[b].venta-bySup[a].venta);
+    let tot={venta:0,clientes:0};
+    let h='<div class="twrap"><table><thead><tr><th>Supervisor / Vendedor</th><th>Clientes</th><th>Venta $</th></tr></thead><tbody>';
+    sups.forEach(s=>{
+      const g=bySup[s]; tot.venta+=g.venta; tot.clientes+=g.clientes;
+      h+=`<tr class="subhead"><td>Equipo ${s}</td><td class="num">${AR.format(g.clientes)}</td><td class="num">${peso(g.venta)}</td></tr>`;
+      g.vend.slice().sort((a,b)=>b.venta-a.venta).forEach(vv=>{
+        h+=`<tr><td class="name">${vv.nombre}</td><td class="num">${AR.format(vv.clientes)}</td><td class="num">${peso(vv.venta)}</td></tr>`;
+      });
+    });
+    if(!sups.length){ h+='<tr><td colspan="3" style="color:var(--muted)">Sin datos para esta selección.</td></tr>'; }
+    h+=`<tr class="grandtotal"><td>TOTAL ${item||''}</td><td class="num">${AR.format(tot.clientes)}</td><td class="num">${peso(tot.venta)}</td></tr>`;
+    h+='</tbody></table></div>';
+    boxCV2.innerHTML=h;
+  }
+  selKind.onchange=()=>{ fillItems(); drawCV2(); };
+  selItem.onchange=drawCV2;
+  fillItems(); drawCV2();
+
   const tp=el('div','card');tp.appendChild(el('div','ctitle','<h2>Top 25 productos</h2><span class="hint">por venta con IVA · todo el equipo</span>'));
   let ph='<div class="twrap"><table><thead><tr><th>#</th><th>Artículo</th><th>Unidades</th><th>Venta $</th></tr></thead><tbody>';
   DATA.topProductos.forEach((x,i)=>{ph+=`<tr><td class="num">${i+1}</td><td class="name">${x.articulo}</td><td class="num">${AR.format(x.cantidad)}</td><td class="num">${peso(x.venta)}</td></tr>`;});
