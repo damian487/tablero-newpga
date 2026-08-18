@@ -69,8 +69,9 @@ header{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--surfa
 .kpi.accent{background:linear-gradient(160deg,var(--accent) 0%,var(--accent2) 130%);border-color:transparent;color:#fff}
 .kpi.accent .lab,.kpi.accent .foot{color:rgba(255,255,255,.82)}
 .kpi.bad .val{color:var(--bad)}
-.kpi-tag{display:inline-flex;align-items:center;gap:6px;margin-top:8px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);border-radius:20px;padding:4px 11px;font-size:11px;font-weight:700;line-height:1.3}
+.kpi-tag{display:inline-flex;align-items:center;gap:6px;margin-top:8px;background:var(--accent-soft);border:1px solid var(--border);border-radius:20px;padding:4px 11px;font-size:11px;font-weight:700;line-height:1.3;color:var(--accent)}
 .kpi-tag .kpi-tag-lab{font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;opacity:.85}
+.kpi.accent .kpi-tag{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.28);color:#fff}
 
 /* nav */
 nav.tabs{display:flex;gap:6px;flex-wrap:wrap;padding-bottom:4px}
@@ -489,17 +490,20 @@ function renderHeaderKpis(){
   document.getElementById('st-fecha').textContent = fdate(DATA.meta.ultimaFecha)+'/'+DATA.meta.ultimaFecha.slice(0,4);
   document.getElementById('st-uni').textContent = 'Universo '+AR.format(DATA.meta.universoTotal)+' clientes';
   K=DATA.kpis;
+  const uni=AR.format(DATA.meta.universoTotal);
   const kpiDefs=[
-    {lab:'Venta P&G neta (c/IVA)',val:peso(K.venta),foot:'neta de devoluciones y NC · '+K.lineas.toLocaleString('es-AR')+' líneas',cls:'accent'},
-    {lab:'Clientes con compra',val:AR.format(K.cccEquipo),foot:'CCC equipo'},
-    {lab:'% Cobertura P&G',val:pct(K.cobertura),foot:'sobre universo '+AR.format(DATA.meta.universoTotal)},
+    {lab:'Venta P&G neta (c/IVA)',val:peso(K.venta),foot:'neta de devoluciones y NC · '+K.lineas.toLocaleString('es-AR')+' líneas',cls:'accent',
+      tag: K.proyeccionCierre ? `<span class="kpi-tag-lab">Tendencia cierre</span>${peso(K.proyeccionCierre)}` : null,
+      tagTitle: K.proyeccionCierre ? `Venta acumulada ÷ ${K.diasTranscurridos} días con actividad × ${K.diasHabilesMes} días hábiles del mes (Lun-Sáb)` : null},
+    {lab:'Clientes con compra',val:AR.format(K.cccEquipo),foot:'CCC equipo',tag:`Universo ${uni} cli.`},
+    {lab:'% Cobertura P&G',val:pct(K.cobertura),foot:'sobre universo '+uni,tag:`CCC ${AR.format(K.cccEquipo)} / Universo ${uni} cli.`},
     {lab:'Ticket promedio',val:peso(K.ticket),foot:'venta / CCC'},
     {lab:'Devoluciones',val:peso(K.devoluciones),foot:K.devPct+'% s/venta',cls:'bad'},
     {lab:'% Mix P&G',val:pct(K.mix),foot:'del portafolio del equipo'},
   ];
   const kel=document.getElementById('kpis'); kel.innerHTML='';
-  kpiDefs.forEach((k,i)=>{const c=el('div','kpi'+(k.cls?' '+k.cls:'')); c.innerHTML=`<div class="lab">${k.lab}</div><div class="val num">${k.val}</div><div class="foot">${k.foot}</div>`;
-    if(i===0 && K.proyeccionCierre){ c.innerHTML+=`<div class="kpi-tag" title="Venta acumulada ÷ ${K.diasTranscurridos} días con actividad × ${K.diasHabilesMes} días hábiles del mes (Lun-Sáb)"><span class="kpi-tag-lab">Tendencia cierre</span>${peso(K.proyeccionCierre)}</div>`; }
+  kpiDefs.forEach(k=>{const c=el('div','kpi'+(k.cls?' '+k.cls:'')); c.innerHTML=`<div class="lab">${k.lab}</div><div class="val num">${k.val}</div><div class="foot">${k.foot}</div>`;
+    if(k.tag){ c.innerHTML+=`<div class="kpi-tag"${k.tagTitle?` title="${k.tagTitle}"`:''}>${k.tag}</div>`; }
     kel.appendChild(c);});
 }
 
