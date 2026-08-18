@@ -495,11 +495,11 @@ function renderHeaderKpis(){
     {lab:'Venta P&G neta (c/IVA)',val:peso(K.venta),foot:'neta de devoluciones y NC · '+K.lineas.toLocaleString('es-AR')+' líneas',cls:'accent',
       tag: K.proyeccionCierre ? `<span class="kpi-tag-lab">Tendencia cierre</span>${peso(K.proyeccionCierre)}` : null,
       tagTitle: K.proyeccionCierre ? `Venta acumulada ÷ ${K.diasTranscurridos} días con actividad × ${K.diasHabilesMes} días hábiles del mes (Lun-Sáb)` : null},
-    {lab:'Clientes con compra',val:AR.format(K.cccEquipo),foot:'CCC equipo',tag:`Universo ${uni} cli.`},
-    {lab:'% Cobertura P&G',val:pct(K.cobertura),foot:'sobre universo '+uni,tag:`CCC ${AR.format(K.cccEquipo)} / Universo ${uni} cli.`},
-    {lab:'Ticket promedio',val:peso(K.ticket),foot:'venta / CCC'},
-    {lab:'Devoluciones',val:peso(K.devoluciones),foot:K.devPct+'% s/venta',cls:'bad'},
-    {lab:'% Mix P&G',val:pct(K.mix),foot:'del portafolio del equipo'},
+    {lab:'Clientes con compra',val:AR.format(K.cccEquipo),foot:'CCC equipo',tag:`Universo ${uni}&nbsp;cli.`},
+    {lab:'% Cobertura P&G',val:pct(K.cobertura),foot:'sobre universo '+uni,tag:`CCC ${AR.format(K.cccEquipo)} / Universo ${uni}&nbsp;cli.`},
+    {lab:'Ticket promedio',val:peso(K.ticket),foot:'venta / CCC',tag:`${peso(K.venta)} ÷ ${AR.format(K.cccEquipo)}&nbsp;cli.`},
+    {lab:'Devoluciones',val:peso(K.devoluciones),foot:K.devPct+'% s/venta',cls:'bad',tag:`${AR.format(K.devClientes)}&nbsp;cli. afectados`},
+    {lab:'% Mix P&G',val:pct(K.mix),foot:'del portafolio del equipo',tag:`${(DATA.porMarca||[]).length}&nbsp;marcas P&amp;G`},
   ];
   const kel=document.getElementById('kpis'); kel.innerHTML='';
   kpiDefs.forEach(k=>{const c=el('div','kpi'+(k.cls?' '+k.cls:'')); c.innerHTML=`<div class="lab">${k.lab}</div><div class="val num">${k.val}</div><div class="foot">${k.foot}</div>`;
