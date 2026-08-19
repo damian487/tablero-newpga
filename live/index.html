@@ -74,7 +74,9 @@ header{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--surfa
 .kpi.accent .kpi-tag{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.28);color:#fff}
 
 /* nav */
-nav.tabs{display:flex;gap:6px;flex-wrap:wrap;padding-bottom:4px}
+nav.tabs{display:flex;gap:10px;flex-wrap:wrap;padding-bottom:4px}
+.tabgroup{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:6px;border-radius:16px;
+  background:color-mix(in srgb,var(--surface2) 45%,transparent);border:1px solid color-mix(in srgb,var(--border) 70%,transparent)}
 .tab{border:1px solid var(--border);background:var(--surface);color:var(--muted);padding:8px 14px;border-radius:999px;
   font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
 .tab:hover{color:var(--ink);border-color:var(--accent2)}
@@ -511,36 +513,45 @@ function renderHeaderKpis(){
     kel.appendChild(c);});
 }
 
-/* ---------- tabs ---------- */
-const TABS=[
-  {id:'p-vend',label:'Vendedores & CCC'},
-  {id:'p-ventadia',label:'📈 Venta del Día'},
-  {id:'p-ficha',label:'Ficha por vendedor'},
-  {id:'p-diario',label:'📋 Reporte diario'},
-  {id:'p-resumen',label:'Resumen gerencial'},
-  {id:'p-efec',label:'Efectividad de ruta'},
-  {id:'p-concurso',label:'🏆 Concurso Nubi'},
-  {id:'p-canales',label:'Canales'},
-  {id:'p-marcas',label:'Marcas & familias'},
-  {id:'p-evo',label:'Evolución diaria'},
-  {id:'p-dev',label:'Devoluciones'},
-  {id:'p-infaltables',label:'Infaltables'},
-  {id:'p-accion',label:'🏷️ Acción precio'},
-  {id:'p-combos',label:'🎁 Combos'},
-  {id:'p-ruta',label:'Ruta / No compradores'},
-  {id:'p-covmarca',label:'Cobertura de marcas'},
-  {id:'p-metaago',label:'🎯 Meta Cobertura Agosto'},
-  {id:'p-matinal',label:'🌅 Matinal'},
-  {id:'p-mapa',label:'🗺️ Mapa'},
+/* ---------- tabs (agrupadas por importancia, cada grupo en su propio chip transparente) ---------- */
+const TAB_GROUPS=[
+  [ {id:'p-resumen',label:'Resumen gerencial'},
+    {id:'p-diario',label:'📋 Reporte diario'},
+    {id:'p-ventadia',label:'📈 Venta del Día'},
+    {id:'p-evo',label:'Evolución diaria'} ],
+  [ {id:'p-vend',label:'Vendedores & CCC'},
+    {id:'p-ficha',label:'Ficha por vendedor'},
+    {id:'p-ruta',label:'Ruta / No compradores'},
+    {id:'p-efec',label:'Efectividad de ruta'},
+    {id:'p-dev',label:'Devoluciones'} ],
+  [ {id:'p-canales',label:'Canales'},
+    {id:'p-marcas',label:'Marcas & familias'},
+    {id:'p-covmarca',label:'Cobertura de marcas'},
+    {id:'p-infaltables',label:'Infaltables'} ],
+  [ {id:'p-accion',label:'🏷️ Acción precio'},
+    {id:'p-combos',label:'🎁 Combos'},
+    {id:'p-concurso',label:'🏆 Concurso Nubi'},
+    {id:'p-metaago',label:'🎯 Meta Cobertura Agosto'},
+    {id:'p-matinal',label:'🌅 Matinal'},
+    {id:'p-mapa',label:'🗺️ Mapa'} ],
 ];
+const TABS=TAB_GROUPS.flat();
 const tabsEl=document.getElementById('tabs');
-TABS.forEach((t,i)=>{const b=el('button','tab',t.label); b.setAttribute('role','tab'); b.setAttribute('aria-selected',i===0?'true':'false');
-  b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-selected','false'));
-    b.setAttribute('aria-selected','true');
-    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
-    document.getElementById(t.id).classList.add('on');
-    if(t.id==='p-mapa' && typeof mapaActivar==='function'){ const fn=mapaActivar; mapaActivar=null; fn(); }};
-  tabsEl.appendChild(b);});
+let tabIdx=0;
+TAB_GROUPS.forEach(group=>{
+  const g=el('div','tabgroup');
+  group.forEach(t=>{
+    const i=tabIdx++;
+    const b=el('button','tab',t.label); b.setAttribute('role','tab'); b.setAttribute('aria-selected',i===0?'true':'false');
+    b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-selected','false'));
+      b.setAttribute('aria-selected','true');
+      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
+      document.getElementById(t.id).classList.add('on');
+      if(t.id==='p-mapa' && typeof mapaActivar==='function'){ const fn=mapaActivar; mapaActivar=null; fn(); }};
+    g.appendChild(b);
+  });
+  tabsEl.appendChild(g);
+});
 
 /* ---------- SVG chart builders ---------- */
 function hbars(items,{val,label,color,fmt=peso,h=28,gap=8,namew=150,w=680}){
@@ -2594,7 +2605,7 @@ if(miVendParam){
   renderMiDia(miVendParam);
 }else{
   renderAll();
-  document.getElementById('p-vend').classList.add('on');
+  document.getElementById('p-resumen').classList.add('on');
 }
 
 /* ---------- Bot de consulta (Gemini, corre del lado del servidor - ver gescom-worker) ---------- */
