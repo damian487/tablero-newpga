@@ -585,7 +585,7 @@ function areaChart(items,{w=980,h=280}){
     pts+=`<circle cx="${x}" cy="${y}" r="${i===items.length-1?4:2.5}" fill="var(--accent)"/>`;
     const voff=13+(i%2)*13;
     vlbl+=`<text x="${x}" y="${Math.max(11,y-voff)}" class="barlabel" text-anchor="middle" style="font-weight:700;fill:var(--accent)">${pesoC(d.venta)}</text>`;
-    if(i%2===0||i===items.length-1) lbl+=`<text x="${x}" y="${h-12}" class="barlabel" text-anchor="middle">${fdate(d.fecha)}</text>`;});
+    lbl+=`<text x="${x}" y="${h-12}" class="barlabel" text-anchor="middle">${fdate(d.fecha)}</text>`;});
   return `<svg viewBox="0 0 ${w} ${h}" class="chart" role="img">
     <defs><linearGradient id="ag" x1="0" x2="0" y1="0" y2="1">
       <stop offset="0" stop-color="var(--accent2)" stop-opacity=".35"/><stop offset="1" stop-color="var(--accent2)" stop-opacity="0"/>
