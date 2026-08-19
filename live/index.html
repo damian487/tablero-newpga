@@ -941,12 +941,12 @@ function renderInfaltables(){
   rh+='</div>';
   top.innerHTML+=rh; p.appendChild(top);
   ['Autoservicios','Almacenes','Kioscos'].forEach(cg=>{
-    const rows=det.filter(x=>x.canal===cg);
+    const rows=det.filter(x=>x.canal===cg).slice().sort((a,b)=>(b.venta||0)-(a.venta||0));
     if(!rows.length) return;
     const card=el('div','card');
-    card.appendChild(el('div','ctitle',`<h2>${cg}</h2><span class="hint">${rows.length} infaltables · universo ${AR.format(rows[0].universo)} clientes</span>`));
-    let h='<div class="twrap"><table><thead><tr><th>Categoría</th><th>Producto (infaltable)</th><th>Cobertura (clientes que lo compran)</th></tr></thead><tbody>';
-    rows.forEach(x=>{ h+=`<tr><td class="name">${x.categoria}</td><td class="name">${x.descripcion}</td><td><div class="cov"><span class="pct num">${pct(x.cobertura)} <span style="color:var(--muted);font-weight:600">· ${AR.format(x.ccc)} cli</span></span><span class="track"><span class="fill" style="width:${Math.min(100,x.cobertura||0)}%;background:${covColor(x.cobertura)}"></span></span></div></td></tr>`; });
+    card.appendChild(el('div','ctitle',`<h2>${cg}</h2><span class="hint">ranking de ${rows.length} infaltables · más vendido a menos vendido · universo ${AR.format(rows[0].universo)} clientes</span>`));
+    let h='<div class="twrap"><table><thead><tr><th>#</th><th>Categoría</th><th>Producto (infaltable)</th><th>Unidades</th><th>Venta $</th><th>Cobertura (clientes que lo compran)</th></tr></thead><tbody>';
+    rows.forEach((x,i)=>{ h+=`<tr><td class="num">${i+1}</td><td class="name">${x.categoria}</td><td class="name">${x.descripcion}</td><td class="num">${AR.format(x.unidades||0)}</td><td class="num">${peso(x.venta||0)}</td><td><div class="cov"><span class="pct num">${pct(x.cobertura)} <span style="color:var(--muted);font-weight:600">· ${AR.format(x.ccc)} cli</span></span><span class="track"><span class="fill" style="width:${Math.min(100,x.cobertura||0)}%;background:${covColor(x.cobertura)}"></span></span></div></td></tr>`; });
     h+='</tbody></table></div>'; card.innerHTML+=h; p.appendChild(card);
   });
 
