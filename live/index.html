@@ -682,8 +682,8 @@ function renderResumen(){
   const cg=el('div','supgrid');
   cg.innerHTML=`
     <div class="supcard"><h3>Facturación bruta</h3><div class="who">FAC-A + FAC-B + VEN</div><div class="big num">${peso(bruto)}</div></div>
-    <div class="supcard"><h3>(−) Devoluciones y NC</h3><div class="who">notas de crédito NCR-A/B</div><div class="big num" style="color:var(--bad)">${peso(K.devoluciones)}</div><div class="row"><span class="l">% s/ bruto</span><span class="v">${pct(Math.round(-1000*K.devoluciones/bruto)/10)}</span></div></div>
-    <div class="supcard" style="border-color:var(--accent)"><h3>= Venta neta</h3><div class="who">lo que muestran los KPIs y las tablas</div><div class="big num">${peso(K.venta)}</div></div>`;
+    <div class="supcard" style="border-color:var(--accent)"><h3>= Venta neta</h3><div class="who">lo que muestran los KPIs y las tablas</div><div class="big num">${peso(K.venta)}</div></div>
+    <div class="supcard"><h3>(−) Devoluciones y NC</h3><div class="who">notas de crédito NCR-A/B</div><div class="big num" style="color:var(--bad)">${peso(K.devoluciones)}</div><div class="row"><span class="l">% s/ bruto</span><span class="v">${pct(Math.round(-1000*K.devoluciones/bruto)/10)}</span></div></div>`;
   comp.appendChild(cg); p.appendChild(comp);
   const g=el('div','grid g3');
   // evolución mini + marca
