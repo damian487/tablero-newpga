@@ -1109,6 +1109,42 @@ function renderAccion(){
     h+='</tbody></table></div>'; box.innerHTML=h;
   }
   selS.onchange=draw; selM.onchange=draw; draw();
+
+  // ---- uso de la herramienta de accion de precio: que vendedor la uso este mes y quien no ----
+  const usoAccTodos={};
+  DATA.porVendedor.filter(v=>!v.mayorista).forEach(v=>{ usoAccTodos[v.cod]={cod:v.cod,nombre:v.nombre,supervisor:v.supervisor,usa:false,unidades:0,clientes:0,importe:0}; });
+  (A.todos.porVendedor||[]).forEach(v=>{
+    const u=usoAccTodos[v.cod]; if(!u) return;
+    if(v.acumU>0){ u.usa=true; }
+    u.unidades=v.acumU; u.clientes=v.acumCli; u.importe=v.acumImp;
+  });
+  const usoAccArr=Object.values(usoAccTodos).sort((a,b)=>(b.unidades-a.unidades)||(b.importe-a.importe));
+  const supsAcc=[...new Set(usoAccArr.map(v=>v.supervisor))].sort((a,b)=>a.localeCompare(b));
+  const usoAccCard=el('div','card');
+  usoAccCard.appendChild(el('div','ctitle',`<h2>Uso de la herramienta de acción</h2><span class="hint">qué vendedores vendieron ${M.nombre} con el descuento de la acción y cuáles todavía no · ordenado de mayor a menor uso</span>`));
+  let uahHead='<div style="margin-bottom:10px"><select id="usoAccSup" class="fsel"><option value="TODOS">Total equipo</option>'+supsAcc.map(s=>`<option value="${s}">Supervisor ${s.split(' ')[0]}</option>`).join('')+'</select></div><div id="usoAccBox"></div>';
+  usoAccCard.innerHTML+=uahHead; p.appendChild(usoAccCard);
+  const usoAccBox=usoAccCard.querySelector('#usoAccBox'), selUsoAcc=usoAccCard.querySelector('#usoAccSup');
+  function drawUsoAcc(){
+    const rows=selUsoAcc.value==='TODOS'?usoAccArr:usoAccArr.filter(v=>v.supervisor===selUsoAcc.value);
+    const usanCount=rows.filter(v=>v.usa).length;
+    const noUsan=rows.filter(v=>!v.usa);
+    let uah=`<div class="kpitiles" style="grid-template-columns:repeat(2,1fr)">
+      <div class="supcard"><h3>Usaron la acción</h3><div class="big num" style="color:var(--good)">${usanCount} / ${rows.length}</div><div class="who">vendedores</div></div>
+      <div class="supcard"><h3>Todavía no la usaron</h3><div class="big num" style="color:var(--bad)">${noUsan.length}</div><div class="who">${noUsan.map(v=>v.nombre).join(', ')||'—'}</div></div>
+    </div>`;
+    uah+='<div class="twrap"><table><thead><tr><th>Vendedor</th><th>Equipo</th><th>Usa la herramienta</th><th>Unidades</th><th>Clientes</th><th>Importe $</th></tr></thead><tbody>';
+    rows.forEach(v=>{
+      uah+=`<tr><td class="name">${v.nombre}</td><td style="color:var(--muted)">${v.supervisor}</td>
+        <td class="num" style="color:${v.usa?'var(--good)':'var(--bad)'};font-weight:700">${v.usa?'Sí':'No'}</td>
+        <td class="num">${AR.format(v.unidades)}</td>
+        <td class="num">${AR.format(v.clientes)}</td>
+        <td class="num">${peso(v.importe)}</td></tr>`;
+    });
+    uah+='</tbody></table></div>';
+    usoAccBox.innerHTML=uah;
+  }
+  selUsoAcc.onchange=drawUsoAcc; drawUsoAcc();
 }
 
 /* ---------- PANEL: Combos ---------- */
