@@ -1210,26 +1210,34 @@ function renderCombos(){
       u.importe+=pv.acumImp; u.clientes+=pv.acumCli;
     });
   });
-  const usoRows=Object.values(usoPorVend).sort((a,b)=>(a.combos.length-b.combos.length)||(a.importe-b.importe));
-  const usanCount=usoRows.filter(v=>v.combos.length>0).length;
-  const noUsan=usoRows.filter(v=>v.combos.length===0);
+  const usoTodos=Object.values(usoPorVend).sort((a,b)=>(b.combos.length-a.combos.length)||(b.importe-a.importe));
+  const supsUso=[...new Set(usoTodos.map(v=>v.supervisor))].sort((a,b)=>a.localeCompare(b));
   const usoCard=el('div','card');
-  usoCard.appendChild(el('div','ctitle','<h2>Uso de la herramienta de combos</h2><span class="hint">qué vendedores vendieron al menos un combo este mes y cuáles todavía no</span>'));
-  let uh=`<div class="kpitiles" style="grid-template-columns:repeat(2,1fr)">
-    <div class="supcard"><h3>Usaron al menos un combo</h3><div class="big num" style="color:var(--good)">${usanCount} / ${usoRows.length}</div><div class="who">vendedores</div></div>
-    <div class="supcard"><h3>Todavía no usaron ningún combo</h3><div class="big num" style="color:var(--bad)">${noUsan.length}</div><div class="who">${noUsan.map(v=>v.nombre).join(', ')||'—'}</div></div>
-  </div>`;
-  uh+='<div class="twrap"><table><thead><tr><th>Vendedor</th><th>Equipo</th><th>Combos distintos usados</th><th>Cuáles</th><th>Clientes con combo</th><th>Importe $ combos</th></tr></thead><tbody>';
-  usoRows.forEach(v=>{
-    const usa=v.combos.length>0;
-    uh+=`<tr><td class="name">${v.nombre}</td><td style="color:var(--muted)">${v.supervisor}</td>
-      <td class="num" style="color:${usa?'var(--good)':'var(--bad)'};font-weight:700">${v.combos.length} / ${lista.length}</td>
-      <td style="font-size:11.5px;color:var(--muted)">${usa?v.combos.map(c=>c.nombre).join(', '):'— ninguno —'}</td>
-      <td class="num">${AR.format(v.clientes)}</td>
-      <td class="num">${peso(v.importe)}</td></tr>`;
-  });
-  uh+='</tbody></table></div>';
-  usoCard.innerHTML+=uh; p.appendChild(usoCard);
+  usoCard.appendChild(el('div','ctitle','<h2>Uso de la herramienta de combos</h2><span class="hint">qué vendedores vendieron al menos un combo este mes y cuáles todavía no · ordenado de mayor a menor uso</span>'));
+  let uHead='<div style="margin-bottom:10px"><select id="usoSup" class="fsel"><option value="TODOS">Total equipo</option>'+supsUso.map(s=>`<option value="${s}">Supervisor ${s.split(' ')[0]}</option>`).join('')+'</select></div><div id="usoBox"></div>';
+  usoCard.innerHTML+=uHead; p.appendChild(usoCard);
+  const usoBox=usoCard.querySelector('#usoBox'), selUso=usoCard.querySelector('#usoSup');
+  function drawUso(){
+    const usoRows=selUso.value==='TODOS'?usoTodos:usoTodos.filter(v=>v.supervisor===selUso.value);
+    const usanCount=usoRows.filter(v=>v.combos.length>0).length;
+    const noUsan=usoRows.filter(v=>v.combos.length===0);
+    let uh=`<div class="kpitiles" style="grid-template-columns:repeat(2,1fr)">
+      <div class="supcard"><h3>Usaron al menos un combo</h3><div class="big num" style="color:var(--good)">${usanCount} / ${usoRows.length}</div><div class="who">vendedores</div></div>
+      <div class="supcard"><h3>Todavía no usaron ningún combo</h3><div class="big num" style="color:var(--bad)">${noUsan.length}</div><div class="who">${noUsan.map(v=>v.nombre).join(', ')||'—'}</div></div>
+    </div>`;
+    uh+='<div class="twrap"><table><thead><tr><th>Vendedor</th><th>Equipo</th><th>Combos distintos usados</th><th>Cuáles</th><th>Clientes con combo</th><th>Importe $ combos</th></tr></thead><tbody>';
+    usoRows.forEach(v=>{
+      const usa=v.combos.length>0;
+      uh+=`<tr><td class="name">${v.nombre}</td><td style="color:var(--muted)">${v.supervisor}</td>
+        <td class="num" style="color:${usa?'var(--good)':'var(--bad)'};font-weight:700">${v.combos.length} / ${lista.length}</td>
+        <td style="font-size:11.5px;color:var(--muted)">${usa?v.combos.map(c=>c.nombre).join(', '):'— ninguno —'}</td>
+        <td class="num">${AR.format(v.clientes)}</td>
+        <td class="num">${peso(v.importe)}</td></tr>`;
+    });
+    uh+='</tbody></table></div>';
+    usoBox.innerHTML=uh;
+  }
+  selUso.onchange=drawUso; drawUso();
 }
 
 /* ---------- PANEL: Ruta / No compradores ---------- */
