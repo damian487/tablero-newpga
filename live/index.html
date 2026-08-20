@@ -2687,6 +2687,70 @@ if(miVendParam){
 /* ---------- Bot de consulta (Gemini, corre del lado del servidor - ver gescom-worker) ---------- */
 const BOT_ENDPOINT = 'https://tablero-newpga-worker.damian-8ad.workers.dev/api/bot';
 
+// ---- respuestas rapidas: las 4 preguntas sugeridas (chips) se responden armando el texto acá
+// mismo con datos que YA estan cargados en el navegador, sin llamar a Gemini - no gastan cuota
+// del plan gratuito y responden al instante. Si el usuario escribe otra cosa (no matchea ninguna
+// exacta), se sigue usando el bot real como siempre.
+function normQ(s){ return (s||'').toLowerCase().normalize('NFD').replace(new RegExp('[̀-ͯ]','g'),'').replace(/[¿?¡!.,]/g,'').trim(); }
+
+function respVentaHoy(){
+  const I=DATA.intradia;
+  if(!I || !I.fecha) return null;
+  let s=`Al corte de las ${I.hhmm} hs de hoy (${fdate(I.fecha)}):\n\n`;
+  s+=`• **Venta neta:** ${peso(I.venta)}`;
+  if(I.ventaBruta!=null) s+=` (bruta ${peso(I.ventaBruta)} − devoluciones ${peso(I.devoluciones)})`;
+  s+=`\n• **Clientes con compra:** ${AR.format(I.ccc)}\n• **Ticket promedio:** ${peso(I.ticket)}`;
+  if(I.vsAyerMismaHora){
+    const v=I.vsAyerMismaHora, up=v.diff>=0;
+    s+=`\n\n**Vs. ayer a la misma hora:** ${up?'+':''}${peso(v.diff)}${v.diffPct!=null?' ('+(up?'+':'')+v.diffPct+'%)':''}`;
+  }
+  return s;
+}
+function respConcurso(){
+  const C=DATA.concurso;
+  if(!C || !C.sellout) return null;
+  const pctSo=C.sellout.meta>0?Math.round(1000*C.sellout.real/C.sellout.meta)/10:0;
+  let s=`**Concurso Nubi** (vigencia ${C.vigencia}, ${C.diasRestantes} días restantes):\n\n`;
+  s+=`• **Sellout:** ${peso(C.sellout.real)} de ${peso(C.sellout.meta)} (${pctSo}%)\n`;
+  s+=`• **Cobertura CCC:** ${AR.format(C.cobertura.real)} de ${AR.format(C.cobertura.meta)}\n\n`;
+  s+='**Por equipo:**\n'+(C.selloutPorEquipo||[]).map(e=>`• ${e.supervisor}: ${peso(e.real)} de ${peso(e.metaEquipo)} (${e.pctAvance}%), faltan ${peso(e.faltan)}`).join('\n');
+  return s;
+}
+function respCompararMes(){
+  const H=DATA.historicoMensual;
+  if(!H || H.length<2) return null;
+  const actual=H[H.length-1], anterior=H[H.length-2];
+  const diffVenta=actual.venta-anterior.venta;
+  const diffPct=anterior.venta>0?Math.round(1000*diffVenta/anterior.venta)/10:null;
+  const diffCcc=actual.ccc-anterior.ccc;
+  const diffCob=Math.round((actual.cobertura-anterior.cobertura)*10)/10;
+  let s=`Comparando **${actual.mes}** (a la fecha, hasta ${fdate(actual.ultimaFecha)}) vs **${anterior.mes}**:\n\n`;
+  s+=`• **Venta:** ${peso(actual.venta)} vs ${peso(anterior.venta)} (${diffVenta>=0?'+':''}${peso(diffVenta)}${diffPct!=null?', '+(diffVenta>=0?'+':'')+diffPct+'%':''})\n`;
+  s+=`• **CCC:** ${AR.format(actual.ccc)} vs ${AR.format(anterior.ccc)} (${diffCcc>=0?'+':''}${AR.format(diffCcc)})\n`;
+  s+=`• **Cobertura:** ${pct(actual.cobertura)} vs ${pct(anterior.cobertura)} (${diffCob>=0?'+':''}${diffCob} pts)\n\n`;
+  s+=`_Nota: ${actual.mes} está en curso, no es 1 a 1 comparable con un mes ya cerrado._`;
+  return s;
+}
+function respCoberturaEquipo(){
+  const K=DATA.kpis;
+  if(!K) return null;
+  let s=`**Cobertura del equipo:** ${pct(K.cobertura)} (${AR.format(K.cccEquipo)} clientes con compra sobre un universo de ${AR.format(DATA.meta.universoTotal)}).\n\n**Por equipo:**\n`;
+  s+=(DATA.porSupervisor||[]).filter(sp=>sp.supervisor.indexOf('N/A')<0).map(sp=>`• ${sp.supervisor}: ${pct(sp.cobertura)} (${AR.format(sp.ccc)} de ${AR.format(sp.universo)})`).join('\n');
+  return s;
+}
+const RESPUESTAS_RAPIDAS=[
+  {match:normQ('¿Cómo viene la venta de hoy?'), fn:respVentaHoy},
+  {match:normQ('¿Cómo viene el concurso Nubi?'), fn:respConcurso},
+  {match:normQ('Compará este mes con el anterior'), fn:respCompararMes},
+  {match:normQ('¿Cómo está la cobertura del equipo?'), fn:respCoberturaEquipo},
+];
+function respuestaRapida(pregunta){
+  const nq=normQ(pregunta);
+  const hit=RESPUESTAS_RAPIDAS.find(r=>r.match===nq);
+  if(!hit) return null;
+  try{ return hit.fn(); }catch(e){ return null; }
+}
+
 function buildBotDigest(){
   // Le mandamos al bot PRACTICAMENTE TODO lo que tiene el tablero (no solo un resumen recortado)
   // para que pueda responder cualquier consulta - articulo mas vendido, vendedor con menos
@@ -2769,7 +2833,11 @@ function botMd(s){ return escapeHtml(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').re
 
   async function sendMsg(){
     const q=(input.value||'').trim(); if(!q) return;
-    addMsg(escapeHtml(q),'user'); input.value=''; sendBtn.disabled=true; input.disabled=true;
+    addMsg(escapeHtml(q),'user'); input.value='';
+    // respuesta instantanea (sin Gemini) si matchea alguna de las preguntas sugeridas - no gasta cuota
+    const rapida=respuestaRapida(q);
+    if(rapida){ addMsg(botMd(rapida),'bot'); input.focus(); return; }
+    sendBtn.disabled=true; input.disabled=true;
     const loading=addMsg('Pensando…','bot loading');
     try{
       const r=await askBot(q);
