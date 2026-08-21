@@ -1161,14 +1161,19 @@ function renderCombos(){
   const card=el('div','card');
   let head='<div class="ctitle"><h2>Combos — seguimiento por combo</h2><span class="hint">líneas de venta con el descuento del combo ya aplicado por el motor de promociones de Gescom (id real, no estimado)</span></div>';
   head+='<div style="display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 12px">';
+  const supsCombo=[...new Set(lista.flatMap(cb=>(cb.porSupervisor||[]).map(s=>s.supervisor)))].filter(s=>s.indexOf('N/A')<0).sort((a,b)=>a.localeCompare(b));
   head+='<select id="cbCombo" class="fsel">'+lista.map((cb,i)=>`<option value="${i}">${cb.nombre}</option>`).join('')+'</select>';
   head+='<select id="cbMetric" class="fsel"><option value="cli">Métrica: Clientes con combo</option><option value="u">Métrica: Unidades (Gillette+asociado)</option><option value="imp">Métrica: Importe $</option></select>';
+  head+='<select id="cbSup" class="fsel"><option value="TODOS">Total equipo</option>'+supsCombo.map(s=>`<option value="${s}">Supervisor ${s.split(' ')[0]}</option>`).join('')+'</select>';
   head+='</div><div id="cbDonas" style="display:flex;gap:14px;flex-wrap:wrap;margin:2px 0 16px"></div><div id="cbMeta"></div><div id="cbSum"></div><div id="cbBox"></div>';
   card.innerHTML=head; p.appendChild(card);
-  const box=card.querySelector('#cbBox'), sumEl=card.querySelector('#cbSum'), metaEl=card.querySelector('#cbMeta'), selC=card.querySelector('#cbCombo'), selM=card.querySelector('#cbMetric'), donasEl=card.querySelector('#cbDonas');
+  const box=card.querySelector('#cbBox'), sumEl=card.querySelector('#cbSum'), metaEl=card.querySelector('#cbMeta'), selC=card.querySelector('#cbCombo'), selM=card.querySelector('#cbMetric'), selSup=card.querySelector('#cbSup'), donasEl=card.querySelector('#cbDonas');
   const CB_PALETTE=['var(--accent)','var(--accent2)','var(--good)','var(--warn2)','var(--bad)','#8e6fce','#d18a3f','var(--muted)'];
   function cbNombreCorto(n){ return n.replace(/^Combo\s*/,''); }
-  function cbMetricVal(cb,m){ return m==='u'?cb.total.acumU : m==='imp'?cb.total.acumImp : cb.combosAcumulados; }
+  // scope de un combo segun el supervisor elegido - 'TODOS' usa el total (todos los equipos +
+  // mayoristas si vendieron), un supervisor puntual usa SU subtotal ya calculado en porSupervisor.
+  function cbScope(cb,sup){ if(sup==='TODOS') return cb.total; return (cb.porSupervisor||[]).find(s=>s.supervisor===sup) || {acumU:0,acumImp:0,acumCli:0,dias:{}}; }
+  function cbMetricVal(cb,m,sup){ const sc=cbScope(cb,sup); return m==='u'?sc.acumU : m==='imp'?sc.acumImp : sc.acumCli; }
   function donutSVG(slices,size,thick){
     const total=slices.reduce((s,x)=>s+x.value,0)||1;
     const r=(size-thick)/2, c=size/2, circ=2*Math.PI*r;
@@ -1198,45 +1203,48 @@ function renderCombos(){
       <div style="display:flex;flex-direction:column;gap:3px;min-width:0">${legend}</div></div></div>`;
   }
   function drawDonas(){
-    const m=selM.value, selIdx=parseInt(selC.value,10);
+    const m=selM.value, sup=selSup.value, selIdx=parseInt(selC.value,10);
     const conId=lista.map((cb,i)=>({...cb,id:i}));
     const autoList=conId.filter(cb=>cb.canal==='Autoservicios');
     const almList=conId.filter(cb=>cb.canal!=='Autoservicios');
-    const slicesFn=arr=>arr.map((cb,k)=>({id:cb.id, nombre:cb.nombre, value:cbMetricVal(cb,m), color:CB_PALETTE[k%CB_PALETTE.length]}));
+    const slicesFn=arr=>arr.map((cb,k)=>({id:cb.id, nombre:cb.nombre, value:cbMetricVal(cb,m,sup), color:CB_PALETTE[k%CB_PALETTE.length]}));
     donasEl.innerHTML =
       donaCard('Total de combos', slicesFn(conId), selIdx) +
       donaCard('Combos en Autoservicios', slicesFn(autoList), autoList.some(c=>c.id===selIdx)?selIdx:null) +
       donaCard('Combos en Almacenes', slicesFn(almList), almList.some(c=>c.id===selIdx)?selIdx:null);
   }
   function draw(){
-    const cb=lista[parseInt(selC.value,10)], m=selM.value, fechas=cb.fechas||[];
-    metaEl.innerHTML=`<div class="note">Canal: ${cb.canal} · descuento ${cb.descuentoPct}% · vigente desde ${fd(cb.desde)} · condición: ${cb.condicion}</div>`;
+    const cb=lista[parseInt(selC.value,10)], m=selM.value, sup=selSup.value, fechas=cb.fechas||[];
+    const scope=cbScope(cb,sup);
+    const combosHoyScope=(scope.dias&&scope.dias[hoyRef])?scope.dias[hoyRef].cli:0;
+    metaEl.innerHTML=`<div class="note">Canal: ${cb.canal} · descuento ${cb.descuentoPct}% · vigente desde ${fd(cb.desde)} · condición: ${cb.condicion}${sup!=='TODOS'?' · vista: Equipo '+sup:''}</div>`;
     sumEl.innerHTML=`<div class="kpitiles" style="grid-template-columns:repeat(4,1fr)">
-      <div class="supcard"><h3>Combos vendidos hoy</h3><div class="big num" style="color:var(--accent)">${AR.format(cb.combosHoy)}</div><div class="who">${fd(hoyRef)}</div></div>
-      <div class="supcard"><h3>Combos vendidos (acumulado)</h3><div class="big num" style="color:var(--good)">${AR.format(cb.combosAcumulados)}</div><div class="who">desde ${fd(cb.desde)}</div></div>
-      <div class="supcard"><h3>Unidades (ambos productos)</h3><div class="big num">${AR.format(cb.total.acumU)}</div><div class="who">Gillette + producto asociado</div></div>
-      <div class="supcard"><h3>Importe acumulado</h3><div class="big num">${peso(cb.total.acumImp)}</div><div class="who">con IVA</div></div></div>`;
+      <div class="supcard"><h3>Combos vendidos hoy</h3><div class="big num" style="color:var(--accent)">${AR.format(combosHoyScope)}</div><div class="who">${fd(hoyRef)}</div></div>
+      <div class="supcard"><h3>Combos vendidos (acumulado)</h3><div class="big num" style="color:var(--good)">${AR.format(scope.acumCli)}</div><div class="who">desde ${fd(cb.desde)}</div></div>
+      <div class="supcard"><h3>Unidades (ambos productos)</h3><div class="big num">${AR.format(scope.acumU)}</div><div class="who">Gillette + producto asociado</div></div>
+      <div class="supcard"><h3>Importe acumulado</h3><div class="big num">${peso(scope.acumImp)}</div><div class="who">con IVA</div></div></div>`;
     if(!fechas.length){ box.innerHTML='<p style="color:var(--muted)">Todavía no hay ventas que cumplan la condición del combo.</p>'; return; }
     let h='<div class="twrap"><table><thead><tr><th>Vendedor / Equipo</th>';
     fechas.forEach(f=>{ h+=`<th class="num">${fd(f)}</th>`; });
     h+='<th class="num">Acum. combo</th></tr></thead><tbody>';
-    cb.porSupervisor.forEach(sup=>{
-      h+=`<tr class="subhead"><td>Equipo ${sup.supervisor}</td>`;
-      fechas.forEach(f=>{ h+=`<td class="num">${cell(sup.dias[f],m)}</td>`; });
-      h+=`<td class="num">${acc(sup,m)}</td></tr>`;
-      cb.porVendedor.filter(v=>v.supervisor===sup.supervisor).forEach(v=>{
+    const supsVisibles=sup==='TODOS'?cb.porSupervisor:cb.porSupervisor.filter(s=>s.supervisor===sup);
+    supsVisibles.forEach(supRow=>{
+      h+=`<tr class="subhead"><td>Equipo ${supRow.supervisor}</td>`;
+      fechas.forEach(f=>{ h+=`<td class="num">${cell(supRow.dias[f],m)}</td>`; });
+      h+=`<td class="num">${acc(supRow,m)}</td></tr>`;
+      cb.porVendedor.filter(v=>v.supervisor===supRow.supervisor).forEach(v=>{
         h+=`<tr><td class="name">${v.nombre}</td>`;
         fechas.forEach(f=>{ h+=`<td class="num">${cell(v.dias[f],m)}</td>`; });
         h+=`<td class="num">${acc(v,m)}</td></tr>`;
       });
     });
-    h+='<tr class="total"><td>TOTAL</td>';
-    fechas.forEach(f=>{ h+=`<td class="num">${cell(cb.total.dias[f],m)}</td>`; });
-    h+=`<td class="num">${acc(cb.total,m)}</td></tr>`;
+    h+=`<tr class="total"><td>TOTAL ${sup==='TODOS'?'':sup}</td>`;
+    fechas.forEach(f=>{ h+=`<td class="num">${cell(scope.dias[f],m)}</td>`; });
+    h+=`<td class="num">${acc(scope,m)}</td></tr>`;
     h+='</tbody></table></div>'; box.innerHTML=h;
   }
   function drawAll(){ drawDonas(); draw(); }
-  selC.onchange=drawAll; selM.onchange=drawAll; drawAll();
+  selC.onchange=drawAll; selM.onchange=drawAll; selSup.onchange=drawAll; drawAll();
 
   // ---- uso de la herramienta de combos: que vendedor vendio al menos un combo este mes y quien no ----
   const usoPorVend={};
