@@ -2321,14 +2321,50 @@ function renderPlanSupervisor(){
     });
     planBox.innerHTML=ph;
     // segunda pasada: renderMiDia necesita un elemento real ya en el DOM para volcar su HTML
+    function ritmoRecienteSellout(soVen){
+      const dias=(soVen.diario||[]).filter(d=>d.conocido).slice(-VENT);
+      if(!dias.length) return 0;
+      return dias.reduce((a,d)=>a+(d.real||0),0)/dias.length;
+    }
     filas.forEach(({v,estado,reciente,cn})=>{
       const cont=document.getElementById('miDiaSup_'+v.cod); if(!cont) return;
       renderMiDia(v.cod,cont);
-      let plan=`<div class="md-card"><h2>Plan de acción</h2><span class="md-hint">${textoCobertura(v,estado,reciente)}</span>`;
+
+      // --- KPIs en rojo: cobertura / concurso (cobertura marcas) / sell-out personal / combos sin vender ---
+      const flags=[];
+      if(estado==='DIFICIL'||estado==='FUERA') flags.push('Cobertura');
+      if(cn && cn.prioridad==='CRITICO') flags.push('Concurso Nubi (cobertura marcas)');
+      const soVen=(CO && CO.diarioSellout)?CO.diarioSellout.porVendedor.find(x=>x.cod===v.cod):null;
+      let estadoSo=null;
+      if(soVen && soVen.metaVen>0){
+        const recienteSo=ritmoRecienteSellout(soVen);
+        const necesarioSo=CO.diasRestantes>0?Math.round(soVen.faltan/CO.diasRestantes):0;
+        estadoSo=clasificar(necesarioSo,recienteSo);
+        if(estadoSo==='DIFICIL'||estadoSo==='FUERA') flags.push('Sell-Out');
+      }
+      const combosLista=(DATA.combos?DATA.combos.lista:[])||[];
+      const combosNoVendidos=combosLista.filter(cb=>{ const pv=(cb.porVendedor||[]).find(x=>x.cod===v.cod); return !pv||pv.acumCli<=0; });
+      if(combosNoVendidos.length) flags.push(`Combos no vendidos (${combosNoVendidos.length}/${combosLista.length})`);
+
+      let plan=`<div class="md-card"><h2>Plan de acción</h2>`;
+      plan+= flags.length
+        ? `<div class="md-hint" style="margin-bottom:8px"><span class="md-chip bad">🔴 KPIs en rojo: ${flags.join(' · ')}</span></div>`
+        : `<div class="md-hint" style="margin-bottom:8px"><span class="md-chip good">✓ Sin KPIs en rojo este mes</span></div>`;
+      plan+=`<span class="md-hint">${textoCobertura(v,estado,reciente)}</span>`;
       if(cn){
         const cnE=cn.prioridad==='CUMPLIDO'?EST.CUMPLIDO:cn.prioridad==='CRITICO'?EST.FUERA:EST.ALCANZABLE;
         plan+=`<div class="md-hint" style="margin-top:8px">Concurso Nubi (cobertura marcas, trimestre): ${AR.format(cn.ccc)}/${AR.format(cn.meta)} clientes (faltan ${AR.format(cn.faltan)}, ritmo ${cn.ritmo}/día) — <b style="color:${cnE.color}">${cn.prioridad}</b>.`
           +(cn.marcasFaltantes&&cn.marcasFaltantes.length?` Le faltan estas marcas: ${cn.marcasFaltantes.join(', ')}.`:' Ya vendió todas las marcas del concurso.')+'</div>';
+      }
+      if(soVen && soVen.metaVen>0){
+        const soE=EST[estadoSo];
+        const avancePct=soVen.metaVen>0?Math.round(100*soVen.real/soVen.metaVen):0;
+        plan+=`<div class="md-hint" style="margin-top:8px">Sell-Out personal (Concurso Nubi): ${peso(soVen.real)} de ${peso(soVen.metaVen)} (${avancePct}%, faltan ${peso(soVen.faltan)}) — <b style="color:${soE.color}">${soE.txt}</b>.</div>`;
+      }
+      if(combosNoVendidos.length){
+        plan+=`<div class="md-hint" style="margin-top:8px">Combos sin vender este mes: ${combosNoVendidos.map(cb=>cb.nombre.replace(/^Combo\s*/,'')).join(', ')}.</div>`;
+      } else if(combosLista.length){
+        plan+=`<div class="md-hint" style="margin-top:8px">Vendió al menos 1 unidad de los ${combosLista.length} combos activos.</div>`;
       }
       plan+='</div>';
       cont.innerHTML+=plan;
