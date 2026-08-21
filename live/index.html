@@ -382,6 +382,7 @@ td.name{font-weight:600}
   <section class="panel" id="p-metaago" role="tabpanel"></section>
   <section class="panel" id="p-matinal" role="tabpanel"></section>
   <section class="panel" id="p-mapa" role="tabpanel"></section>
+  <section class="panel" id="p-plansup" role="tabpanel"></section>
 </main>
 
 <div id="miDia" class="miDiaWrap" style="display:none"></div>
@@ -534,7 +535,8 @@ const TAB_GROUPS=[
     {id:'p-concurso',label:'🏆 Concurso Nubi'},
     {id:'p-metaago',label:'🎯 Meta Cobertura Agosto'},
     {id:'p-matinal',label:'🌅 Matinal'},
-    {id:'p-mapa',label:'🗺️ Mapa'} ],
+    {id:'p-mapa',label:'🗺️ Mapa'},
+    {id:'p-plansup',label:'Plan de acción por supervisor'} ],
 ];
 const TABS=TAB_GROUPS.flat();
 const tabsEl=document.getElementById('tabs');
@@ -2104,107 +2106,6 @@ function renderDiario(){
   head.appendChild(prBtn);
   head.appendChild(prMsg);
   p.appendChild(head);
-
-  // ---- Plan de acción por supervisor: 3 estados según ritmo NECESARIO vs ritmo REAL reciente ----
-  // (no el ritmo "ideal" teórico - si el vendedor viene de días flojos, pedirle el ritmo ideal ya
-  // no es realista; comparamos contra lo que de verdad viene logrando en los últimos días).
-  (function(){
-    const MA=DATA.metaAgosto, CO=DATA.concurso;
-    if(!MA || !MA.esAgosto) return; // fuera de mes en curso (ej. viendo un archivo de mes cerrado) - no aplica
-    const planCard=el('div','card');
-    planCard.appendChild(el('div','ctitle','<h2>Plan de acción por supervisor</h2><span class="hint">estado según el ritmo REAL reciente de cada uno (no el ideal) · para no pedir un ritmo que días flojos ya hicieron inalcanzable</span>'));
-    const supsPlan=[...new Set(MA.porVendedor.map(v=>v.supervisor))];
-    let planHead='<div style="margin-bottom:10px"><select id="planSup" class="fsel"><option value="TODOS">Total equipo</option>'+supsPlan.map(s=>`<option value="${s}">Supervisor ${s.split(' ')[0]}</option>`).join('')+'</select></div><div id="planBox"></div>';
-    planCard.innerHTML+=planHead; p.appendChild(planCard);
-    const planBox=planCard.querySelector('#planBox'), selPlan=planCard.querySelector('#planSup');
-
-    const fechasRep=Object.keys(DATA.reporteDiario||{}).sort();
-    const VENT=5; // ventana de "ritmo reciente": últimos 5 días hábiles con dato
-
-    function ritmoRecienteCCC(cod){
-      const v=MA.porVendedor.find(x=>x.cod===cod); if(!v) return 0;
-      const dias=(v.diario||[]).filter(d=>d.conocido).slice(-VENT);
-      if(!dias.length) return 0;
-      return dias.reduce((a,d)=>a+(d.real||0),0)/dias.length;
-    }
-    function ritmoRecienteVenta(cods){
-      const fechas=fechasRep.slice(-VENT); if(!fechas.length) return 0;
-      let tot=0;
-      fechas.forEach(f=>{
-        const porV=DATA.reporteDiario[f].porVendedor||[];
-        cods.forEach(c=>{ const row=porV.find(v=>v.cod===c); if(row) tot+=(row.ventaBruta||0); });
-      });
-      return tot/fechas.length;
-    }
-    function clasificar(necesario,reciente){
-      if(necesario<=0) return 'CUMPLIDO';
-      if(reciente<=0) return 'FUERA';
-      const ratio=necesario/reciente;
-      if(ratio<=1.2) return 'ALCANZABLE';
-      if(ratio<=2) return 'DIFICIL';
-      return 'FUERA';
-    }
-    const EST={CUMPLIDO:{txt:'Meta cumplida',color:'var(--good)'},ALCANZABLE:{txt:'Alcanzable',color:'var(--good)'},DIFICIL:{txt:'Difícil, pero posible',color:'var(--warn2)'},FUERA:{txt:'Fuera de alcance realista',color:'var(--bad)'}};
-    const ORDEN_EST={FUERA:0,DIFICIL:1,ALCANZABLE:2,CUMPLIDO:3};
-
-    function textoCobertura(v,estado,reciente){
-      if(estado==='CUMPLIDO') return `Cobertura: ${AR.format(v.cccActual)}/${AR.format(v.metaCCC)} CCC — meta ya cumplida.`;
-      const base=`Cobertura: ${AR.format(v.cccActual)}/${AR.format(v.metaCCC)} CCC (faltan ${AR.format(v.faltan)}). Ritmo necesario: ${v.ritmoDia}/día · tu ritmo reciente: ${Math.round(reciente*10)/10}/día.`;
-      if(estado==='ALCANZABLE') return base+' Está a tu alcance con un poco más de foco.';
-      if(estado==='DIFICIL') return base+' Requiere un esfuerzo grande — priorizá los clientes de tu ruta que todavía no compraron este mes (ver Ruta / No compradores).';
-      return base+' Al ritmo actual, llegar a la meta original ya no es realista este mes. No te frenes: sumá los clientes de ruta que puedas y arrancá el mes que viene con esa base ya visitada.';
-    }
-    function tileEstado(lab,estado,detalle){
-      const e=EST[estado];
-      return `<div class="supcard"><h3>${lab}</h3><div class="big num" style="color:${e.color};font-size:16px">${e.txt}</div><div class="who">${detalle}</div></div>`;
-    }
-
-    function drawPlan(){
-      const filtro=selPlan.value;
-      const vendPlan=filtro==='TODOS'?MA.porVendedor:MA.porVendedor.filter(v=>v.supervisor===filtro);
-      const codsTeam=vendPlan.map(v=>v.cod);
-      // --- agregado de equipo: cobertura ---
-      const metaTeam=vendPlan.reduce((a,v)=>a+v.metaCCC,0), actTeam=vendPlan.reduce((a,v)=>a+v.cccActual,0), faltanTeam=Math.max(0,metaTeam-actTeam);
-      const ritmoNecTeam=MA.diasRestantes>0?Math.round((faltanTeam/MA.diasRestantes)*10)/10:0;
-      const recienteTeam=vendPlan.reduce((a,v)=>a+ritmoRecienteCCC(v.cod),0);
-      const estCobTeam=clasificar(ritmoNecTeam,recienteTeam);
-      // --- agregado de equipo: sellout $ (concurso) ---
-      let selloutHtml='';
-      if(CO && CO.selloutPorEquipo){
-        const eqs=filtro==='TODOS'?CO.selloutPorEquipo:CO.selloutPorEquipo.filter(e=>e.supervisor===filtro);
-        const metaSo=eqs.reduce((a,e)=>a+e.metaEquipo,0), realSo=eqs.reduce((a,e)=>a+e.real,0), faltanSo=Math.max(0,metaSo-realSo);
-        const ritmoNecSo=CO.diasRestantes>0?Math.round(faltanSo/CO.diasRestantes):0;
-        const recienteSo=ritmoRecienteVenta(codsTeam);
-        const estSo=clasificar(ritmoNecSo,recienteSo);
-        selloutHtml=tileEstado('Sellout Concurso Nubi ($)',estSo,`${peso(realSo)} de ${peso(metaSo)} · necesita ${peso(ritmoNecSo)}/día, viene hac. ${peso(Math.round(recienteSo))}/día`);
-      }
-      let ph=`<div class="kpitiles" style="grid-template-columns:repeat(2,1fr)">
-        ${tileEstado('Cobertura CCC del equipo',estCobTeam,`${AR.format(actTeam)} de ${AR.format(metaTeam)} · necesita ${ritmoNecTeam}/día, viene hac. ${Math.round(recienteTeam*10)/10}/día`)}
-        ${selloutHtml}
-      </div>`;
-      ph+='<div class="note">Ordenado del caso más urgente al menos urgente · sin perder de vista que atrás de cada vendedor está el resultado de toda la Distribuidora.</div>';
-      const filas=vendPlan.map(v=>{
-        const reciente=ritmoRecienteCCC(v.cod);
-        const estado=clasificar(v.ritmoDia,reciente);
-        const cn=(CO?CO.porVendedor.find(x=>x.cod===v.cod):null);
-        return {v,estado,reciente,cn};
-      }).sort((a,b)=>ORDEN_EST[a.estado]-ORDEN_EST[b.estado]||b.v.faltan-a.v.faltan);
-      filas.forEach(({v,estado,reciente,cn})=>{
-        const e=EST[estado];
-        ph+=`<div class="card" style="border-left:4px solid ${e.color};margin-top:12px"><div class="ctitle"><h2 style="font-size:15px">${v.nombre}</h2><span class="hint">${v.supervisor} · <b style="color:${e.color}">${e.txt}</b></span></div>`;
-        ph+=`<div class="note">${textoCobertura(v,estado,reciente)}</div>`;
-        if(cn){
-          const cnE=cn.prioridad==='CUMPLIDO'?EST.CUMPLIDO:cn.prioridad==='CRITICO'?EST.FUERA:EST.ALCANZABLE;
-          ph+=`<div class="note" style="margin-top:6px">Concurso Nubi (cobertura marcas, trimestre): ${AR.format(cn.ccc)}/${AR.format(cn.meta)} clientes (faltan ${AR.format(cn.faltan)}, ritmo ${cn.ritmo}/día) — <b style="color:${cnE.color}">${cn.prioridad}</b>.`
-            +(cn.marcasFaltantes&&cn.marcasFaltantes.length?` Le faltan estas marcas: ${cn.marcasFaltantes.join(', ')}.`:' Ya vendió todas las marcas del concurso.')+'</div>';
-        }
-        ph+='</div>';
-      });
-      planBox.innerHTML=ph;
-    }
-    selPlan.onchange=drawPlan; drawPlan();
-  })();
-
   const box=el('div',null,''); p.appendChild(box);
   function miniBar(v,max){var r=max>0?Math.max(0,v)/max:0;var col=covColor(v);return '<span class="track" style="width:52px;display:inline-block;vertical-align:middle;margin-right:6px"><span class="fill" style="width:'+Math.min(100,Math.round(r*100))+'%;background:'+col+'"></span></span>';}
   function draw(f){
@@ -2323,6 +2224,117 @@ function renderDiario(){
     ps.onchange=()=>drawPerf(ps.value); drawPerf(ps.options[0].value);
   }
   sel.onchange=()=>draw(sel.value); draw(fechas[0]);
+}
+
+/* ---------- PANEL: Plan de acción por supervisor ---------- */
+// Resumen de equipo + por cada vendedor: los mismos KPIs que ve en "Mi Día" (rendimiento del
+// día y desarrollo acumulado - meta cobertura, concurso, etc.) y, de remate, el plan de acción
+// con 3 estados según el ritmo NECESARIO vs el ritmo REAL reciente (no el "ideal" teórico - si
+// el vendedor viene de días flojos, pedirle el ritmo ideal ya no es realista; comparamos contra
+// lo que de verdad viene logrando en los últimos días).
+function renderPlanSupervisor(){
+  const p=document.getElementById('p-plansup'); p.innerHTML='';
+  const MA=DATA.metaAgosto, CO=DATA.concurso;
+  if(!MA || !MA.esAgosto){ p.innerHTML='<div class="card"><div class="ctitle"><h2>Plan de acción por supervisor</h2></div><p style="color:var(--muted)">No aplica: no estás viendo el mes en curso.</p></div>'; return; }
+  const planCard=el('div','card');
+  planCard.appendChild(el('div','ctitle','<h2>Plan de acción por supervisor</h2><span class="hint">por cada vendedor: los mismos KPIs que ve a diario en "Mi Día" (rendimiento del día y desarrollo acumulado) y, de remate, el plan de acción · estado según el ritmo REAL reciente de cada uno, no el ideal</span>'));
+  const supsPlan=[...new Set(MA.porVendedor.map(v=>v.supervisor))];
+  let planHead='<div style="margin-bottom:10px"><select id="planSup" class="fsel"><option value="TODOS">Total equipo</option>'+supsPlan.map(s=>`<option value="${s}">Supervisor ${s.split(' ')[0]}</option>`).join('')+'</select></div><div id="planBox"></div>';
+  planCard.innerHTML+=planHead; p.appendChild(planCard);
+  const planBox=planCard.querySelector('#planBox'), selPlan=planCard.querySelector('#planSup');
+
+  const fechasRep=Object.keys(DATA.reporteDiario||{}).sort();
+  const VENT=5; // ventana de "ritmo reciente": últimos 5 días hábiles con dato
+
+  function ritmoRecienteCCC(cod){
+    const v=MA.porVendedor.find(x=>x.cod===cod); if(!v) return 0;
+    const dias=(v.diario||[]).filter(d=>d.conocido).slice(-VENT);
+    if(!dias.length) return 0;
+    return dias.reduce((a,d)=>a+(d.real||0),0)/dias.length;
+  }
+  function ritmoRecienteVenta(cods){
+    const fechas=fechasRep.slice(-VENT); if(!fechas.length) return 0;
+    let tot=0;
+    fechas.forEach(f=>{
+      const porV=DATA.reporteDiario[f].porVendedor||[];
+      cods.forEach(c=>{ const row=porV.find(v=>v.cod===c); if(row) tot+=(row.ventaBruta||0); });
+    });
+    return tot/fechas.length;
+  }
+  function clasificar(necesario,reciente){
+    if(necesario<=0) return 'CUMPLIDO';
+    if(reciente<=0) return 'FUERA';
+    const ratio=necesario/reciente;
+    if(ratio<=1.2) return 'ALCANZABLE';
+    if(ratio<=2) return 'DIFICIL';
+    return 'FUERA';
+  }
+  const EST={CUMPLIDO:{txt:'Meta cumplida',color:'var(--good)'},ALCANZABLE:{txt:'Alcanzable',color:'var(--good)'},DIFICIL:{txt:'Difícil, pero posible',color:'var(--warn2)'},FUERA:{txt:'Fuera de alcance realista',color:'var(--bad)'}};
+  const ORDEN_EST={FUERA:0,DIFICIL:1,ALCANZABLE:2,CUMPLIDO:3};
+
+  function textoCobertura(v,estado,reciente){
+    if(estado==='CUMPLIDO') return `Cobertura: ${AR.format(v.cccActual)}/${AR.format(v.metaCCC)} CCC — meta ya cumplida.`;
+    const base=`Cobertura: ${AR.format(v.cccActual)}/${AR.format(v.metaCCC)} CCC (faltan ${AR.format(v.faltan)}). Ritmo necesario: ${v.ritmoDia}/día · tu ritmo reciente: ${Math.round(reciente*10)/10}/día.`;
+    if(estado==='ALCANZABLE') return base+' Está a tu alcance con un poco más de foco.';
+    if(estado==='DIFICIL') return base+' Requiere un esfuerzo grande — priorizá los clientes de tu ruta que todavía no compraron este mes (ver Ruta / No compradores).';
+    return base+' Al ritmo actual, llegar a la meta original ya no es realista este mes. No te frenes: sumá los clientes de ruta que puedas y arrancá el mes que viene con esa base ya visitada.';
+  }
+  function tileEstado(lab,estado,detalle){
+    const e=EST[estado];
+    return `<div class="supcard"><h3>${lab}</h3><div class="big num" style="color:${e.color};font-size:16px">${e.txt}</div><div class="who">${detalle}</div></div>`;
+  }
+
+  function drawPlan(){
+    const filtro=selPlan.value;
+    const vendPlan=filtro==='TODOS'?MA.porVendedor:MA.porVendedor.filter(v=>v.supervisor===filtro);
+    const codsTeam=vendPlan.map(v=>v.cod);
+    const metaTeam=vendPlan.reduce((a,v)=>a+v.metaCCC,0), actTeam=vendPlan.reduce((a,v)=>a+v.cccActual,0), faltanTeam=Math.max(0,metaTeam-actTeam);
+    const ritmoNecTeam=MA.diasRestantes>0?Math.round((faltanTeam/MA.diasRestantes)*10)/10:0;
+    const recienteTeam=vendPlan.reduce((a,v)=>a+ritmoRecienteCCC(v.cod),0);
+    const estCobTeam=clasificar(ritmoNecTeam,recienteTeam);
+    let selloutHtml='';
+    if(CO && CO.selloutPorEquipo){
+      const eqs=filtro==='TODOS'?CO.selloutPorEquipo:CO.selloutPorEquipo.filter(e=>e.supervisor===filtro);
+      const metaSo=eqs.reduce((a,e)=>a+e.metaEquipo,0), realSo=eqs.reduce((a,e)=>a+e.real,0), faltanSo=Math.max(0,metaSo-realSo);
+      const ritmoNecSo=CO.diasRestantes>0?Math.round(faltanSo/CO.diasRestantes):0;
+      const recienteSo=ritmoRecienteVenta(codsTeam);
+      const estSo=clasificar(ritmoNecSo,recienteSo);
+      selloutHtml=tileEstado('Sellout Concurso Nubi ($)',estSo,`${peso(realSo)} de ${peso(metaSo)} · necesita ${peso(ritmoNecSo)}/día, viene hac. ${peso(Math.round(recienteSo))}/día`);
+    }
+    let ph=`<div class="kpitiles" style="grid-template-columns:repeat(2,1fr)">
+      ${tileEstado('Cobertura CCC del equipo',estCobTeam,`${AR.format(actTeam)} de ${AR.format(metaTeam)} · necesita ${ritmoNecTeam}/día, viene hac. ${Math.round(recienteTeam*10)/10}/día`)}
+      ${selloutHtml}
+    </div>`;
+    ph+='<div class="note">Cada vendedor abajo: sus KPIs de siempre (Mi Día) y, de remate, el plan de acción · ordenados del caso más urgente al menos urgente, sin perder de vista que atrás de cada uno está el resultado de toda la Distribuidora.</div>';
+    const filas=vendPlan.map(v=>{
+      const reciente=ritmoRecienteCCC(v.cod);
+      const estado=clasificar(v.ritmoDia,reciente);
+      const cn=(CO?CO.porVendedor.find(x=>x.cod===v.cod):null);
+      return {v,estado,reciente,cn};
+    }).sort((a,b)=>ORDEN_EST[a.estado]-ORDEN_EST[b.estado]||b.v.faltan-a.v.faltan);
+    filas.forEach(({v,estado})=>{
+      const e=EST[estado];
+      ph+=`<details class="card" style="border-left:4px solid ${e.color};margin-top:12px">
+        <summary style="cursor:pointer;font-weight:700;font-size:14px">${v.nombre} <span style="color:var(--muted);font-weight:400">· ${v.supervisor}</span> · <span style="color:${e.color}">${e.txt}</span></summary>
+        <div class="miDiaWrap" id="miDiaSup_${v.cod}" style="margin:14px auto 0;padding:0"></div>
+      </details>`;
+    });
+    planBox.innerHTML=ph;
+    // segunda pasada: renderMiDia necesita un elemento real ya en el DOM para volcar su HTML
+    filas.forEach(({v,estado,reciente,cn})=>{
+      const cont=document.getElementById('miDiaSup_'+v.cod); if(!cont) return;
+      renderMiDia(v.cod,cont);
+      let plan=`<div class="md-card"><h2>Plan de acción</h2><span class="md-hint">${textoCobertura(v,estado,reciente)}</span>`;
+      if(cn){
+        const cnE=cn.prioridad==='CUMPLIDO'?EST.CUMPLIDO:cn.prioridad==='CRITICO'?EST.FUERA:EST.ALCANZABLE;
+        plan+=`<div class="md-hint" style="margin-top:8px">Concurso Nubi (cobertura marcas, trimestre): ${AR.format(cn.ccc)}/${AR.format(cn.meta)} clientes (faltan ${AR.format(cn.faltan)}, ritmo ${cn.ritmo}/día) — <b style="color:${cnE.color}">${cn.prioridad}</b>.`
+          +(cn.marcasFaltantes&&cn.marcasFaltantes.length?` Le faltan estas marcas: ${cn.marcasFaltantes.join(', ')}.`:' Ya vendió todas las marcas del concurso.')+'</div>';
+      }
+      plan+='</div>';
+      cont.innerHTML+=plan;
+    });
+  }
+  selPlan.onchange=drawPlan; drawPlan();
 }
 
 /* ---------- PANEL: Mapa de clientes (Leaflet, carga bajo demanda, requiere internet) ---------- */
@@ -2489,8 +2501,8 @@ function miDiaDonut(pctVal,color,size,stroke){
   </div>`;
 }
 /* ---------- Mi Dia: vista personal por vendedor (?vend=COD) ---------- */
-function renderMiDia(cod){
-  const wrap=document.getElementById('miDia');
+function renderMiDia(cod,targetWrap){
+  const wrap=targetWrap||document.getElementById('miDia');
   const v=DATA.porVendedor.find(x=>x.cod===cod);
   if(!v){ wrap.innerHTML='<div class="md-card"><p style="color:var(--muted)">No encontramos ese código de vendedor.</p></div>'; return; }
   const now=new Date();
@@ -2755,7 +2767,7 @@ const DIAS_ES=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sába
 
 /* ---------- init ---------- */
 function renderAll(){
-  renderHeaderKpis(); renderVend(); renderVentaDia(); renderFicha(); renderDiario(); renderResumen(); renderEfec(); renderConcurso(); renderCanales(); renderMarcas(); renderEvo(); renderDev(); renderInfaltables(); renderAccion(); renderCombos(); renderRuta(); renderCoberturaMarcas(); renderMetaAgosto(); renderSeguimientoDiario(); renderMatinal(); renderMapa();
+  renderHeaderKpis(); renderVend(); renderVentaDia(); renderFicha(); renderDiario(); renderResumen(); renderEfec(); renderConcurso(); renderCanales(); renderMarcas(); renderEvo(); renderDev(); renderInfaltables(); renderAccion(); renderCombos(); renderRuta(); renderCoberturaMarcas(); renderMetaAgosto(); renderSeguimientoDiario(); renderMatinal(); renderMapa(); renderPlanSupervisor();
 }
 (function initMesSelector(){
   const sel=document.getElementById('mesSel'); if(!sel) return;
