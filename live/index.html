@@ -2289,6 +2289,14 @@ function renderPlanSupervisor(){
     const vendPlan=filtro==='TODOS'?MA.porVendedor:MA.porVendedor.filter(v=>v.supervisor===filtro);
     const codsTeam=vendPlan.map(v=>v.cod);
     const metaTeam=vendPlan.reduce((a,v)=>a+v.metaCCC,0), actTeam=vendPlan.reduce((a,v)=>a+v.cccActual,0), faltanTeam=Math.max(0,metaTeam-actTeam);
+    const universoTeam=vendPlan.reduce((a,v)=>a+v.universo,0);
+    // el objetivo del mes NO es "todo el universo", es un % definido por equipo (80% Lucy / 65%
+    // Juan) - se muestra explícito para que quien lea el tablero entienda qué se está contando:
+    // "Total equipo" mezcla ambos % (da un % combinado, no 80 ni 65 puros), cada equipo por separado
+    // muestra su % real definido.
+    const metaPctTxt=filtro==='TODOS'
+      ? (universoTeam>0?(Math.round(metaTeam/universoTeam*1000)/10)+'%':'—')
+      : ((vendPlan[0]&&vendPlan[0].metaPct!=null)?vendPlan[0].metaPct+'%':(universoTeam>0?(Math.round(metaTeam/universoTeam*1000)/10)+'%':'—'));
     const ritmoNecTeam=faltanTeam<=0?0:(MA.diasRestantes>0?Math.round((faltanTeam/MA.diasRestantes)*10)/10:Infinity);
     const recienteTeam=vendPlan.reduce((a,v)=>a+ritmoRecienteCCC(v.cod),0);
     const estCobTeam=clasificar(ritmoNecTeam,recienteTeam);
@@ -2321,7 +2329,7 @@ function renderPlanSupervisor(){
       </div>`;
     }
     let ph=`<div class="kpitiles" style="grid-template-columns:repeat(3,1fr)">
-      ${tileEstado('Cobertura CCC del equipo',estCobTeam,`${AR.format(actTeam)} de ${AR.format(metaTeam)} · necesita ${ritmoNecTeam}/día, viene hac. ${Math.round(recienteTeam*10)/10}/día`)}
+      ${tileEstado('Cobertura CCC del equipo',estCobTeam,`${AR.format(actTeam)} de ${AR.format(metaTeam)} clientes con compra (meta: ${metaPctTxt} de cobertura sobre un universo de ${AR.format(universoTeam)}) · necesita ${ritmoNecTeam}/día, viene hac. ${Math.round(recienteTeam*10)/10}/día`)}
       ${selloutHtml}
       ${distribHtml}
     </div>`;
