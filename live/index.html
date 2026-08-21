@@ -2269,11 +2269,11 @@ function renderPlanSupervisor(){
     if(ratio<=2) return 'DIFICIL';
     return 'FUERA';
   }
-  const EST={CUMPLIDO:{txt:'Meta cumplida',color:'var(--good)'},ALCANZABLE:{txt:'Alcanzable',color:'var(--good)'},DIFICIL:{txt:'Difícil, pero posible',color:'var(--warn2)'},FUERA:{txt:'Fuera de alcance realista',color:'var(--bad)'}};
+  const EST={CUMPLIDO:{txt:'Meta alcanzada · Seguí sumando',color:'var(--good)'},ALCANZABLE:{txt:'Alcanzable',color:'var(--good)'},DIFICIL:{txt:'Difícil, pero posible',color:'var(--warn2)'},FUERA:{txt:'Fuera de alcance realista',color:'var(--bad)'}};
   const ORDEN_EST={FUERA:0,DIFICIL:1,ALCANZABLE:2,CUMPLIDO:3};
 
   function textoCobertura(v,estado,reciente){
-    if(estado==='CUMPLIDO') return `Cobertura: ${AR.format(v.cccActual)}/${AR.format(v.metaCCC)} CCC — meta ya cumplida.`;
+    if(estado==='CUMPLIDO') return `Cobertura: ${AR.format(v.cccActual)}/${AR.format(v.metaCCC)} CCC — meta alcanzada, seguí sumando clientes para afianzarla.`;
     const base=`Cobertura: ${AR.format(v.cccActual)}/${AR.format(v.metaCCC)} CCC (faltan ${AR.format(v.faltan)}). Ritmo necesario: ${v.ritmoDia}/día · tu ritmo reciente: ${Math.round(reciente*10)/10}/día.`;
     if(estado==='ALCANZABLE') return base+' Está a tu alcance con un poco más de foco.';
     if(estado==='DIFICIL') return base+' Requiere un esfuerzo grande — priorizá los clientes de tu ruta que todavía no compraron este mes (ver Ruta / No compradores).';
@@ -2289,14 +2289,14 @@ function renderPlanSupervisor(){
     const vendPlan=filtro==='TODOS'?MA.porVendedor:MA.porVendedor.filter(v=>v.supervisor===filtro);
     const codsTeam=vendPlan.map(v=>v.cod);
     const metaTeam=vendPlan.reduce((a,v)=>a+v.metaCCC,0), actTeam=vendPlan.reduce((a,v)=>a+v.cccActual,0), faltanTeam=Math.max(0,metaTeam-actTeam);
-    const ritmoNecTeam=MA.diasRestantes>0?Math.round((faltanTeam/MA.diasRestantes)*10)/10:0;
+    const ritmoNecTeam=faltanTeam<=0?0:(MA.diasRestantes>0?Math.round((faltanTeam/MA.diasRestantes)*10)/10:Infinity);
     const recienteTeam=vendPlan.reduce((a,v)=>a+ritmoRecienteCCC(v.cod),0);
     const estCobTeam=clasificar(ritmoNecTeam,recienteTeam);
     let selloutHtml='';
     if(CO && CO.selloutPorEquipo){
       const eqs=filtro==='TODOS'?CO.selloutPorEquipo:CO.selloutPorEquipo.filter(e=>e.supervisor===filtro);
       const metaSo=eqs.reduce((a,e)=>a+e.metaEquipo,0), realSo=eqs.reduce((a,e)=>a+e.real,0), faltanSo=Math.max(0,metaSo-realSo);
-      const ritmoNecSo=CO.diasRestantes>0?Math.round(faltanSo/CO.diasRestantes):0;
+      const ritmoNecSo=faltanSo<=0?0:(CO.diasRestantes>0?Math.round(faltanSo/CO.diasRestantes):Infinity);
       const recienteSo=ritmoRecienteVenta(codsTeam);
       const estSo=clasificar(ritmoNecSo,recienteSo);
       selloutHtml=tileEstado('Sellout Concurso Nubi ($)',estSo,`${peso(realSo)} de ${peso(metaSo)} · necesita ${peso(ritmoNecSo)}/día, viene hac. ${peso(Math.round(recienteSo))}/día`);
@@ -2358,7 +2358,7 @@ function renderPlanSupervisor(){
       let estadoSo=null;
       if(soVen && soVen.metaVen>0){
         const recienteSo=ritmoRecienteSellout(soVen);
-        const necesarioSo=CO.diasRestantes>0?Math.round(soVen.faltan/CO.diasRestantes):0;
+        const necesarioSo=soVen.faltan<=0?0:(CO.diasRestantes>0?Math.round(soVen.faltan/CO.diasRestantes):Infinity);
         estadoSo=clasificar(necesarioSo,recienteSo);
         if(estadoSo==='DIFICIL'||estadoSo==='FUERA') flags.push('Sell-Out');
       }
