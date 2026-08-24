@@ -367,6 +367,7 @@ td.name{font-weight:600}
   <section class="panel" id="p-ventadia" role="tabpanel"></section>
   <section class="panel" id="p-ficha" role="tabpanel"></section>
   <section class="panel" id="p-resumen" role="tabpanel"></section>
+  <section class="panel" id="p-resultados" role="tabpanel"></section>
   <section class="panel" id="p-canales" role="tabpanel"></section>
   <section class="panel" id="p-marcas" role="tabpanel"></section>
   <section class="panel" id="p-diario" role="tabpanel"></section>
@@ -538,6 +539,7 @@ function renderHeaderKpis(){
 /* ---------- tabs (agrupadas por importancia, cada grupo en su propio chip transparente) ---------- */
 const TAB_GROUPS=[
   [ {id:'p-resumen',label:'Resumen gerencial'},
+    {id:'p-resultados',label:'📊 Resultados del mes'},
     {id:'p-diario',label:'📋 Reporte diario'},
     {id:'p-ventadia',label:'📈 Venta del Día'},
     {id:'p-evo',label:'Evolución diaria'} ],
@@ -730,6 +732,119 @@ function renderResumen(){
       <div class="row"><span class="l">% Cob.</span><span class="v">${pct(s.cobertura)}</span></div>`; sg.appendChild(c);});
   sup.appendChild(sg);
   g2.appendChild(canal); g2.appendChild(sup); p.appendChild(g2);
+}
+
+/* ---------- PANEL: Resultados del mes (comparativo vs mes anterior) ---------- */
+function renderResultadosMes(){
+  const p=document.getElementById('p-resultados'); p.innerHTML='';
+  const HM=DATA.historicoMensual||[];
+  if(HM.length<2){ p.innerHTML='<div class="card"><div class="ctitle"><h2>Resultados del mes</h2></div><p style="color:var(--muted)">Todavía no hay un mes anterior cerrado para comparar.</p></div>'; return; }
+  const mesAnt=HM[HM.length-2], mesAct=HM[HM.length-1];
+  function mesLabel(s){ const [y,m]=s.split('-'); return MESES_ES[parseInt(m,10)-1]+' '+y; }
+  function diasHabilesDelMes(s){ const [y,m]=s.split('-').map(Number); const ult=new Date(Date.UTC(y,m,0)).getUTCDate();
+    let n=0; for(let d=1;d<=ult;d++){ if(new Date(Date.UTC(y,m-1,d)).getUTCDay()!==0) n++; } return n; }
+  function deltaPct(nuevo,viejo){ return viejo?Math.round(1000*(nuevo-viejo)/viejo)/10:null; }
+  function deltaTag(d,invertido){ if(d==null) return ''; const bueno=invertido?d<0:d>0; const color=Math.abs(d)<1?'var(--muted)':(bueno?'var(--good)':'var(--bad)'); const flecha=d>0?'▲':(d<0?'▼':'·');
+    return `<div class="who" style="color:${color};font-weight:700">${flecha} ${Math.abs(d)}% vs ${mesLabel(mesAnt.mes)}</div>`; }
+
+  const K=DATA.kpis;
+  const diasHabAnt=diasHabilesDelMes(mesAnt.mes);
+  const ticketAnt=mesAnt.ccc?Math.round(mesAnt.venta/mesAnt.ccc):0;
+  const ticketAct=K.cccEquipo?Math.round(K.venta/K.cccEquipo):0;
+  const proyeccion=K.proyeccionCierre||K.venta;
+
+  const card=el('div','card');
+  card.appendChild(el('div','ctitle',`<h2>Resultados del mes</h2><span class="hint">${mesLabel(mesAct.mes)} (en curso, día ${K.diasTranscurridos||'—'} de ${K.diasHabilesMes||'—'} hábiles) vs ${mesLabel(mesAnt.mes)} (cerrado)</span>`));
+  card.innerHTML+=`<div class="kpitiles" style="grid-template-columns:repeat(3,1fr)">
+    <div class="supcard"><h3>Venta — ${mesLabel(mesAnt.mes)}</h3><div class="big num">${peso(mesAnt.venta)}</div></div>
+    <div class="supcard" style="border-color:var(--accent)"><h3>Venta — ${mesLabel(mesAct.mes)} (proyectada)</h3><div class="big num">${peso(proyeccion)}</div>${deltaTag(deltaPct(proyeccion,mesAnt.venta))}</div>
+    <div class="supcard"><h3>Venta acumulada a hoy</h3><div class="big num">${peso(K.venta)}</div><div class="who">${mesLabel(mesAct.mes)}, sin cerrar</div></div>
+    <div class="supcard"><h3>Cobertura — ${mesLabel(mesAnt.mes)}</h3><div class="big num">${pct(mesAnt.cobertura)}</div></div>
+    <div class="supcard"><h3>Cobertura — ${mesLabel(mesAct.mes)} (a hoy)</h3><div class="big num">${pct(K.cobertura)}</div><div class="who">en construcción, todavía no cierra</div></div>
+    <div class="supcard"><h3>Ticket promedio</h3><div class="big num">${peso(ticketAct)}</div>${deltaTag(deltaPct(ticketAct,ticketAnt))}<div class="who">era ${peso(ticketAnt)} en ${mesLabel(mesAnt.mes)}</div></div>
+  </div>
+  <div class="note">Venta proyectada = ritmo diario actual × días hábiles del mes (mismo criterio que la "Tendencia de cierre" del header) — es la forma correcta de comparar un mes en curso contra uno ya cerrado.</div>`;
+  p.appendChild(card);
+
+  // ---- por equipo: ritmo diario (no el total) ----
+  function ritmoEquipo(mes,dias){ const g={}; (mes.porVendedor||[]).forEach(v=>{ if(!g[v.supervisor]) g[v.supervisor]={venta:0,ccc:0}; g[v.supervisor].venta+=v.venta; g[v.supervisor].ccc+=v.ccc; });
+    Object.values(g).forEach(x=>{ x.ritmoVenta=dias?x.venta/dias:0; x.ritmoCcc=dias?x.ccc/dias:0; x.ticket=x.ccc?x.venta/x.ccc:0; }); return g; }
+  const eqAnt=ritmoEquipo(mesAnt,diasHabAnt);
+  const eqAct=ritmoEquipo(mesAct,K.diasTranscurridos||1);
+  const equipoCard=el('div','card'); equipoCard.appendChild(el('div','ctitle','<h2>Por equipo — ritmo diario</h2><span class="hint">venta y cobertura por día hábil, no el total (para que un mes a mitad de camino se compare bien contra uno cerrado)</span>'));
+  const teamGrid=el('div','grid g2');
+  ['LUCY CEJAS','JUAN ARMANDOLA'].forEach(sup=>{
+    const a=eqAnt[sup]||{ritmoVenta:0,ritmoCcc:0,ticket:0,venta:0}, c=eqAct[sup]||{ritmoVenta:0,ritmoCcc:0,ticket:0,venta:0};
+    const dVenta=deltaPct(c.ritmoVenta,a.ritmoVenta), dCcc=deltaPct(c.ritmoCcc,a.ritmoCcc), dTicket=deltaPct(c.ticket,a.ticket);
+    const proyEq=c.ritmoVenta*(K.diasHabilesMes||diasHabAnt);
+    const cls=d=>d==null?'':(d>0?'good':(d<0?'bad':'muted'));
+    const tc=el('div','card'); tc.style.borderLeft='4px solid '+(sup==='LUCY CEJAS'?'var(--accent)':'var(--warn2)');
+    tc.innerHTML=`<h3 style="margin:0 0 2px">${grupoLabel(sup)}</h3><div class="who" style="margin-bottom:10px">${(DATA.porSupervisor.find(s=>s.supervisor===sup)||{}).vendedores||'—'} vendedores</div>
+      <div class="row"><span class="l">Ritmo de venta</span><span class="v">${peso(a.ritmoVenta)}/día → ${peso(c.ritmoVenta)}/día <b style="color:var(--${cls(dVenta)})">${dVenta==null?'':(dVenta>0?'▲':'▼')+' '+Math.abs(dVenta)+'%'}</b></span></div>
+      <div class="row"><span class="l">Proyección de cierre</span><span class="v">${peso(proyEq)} <span style="color:var(--muted)">(vs ${peso(a.venta)} ${mesLabel(mesAnt.mes)})</span></span></div>
+      <div class="row"><span class="l">Ritmo de cobertura (CCC/día)</span><span class="v">${Math.round(a.ritmoCcc*10)/10} → ${Math.round(c.ritmoCcc*10)/10} <b style="color:var(--${cls(dCcc)})">${dCcc==null?'':(dCcc>0?'▲':'▼')+' '+Math.abs(dCcc)+'%'}</b></span></div>
+      <div class="row"><span class="l">Ticket promedio equipo</span><span class="v">${peso(a.ticket)} → ${peso(c.ticket)} <span style="color:var(--muted)">${dTicket==null?'':(dTicket>0?'▲':'▼')+' '+Math.abs(dTicket)+'%'}</span></span></div>`;
+    teamGrid.appendChild(tc);
+  });
+  equipoCard.appendChild(teamGrid); p.appendChild(equipoCard);
+
+  // ---- concurso Nubi (trimestral, estado acumulado a la fecha) ----
+  if(DATA.concurso){
+    const CN=DATA.concurso;
+    const cnCard=el('div','card'); cnCard.appendChild(el('div','ctitle','<h2>Concurso Nubi</h2><span class="hint">es trimestral, no se corta por mes — estado acumulado a la fecha</span>'));
+    cnCard.innerHTML+=`<div class="kpitiles" style="grid-template-columns:repeat(2,1fr)">
+      <div class="supcard"><h3>Sell-out del concurso</h3><div class="big num">${peso(CN.sellout.real)}</div><div class="who">de ${peso(CN.sellout.meta)} meta · ${pct(Math.round(1000*CN.sellout.real/CN.sellout.meta)/10)}</div></div>
+      <div class="supcard"><h3>Cobertura de marcas (distribuidora)</h3><div class="big num">${AR.format(CN.cobertura.real)}</div><div class="who">de ${AR.format(CN.cobertura.meta)} clientes meta · ${pct(Math.round(1000*CN.cobertura.real/CN.cobertura.meta)/10)}</div></div>
+    </div>`;
+    if(CN.selloutPorEquipo&&CN.selloutPorEquipo.length){
+      let h='<div class="twrap"><table><thead><tr><th>Equipo</th><th class="num">% avance sell-out</th></tr></thead><tbody>';
+      CN.selloutPorEquipo.forEach(e=>{ h+=`<tr><td>${grupoLabel(e.supervisor)}</td><td class="num"><div class="cov"><span class="pct num">${pct(e.pctAvance)}</span><span class="track"><span class="fill" style="width:${Math.min(100,e.pctAvance)}%;background:var(--accent)"></span></span></div></td></tr>`; });
+      h+='</tbody></table></div>'; cnCard.innerHTML+=h;
+    }
+    p.appendChild(cnCard);
+  }
+
+  // ---- herramientas: adopcion desde que se lanzaron, antes/durante el mes en curso ----
+  const corte=mesAct.mes+'-01';
+  function splitImp(diasObj){ let antes=0,actual=0; Object.keys(diasObj||{}).forEach(f=>{ const v=diasObj[f]; if(!v) return; if(f<corte) antes+=v.imp; else actual+=v.imp; }); return {antes,actual}; }
+  let accAntes=0,accActual=0;
+  (DATA.accion&&DATA.accion.todos&&DATA.accion.todos.porVendedor||[]).forEach(v=>{ const s=splitImp(v.dias); accAntes+=s.antes; accActual+=s.actual; });
+  let cbAntes=0,cbActual=0;
+  (DATA.combos&&DATA.combos.lista||[]).forEach(cb=>{ (cb.porVendedor||[]).forEach(v=>{ const s=splitImp(v.dias); cbAntes+=s.antes; cbActual+=s.actual; }); });
+  const toolCard=el('div','card'); toolCard.appendChild(el('div','ctitle','<h2>Adopción de herramientas comerciales</h2><span class="hint">Acción de precio y Combos, importe con el descuento aplicado — curva de adopción, no una comparación de negocio 1 a 1</span>'));
+  toolCard.innerHTML+=`<div class="kpitiles" style="grid-template-columns:repeat(2,1fr)">
+    <div class="supcard"><h3>Acción de precio</h3>
+      <div class="row"><span class="l">Antes</span><span class="v">${peso(accAntes)}</span></div>
+      <div class="row"><span class="l">${mesLabel(mesAct.mes)}</span><span class="v" style="color:var(--good)">${peso(accActual)}</span></div></div>
+    <div class="supcard"><h3>Combos</h3>
+      <div class="row"><span class="l">Antes</span><span class="v">${peso(cbAntes)}</span></div>
+      <div class="row"><span class="l">${mesLabel(mesAct.mes)}</span><span class="v" style="color:var(--good)">${peso(cbActual)}</span></div></div>
+  </div>`;
+  p.appendChild(toolCard);
+
+  // ---- oportunidad: clientes sin comprar por canal y equipo ----
+  if(DATA.porCanalVendedor){
+    const oppCard=el('div','card'); oppCard.appendChild(el('div','ctitle','<h2>Oportunidad — clientes sin comprar este mes</h2><span class="hint">universo asignado menos clientes con al menos una compra, por canal</span>'));
+    const oppGrid=el('div','grid g2');
+    ['LUCY CEJAS','JUAN ARMANDOLA'].forEach(sup=>{
+      const porCanal={};
+      Object.keys(DATA.porCanalVendedor).forEach(canal=>{
+        const rows=DATA.porCanalVendedor[canal].filter(r=>r.supervisor===sup);
+        const uni=rows.reduce((a,r)=>a+r.universo,0), ccc=rows.reduce((a,r)=>a+r.ccc,0);
+        porCanal[canal]={uni,ccc,sin:uni-ccc};
+      });
+      const totSin=Object.values(porCanal).reduce((a,x)=>a+x.sin,0);
+      let h=`<div class="twrap"><table><thead><tr><th>Canal — ${grupoLabel(sup)}</th><th class="num">Sin comprar</th></tr></thead><tbody>`;
+      Object.entries(porCanal).sort((a,b)=>b[1].sin-a[1].sin).forEach(([canal,x])=>{ h+=`<tr><td class="name">${canal}</td><td class="num">${AR.format(x.sin)}</td></tr>`; });
+      h+=`<tr class="total"><td>Total</td><td class="num">${AR.format(totSin)}</td></tr></tbody></table></div>`;
+      const div=el('div',null,h); oppGrid.appendChild(div);
+    });
+    oppCard.appendChild(oppGrid); p.appendChild(oppCard);
+  }
+
+  if(DATA.metaAgosto&&DATA.metaAgosto.esAgosto){
+    p.appendChild(el('div','note',`Quedan <b>${DATA.metaAgosto.diasRestantes}</b> días hábiles del mes — el detalle de plan de acción por vendedor y equipo está en la pestaña <b>"Plan de acción por supervisor"</b>.`));
+  }
 }
 
 /* ---------- PANEL: Canales ---------- */
@@ -2870,7 +2985,7 @@ const DIAS_ES=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sába
 
 /* ---------- init ---------- */
 function renderAll(){
-  renderHeaderKpis(); renderVend(); renderVentaDia(); renderFicha(); renderDiario(); renderResumen(); renderEfec(); renderConcurso(); renderCanales(); renderMarcas(); renderEvo(); renderDev(); renderInfaltables(); renderAccion(); renderCombos(); renderRuta(); renderCoberturaMarcas(); renderMetaAgosto(); renderSeguimientoDiario(); renderMatinal(); renderMapa(); renderPlanSupervisor();
+  renderHeaderKpis(); renderVend(); renderVentaDia(); renderFicha(); renderDiario(); renderResumen(); renderResultadosMes(); renderEfec(); renderConcurso(); renderCanales(); renderMarcas(); renderEvo(); renderDev(); renderInfaltables(); renderAccion(); renderCombos(); renderRuta(); renderCoberturaMarcas(); renderMetaAgosto(); renderSeguimientoDiario(); renderMatinal(); renderMapa(); renderPlanSupervisor();
 }
 (function initMesSelector(){
   const sel=document.getElementById('mesSel'); if(!sel) return;
