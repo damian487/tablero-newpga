@@ -282,6 +282,7 @@ td.name{font-weight:600}
 .miDiaWrap .md-brand{ font-size:11px; font-weight:700; padding:5px 10px; border-radius:99px; }
 .miDiaWrap .md-brand.good{ background:var(--good-soft); color:var(--good); }
 .miDiaWrap .md-brand.todo{ background:transparent; color:var(--muted); border:1.5px dashed var(--border); }
+.miDiaWrap .md-brand.bad{ background:var(--bad-soft); color:var(--bad); }
 .miDiaWrap .md-progrow{ display:flex; justify-content:space-between; align-items:baseline; margin-top:10px; font-size:13px; }
 .miDiaWrap .md-progrow b{ font-variant-numeric:tabular-nums; }
 .miDiaWrap .md-track{ height:10px; border-radius:99px; background:var(--ground); margin-top:6px; overflow:hidden; }
@@ -2814,6 +2815,38 @@ function renderMiDia(cod,targetWrap){
       if(rdV.marcaDetalle && rdV.marcaDetalle.length){
         h+='<div class="md-brands">'+rdV.marcaDetalle.map(m=>`<span class="md-brand good">${m.marca} <span style="opacity:.7">${m.clientes} cli</span></span>`).join('')+'</div>';
       }
+    }
+    h+='</div>';
+  }
+
+  /* ---- NO COMPRADORES (DEL DÍA) + MARCAS NO VENDIDAS ---- */
+  const DIA_ABBR_HOY={1:'Lu',2:'Ma',3:'Mi',4:'Ju',5:'Vi'}[now.getDay()];
+  const rutaHoy = DIA_ABBR_HOY && DATA.ruta && DATA.ruta.data && (DATA.ruta.data[DIA_ABBR_HOY]||{})[cod];
+  if(rutaHoy){
+    const noCompradores=(rutaHoy.cl||[]).filter(r=>r[1]===0);
+    const plan=rutaHoy.p, comp=rutaHoy.c, no=noCompradores.length;
+    h+=`<div class="md-card"><h2>🚫 No compradores (del día)</h2>
+      <span class="md-hint">tu ruta de hoy · ${DIAS_ES[now.getDay()]} · clientes que todavía no compraron nada este mes</span>
+      <div class="md-stat3">
+        <div class="s"><div class="l">Clientes de la ruta</div><div class="v">${AR.format(plan)}</div></div>
+        <div class="s"><div class="l">Ya compraron (mes)</div><div class="v" style="color:var(--good)">${AR.format(comp)}</div></div>
+        <div class="s"><div class="l">Sin comprar</div><div class="v" style="color:var(--bad)">${AR.format(no)}</div></div>
+      </div>`;
+    if(no>0){
+      const CLI=DATA.ruta.clientes||{};
+      h+='<div class="md-brands" style="margin-top:10px">'+noCompradores.map(r=>{ const ci=CLI[r[0]]||['(s/d)','','']; return `<span class="md-brand bad">${r[0]} - ${ci[0]}</span>`; }).join('')+'</div>';
+    } else {
+      h+='<div style="margin-top:10px"><span class="md-chip good">✓ Toda tu ruta de hoy ya compró algo este mes</span></div>';
+    }
+    const marcasCat=DATA.marcasOrden||(DATA.concurso&&DATA.concurso.marcas)||[];
+    if(marcasCat.length){
+      const vendidasHoy=new Set((rdV&&rdV.marcaDetalle||[]).map(m=>m.marca));
+      const noVendidasHoy=marcasCat.filter(m=>!vendidasHoy.has(m));
+      h+='<div style="margin-top:14px"><div class="md-progrow" style="margin-top:0"><b style="font-size:12.5px">Marcas no vendidas hoy</b></div><div class="md-brands" style="margin-top:8px">';
+      h+= noVendidasHoy.length
+        ? noVendidasHoy.map(m=>`<span class="md-brand todo">${m==='HEAD AND SHOULDERS'?'H&amp;S':m}</span>`).join('')
+        : '<span class="md-brand good">✓ vendiste todas las marcas hoy</span>';
+      h+=`</div><span class="md-hint" style="margin-top:8px">${marcasCat.length-noVendidasHoy.length} de ${marcasCat.length} marcas vendidas hoy</span></div>`;
     }
     h+='</div>';
   }
