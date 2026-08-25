@@ -1298,9 +1298,17 @@ function renderMSU(){
   if(!M){ p.innerHTML='<div class="card"><div class="ctitle"><h2>🎯 Meta del trimestre</h2></div><p style="color:var(--muted)">Sin datos todavía.</p></div>'; return; }
   const barColorFor=pc=>pc>=100?'var(--good)':(pc>=75?'var(--warn)':(pc>=40?'var(--warn2)':'var(--bad)'));
   const cajasN=n=>AR.format(Math.round(n));
+  function estadoPill(e){
+    if(e==='ALCANZABLE') return '<span class="pill ok">✓ Alcanzable</span>';
+    if(e==='DIFICIL') return '<span class="pill" style="background:var(--warn2);color:#fff">⚠️ Difícil pero posible</span>';
+    return '<span class="pill bad">🔴 Fuera de alcance realista</span>';
+  }
 
   const head=el('div','card');
   head.appendChild(el('div','ctitle',`<h2>🎯 Meta del trimestre — Objetivo Nubi Sell-Out</h2><span class="hint">vigencia 01/07 al 30/09 · día ${M.diasTranscurridos} de ${M.diasTotales} · quedan ${M.diasRestantes} días</span>`));
+  if(M.estado){
+    head.appendChild(el('div',null,`<div style="margin:4px 0 10px">${estadoPill(M.estado)} <span style="font-size:11.5px;color:var(--muted);margin-left:6px">ritmo necesario ${peso(M.ritmoNecesarioPesos)}/día vs ritmo real de los últimos ${M.ritmoRecienteDias} días ${peso(M.ritmoRecientePesos)}/día</span></div>`));
+  }
   const g=el('div','grid g2');
   const pctBar1=Math.min(100,M.pctAvance);
   const o1=el('div','supcard'); o1.innerHTML=`<h3>Cajas vendidas</h3><div class="who">todas las categorías New PGA</div>
@@ -1322,19 +1330,21 @@ function renderMSU(){
   /* ---- cascade por equipo ---- */
   if(M.porEquipo && M.porEquipo.length){
     const eqCard=el('div','card');
-    eqCard.appendChild(el('div','ctitle','<h2>Meta cascadeada por equipo</h2><span class="hint">meta proporcional al universo de clientes vigente (no al peso histórico de venta) — para que la meta empuje a que todos vendan, no solo a quien ya vende más</span>'));
+    eqCard.appendChild(el('div','ctitle','<h2>Meta cascadeada por equipo</h2><span class="hint">meta fija por equipo (Lucía 65% / Juan 45% del objetivo total, no proporcional al universo) — a Lucía se le pide más porque tiene mejores autoservicios y mayor concentración de venta, para que no vea la meta ya superada y deje de traccionar</span>'));
     const sg=el('div','supgrid');
     M.porEquipo.forEach(eq=>{
       const bc=barColorFor(eq.pctAvance);
       const c=el('div','supcard');
-      c.innerHTML=`<h3>${eq.supervisor}</h3><div class="who">universo: ${AR.format(eq.universo)} clientes</div>
+      c.innerHTML=`<h3>${eq.supervisor}</h3><div class="who">universo: ${AR.format(eq.universo)} clientes · meta asignada ${Math.round(eq.metaPct*100)}%</div>
         <div class="big num">${cajasN(eq.realCajas)} cajas</div>
         <div class="row"><span class="l">Meta del equipo</span><span class="v">${cajasN(eq.metaEquipoCajas)} cajas</span></div>
         <div class="row"><span class="l">$ vendido</span><span class="v">${peso(eq.realImporte)}</span></div>
         <div class="row"><span class="l">Meta del equipo ($)</span><span class="v">${peso(eq.metaEquipoPesos)}</span></div>
         <div class="cov" style="margin-top:8px;justify-content:flex-start"><span class="track" style="width:100%"><span class="fill" style="width:${Math.min(100,eq.pctAvance)}%;background:${bc}"></span></span><span class="pct num">${eq.pctAvance}%</span></div>
         <div class="row" style="margin-top:6px"><span class="l">Faltan</span><span class="v">${cajasN(eq.faltanCajas)} cajas · ${peso(eq.faltanPesos)}</span></div>
-        <div class="row"><span class="l">Ritmo necesario</span><span class="v">${peso(eq.ritmoNecesarioPesos)}/día</span></div>`;
+        <div class="row"><span class="l">Ritmo necesario</span><span class="v">${peso(eq.ritmoNecesarioPesos)}/día</span></div>
+        <div class="row"><span class="l">Ritmo real (últ. ${M.ritmoRecienteDias} días)</span><span class="v">${peso(eq.ritmoRecientePesos)}/día</span></div>
+        <div style="margin-top:8px">${estadoPill(eq.estado)}</div>`;
       sg.appendChild(c);
     });
     eqCard.appendChild(sg); p.appendChild(eqCard);
@@ -1343,13 +1353,13 @@ function renderMSU(){
   /* ---- por vendedor (seguimiento diario) ---- */
   if(M.porVendedor && M.porVendedor.length){
     const vCard=el('div','card');
-    vCard.appendChild(el('div','ctitle','<h2>Meta por vendedor</h2><span class="hint">meta proporcional al universo de clientes · ritmo = faltan / días restantes al 30/09</span>'));
-    let h='<div class="twrap"><table><thead><tr><th>Vendedor</th><th>Equipo</th><th class="num">Universo</th><th class="num">Meta (cajas)</th><th class="num">Real (cajas)</th><th class="num">Meta ($)</th><th class="num">Real ($)</th><th>Avance</th><th class="num">Ritmo necesario/día</th></tr></thead><tbody>';
+    vCard.appendChild(el('div','ctitle',`<h2>Meta por vendedor</h2><span class="hint">la meta de cada equipo (fija) se cascadea a sus vendedores proporcional al universo de clientes · Estado compara el ritmo necesario contra el ritmo real de los últimos ${M.ritmoRecienteDias} días</span>`));
+    let h='<div class="twrap"><table><thead><tr><th>Vendedor</th><th>Equipo</th><th class="num">Universo</th><th class="num">Meta (cajas)</th><th class="num">Real (cajas)</th><th class="num">Meta ($)</th><th class="num">Real ($)</th><th>Avance</th><th class="num">Ritmo necesario/día</th><th>Estado</th></tr></thead><tbody>';
     M.porVendedor.slice().sort((a,b)=>a.pctAvance-b.pctAvance).forEach(v=>{
       const bc=barColorFor(v.pctAvance);
       h+=`<tr><td class="name">${v.nombre}</td><td style="color:var(--muted)">${v.supervisor}</td><td class="num">${AR.format(v.universo)}</td><td class="num">${cajasN(v.metaVenCajas)}</td><td class="num">${cajasN(v.realCajas)}</td><td class="num">${peso(v.metaVenPesos)}</td><td class="num">${peso(v.importe)}</td>
         <td><div class="cov"><span class="pct num">${v.pctAvance}%</span><span class="track"><span class="fill" style="width:${Math.min(100,v.pctAvance)}%;background:${bc}"></span></span></div></td>
-        <td class="num">${peso(v.ritmoNecesarioPesos)}</td></tr>`;
+        <td class="num">${peso(v.ritmoNecesarioPesos)}</td><td>${estadoPill(v.estado)}</td></tr>`;
     });
     h+='</tbody></table></div>'; vCard.innerHTML+=h; p.appendChild(vCard);
   }
@@ -2122,12 +2132,12 @@ function renderConcurso(){
   /* ---- Sell-out cascadeado por equipo ---- */
   if(C.selloutPorEquipo && C.selloutPorEquipo.length){
     const se=el('div','card');
-    se.appendChild(el('div','ctitle','<h2>Objetivo 1 · Sell-out cascadeado por equipo</h2><span class="hint">como no hay historial previo al trimestre (arrancó fines de junio), el reparto usa el peso real de cada equipo en julio + los días de agosto ya cargados, proyectado sobre el objetivo total de la empresa</span>'));
+    se.appendChild(el('div','ctitle','<h2>Objetivo 1 · Sell-out cascadeado por equipo</h2><span class="hint">meta fija por equipo (no proporcional al universo): a Lucía se le pide más porque tiene los mejores autoservicios y mayor concentración de venta — si su meta fuera chica la superaría enseguida y dejaría de traccionar. Entre los dos equipos se pide 110% a propósito, como colchón; la meta real de la empresa sigue siendo 100%.</span>'));
     const sg2=el('div','supgrid');
     C.selloutPorEquipo.forEach(eq=>{
       const barColor=eq.pctAvance>=100?'var(--good)':(eq.pctAvance>=50?'var(--warn)':'var(--bad)');
       const c=el('div','supcard');
-      c.innerHTML=`<h3>${eq.supervisor}</h3><div class="who">participación histórica: ${eq.participacionHistorica}% del sell-out del concurso</div>
+      c.innerHTML=`<h3>${eq.supervisor}</h3><div class="who">meta asignada: ${eq.participacionHistorica}% del objetivo total de la empresa</div>
         <div class="big num">${peso(eq.real)}</div>
         <div class="row"><span class="l">Meta del equipo</span><span class="v">${peso(eq.metaEquipo)}</span></div>
         <div class="cov" style="margin-top:8px;justify-content:flex-start"><span class="track" style="width:100%"><span class="fill" style="width:${Math.min(100,eq.pctAvance)}%;background:${barColor}"></span></span><span class="pct num">${eq.pctAvance}%</span></div>
@@ -2136,7 +2146,7 @@ function renderConcurso(){
       sg2.appendChild(c);
     });
     se.appendChild(sg2);
-    se.appendChild(el('div','note','La participación histórica se recalcula cada corrida con lo acumulado a la fecha (julio + agosto en curso) — a medida que avance el trimestre el reparto se va a ir afinando solo.'));
+    se.appendChild(el('div','note','Meta fija: Lucía 65% / Juan 45% del objetivo total (pedido de Damián, 25/8) — no se recalcula sola con el avance; se revisa manualmente cada tanto.'));
     p.appendChild(se);
   }
 
@@ -3032,19 +3042,27 @@ function renderMiDia(cod,targetWrap){
       h+=`<div class="md-subrow"><span>Faltan ${peso(soEq.faltan)}</span><span>Ritmo necesario: ${peso(soEq.ritmoNecesario)}/día</span></div>`;
     }
     if(DATA.msu){
+      const estadoPillMd=e=>{
+        if(e==='ALCANZABLE') return '<span class="pill ok">✓ Alcanzable</span>';
+        if(e==='DIFICIL') return '<span class="pill" style="background:var(--warn2);color:#fff">⚠️ Difícil pero posible</span>';
+        if(e==='FUERA_DE_ALCANCE') return '<span class="pill bad">🔴 Fuera de alcance realista</span>';
+        return '';
+      };
       const msuVen=(DATA.msu.porVendedor||[]).find(x=>x.cod===cod);
       if(msuVen && msuVen.metaVen>0){
         const mvBar=msuVen.pctAvance>=100?'var(--good)':(msuVen.pctAvance>=75?'var(--warn)':(msuVen.pctAvance>=40?'var(--warn2)':'var(--bad)'));
         h+=`<div class="md-progrow" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)"><span style="font-size:12.5px;color:var(--muted);font-weight:700">🎯 Objetivo Personal (todas las categorías) · ${peso(msuVen.metaVenPesos)}</span><span style="font-size:14px;font-weight:800;color:${mvBar}">${msuVen.pctAvance}%</span></div>
           <div class="md-track"><div class="md-fill" style="width:${Math.min(100,msuVen.pctAvance)}%;background:${mvBar}"></div></div>
-          <div class="md-subrow"><span>Real: ${peso(msuVen.importe)} (≈${AR.format(Math.round(msuVen.realCajas))} cajas)</span><span>Ritmo necesario: ${peso(msuVen.ritmoNecesarioPesos)}/día</span></div>`;
+          <div class="md-subrow"><span>Real: ${peso(msuVen.importe)} (≈${AR.format(Math.round(msuVen.realCajas))} cajas)</span><span>Ritmo necesario: ${peso(msuVen.ritmoNecesarioPesos)}/día</span></div>
+          <div style="margin-top:6px">${estadoPillMd(msuVen.estado)}</div>`;
       }
       const msuEq=(DATA.msu.porEquipo||[]).find(x=>x.supervisor===v.supervisor);
       if(msuEq){
         const meBar=msuEq.pctAvance>=100?'var(--good)':(msuEq.pctAvance>=75?'var(--warn)':(msuEq.pctAvance>=40?'var(--warn2)':'var(--bad)'));
         h+=`<div class="md-progrow" style="margin-top:10px"><span style="font-size:12.5px;color:var(--muted);font-weight:700">🎯 Objetivo Equipo · ${peso(msuEq.metaEquipoPesos)}</span><span style="font-size:14px;font-weight:800;color:${meBar}">${msuEq.pctAvance}%</span></div>
           <div class="md-track"><div class="md-fill" style="width:${Math.min(100,msuEq.pctAvance)}%;background:${meBar}"></div></div>
-          <div class="md-subrow"><span>Faltan ${peso(msuEq.faltanPesos)} (≈${AR.format(Math.round(msuEq.faltanCajas))} cajas)</span><span>Ritmo necesario: ${peso(msuEq.ritmoNecesarioPesos)}/día</span></div>`;
+          <div class="md-subrow"><span>Faltan ${peso(msuEq.faltanPesos)} (≈${AR.format(Math.round(msuEq.faltanCajas))} cajas)</span><span>Ritmo necesario: ${peso(msuEq.ritmoNecesarioPesos)}/día</span></div>
+          <div style="margin-top:6px">${estadoPillMd(msuEq.estado)}</div>`;
       }
       h+='<span class="md-hint" style="margin-top:4px">Se puede llegar con cualquier familia de productos — priorizá el producto accionado y los combos activos (pestaña 🎯 Meta del trimestre) según lo que tengas disponible en stock.</span>';
     }
