@@ -1300,8 +1300,8 @@ function renderMSU(){
   const cajasN=n=>AR.format(Math.round(n));
   function estadoPill(e){
     if(e==='ALCANZABLE') return '<span class="pill ok">✓ Alcanzable</span>';
-    if(e==='DIFICIL') return '<span class="pill" style="background:var(--warn2);color:#fff">⚠️ Difícil pero posible</span>';
-    return '<span class="pill bad">🔴 Fuera de alcance realista</span>';
+    if(e==='DIFICIL') return '<span class="pill" style="background:var(--warn2);color:#fff">💪 Desafiante — se puede</span>';
+    return '<span class="pill bad">🔥 Muy desafiante — ¡se puede dar vuelta!</span>';
   }
 
   const head=el('div','card');
@@ -1324,7 +1324,7 @@ function renderMSU(){
     <div class="row" style="margin-top:6px"><span class="l">Faltan</span><span class="v">${peso(M.faltanPesos)}</span></div>
     <div class="row"><span class="l">Ritmo necesario (resto del trimestre)</span><span class="v">${peso(M.ritmoNecesarioPesos)}/día</span></div>`;
   g.appendChild(o1); g.appendChild(o2); head.appendChild(g);
-  head.appendChild(el('div','note',`Uso interno de gerencia: esto equivale a ${M.real} de ${M.meta} MSU (unidad estadística de P&G, Stat Factor oficial). Calibrado contra el registro interno de P&G (factor 1,0645, validado 25/8) para medir igual que ellos — así la meta en $ y cajas no queda corta respecto de lo que P&G reconoce para el premio. Cajas y $ son la conversión de esa meta al mix real vendido; a diferencia del viejo objetivo de $ (10 marcas del concurso), esto cubre TODAS las categorías New PGA, incluyendo Cuidado de la Ropa (Downy).`));
+  head.appendChild(el('div','note',`Uso interno de gerencia: esto equivale a ${M.real} de ${M.meta} MSU (unidad estadística de P&G, Stat Factor oficial). Calibrado contra el registro interno de P&G (factor 1,0645, validado 25/8) para medir igual que ellos — así la meta en $ y cajas no queda corta respecto de lo que P&G reconoce para el premio. Cajas y $ son la conversión de esa meta al mix real vendido; a diferencia del viejo objetivo de $ (10 marcas del concurso), esto cubre TODAS las categorías New PGA, incluyendo Cuidado de la Ropa (Downy). ¿No te queda claro cómo se calcula? Hay un Glosario completo en la pestaña 🏆 Concurso Nubi.`));
   p.appendChild(head);
 
   /* ---- cascade por equipo ---- */
@@ -2129,6 +2129,26 @@ function renderConcurso(){
   head.appendChild(el('div','note','El sell-out corresponde a la distribuidora Pehuenia (referencia). La cobertura oficial sale de Thalamus; acá es la estimación desde la bajada con las 10 marcas del concurso.'));
   p.appendChild(head);
 
+  /* ---- Glosario: como se mide el concurso, para quien no conoce el tema ---- */
+  const gloss=document.createElement('details');
+  gloss.className='card';
+  gloss.style.cssText='border-left:4px solid var(--accent)';
+  gloss.innerHTML=`<summary style="cursor:pointer;font-weight:800;font-size:15px;color:var(--ink)">📖 Glosario — cómo se calculan estos dos objetivos</summary>
+    <div style="margin-top:12px;font-size:13.5px;line-height:1.6;color:var(--ink)">
+      <p><b>MSU (Unidad Estadística de P&G).</b> P&G no mide las ventas de sus distribuidores en pesos ni en cajas directamente — usa una unidad propia, el MSU, que permite comparar productos muy distintos (un shampoo, una máquina de afeitar, un pañal) con una sola vara. Cada producto tiene un "Stat Factor" que P&G le asigna según su categoría y tamaño, y la fórmula es:</p>
+      <p style="text-align:center;font-weight:700;background:var(--surface2);padding:8px;border-radius:8px">MSU = (Stat Factor ÷ 1000) × Unidades vendidas</p>
+      <p>Por ejemplo, un shampoo de 400ml tiene Stat Factor 0,156: vender 1.000 unidades genera 0,156 MSU. Cada producto "pesa" distinto según su Stat Factor — por eso 10 MSU no equivalen siempre a la misma cantidad de cajas ni de pesos.</p>
+      <p><b>¿Por qué mostramos $ y cajas en vez de MSU?</b> Porque nadie piensa el día a día en "0,15 MSU", pero sí en cajas vendidas o en pesos facturados. Como no hay una conversión fija (depende de qué productos se estén vendiendo), tomamos el mix real de ventas y calculamos:</p>
+      <ul style="margin:6px 0 6px 20px;padding:0">
+        <li>$ por MSU = $ vendido ÷ MSU generado con esa venta</li>
+        <li>Cajas por MSU = cajas vendidas ÷ MSU generado con esa venta</li>
+      </ul>
+      <p>y usamos esos ratios para traducir la meta de 10 MSU a su equivalente en $ y en cajas (pestaña 🎯 Meta del trimestre). Como el mix de productos cambia todos los días, esos ratios — y por lo tanto la meta en $ y cajas — se recalculan solos en cada actualización.</p>
+      <p><b>Calibración.</b> Tenemos la tabla oficial de Stat Factor para casi todos los productos, pero una porción chica de las ventas (~2%) no matchea un SKU exacto y usa un promedio de su categoría — eso hace que nuestro cálculo salga un poco más alto que lo que P&G realmente registra. Para no arriesgarnos a mostrar "meta cumplida" cuando en los hechos no lo está (y perder el reconocimiento del premio), corregimos el cálculo con un factor de ajuste validado contra un reporte real de P&G, de forma que la meta que mostramos nunca queda más floja de lo que realmente hace falta.</p>
+      <p><b>Cobertura (Objetivo 2) — un cálculo totalmente distinto.</b> No tiene nada que ver con MSU, cajas ni pesos. Mide cuántos <b>clientes distintos</b> le compraron <b>al menos una vez</b> alguna de las 10 marcas del concurso durante el trimestre — no importa cuánto le compraron, solo si compraron o no. La meta es de <b>1.702 clientes</b> sobre un universo de 2.738 posibles (~62%). Igual que con el Sell-Out, a cada equipo se le asignó una meta propia de cobertura sobre su propio universo (Lucía 80% / Juan 65%), no un reparto parejo, para que cada equipo tenga un objetivo ambicioso pero realista según su propia cartera de clientes.</p>
+    </div>`;
+  p.appendChild(gloss);
+
   /* ---- Sell-out cascadeado por equipo ---- */
   if(C.selloutPorEquipo && C.selloutPorEquipo.length){
     const se=el('div','card');
@@ -2534,7 +2554,7 @@ function renderPlanSupervisor(){
     if(ratio<=2) return 'DIFICIL';
     return 'FUERA';
   }
-  const EST={CUMPLIDO:{txt:'Meta alcanzada · Seguí sumando',color:'var(--good)'},ALCANZABLE:{txt:'Alcanzable',color:'var(--good)'},DIFICIL:{txt:'Difícil, pero posible',color:'var(--warn2)'},FUERA:{txt:'Fuera de alcance realista',color:'var(--bad)'}};
+  const EST={CUMPLIDO:{txt:'Meta alcanzada · Seguí sumando',color:'var(--good)'},ALCANZABLE:{txt:'Alcanzable',color:'var(--good)'},DIFICIL:{txt:'Desafiante — se puede',color:'var(--warn2)'},FUERA:{txt:'Muy desafiante — ¡se puede dar vuelta!',color:'var(--bad)'}};
   const ORDEN_EST={FUERA:0,DIFICIL:1,ALCANZABLE:2,CUMPLIDO:3};
 
   function textoCobertura(v,estado,reciente){
@@ -2542,7 +2562,7 @@ function renderPlanSupervisor(){
     const base=`Cobertura: ${AR.format(v.cccActual)}/${AR.format(v.metaCCC)} CCC (faltan ${AR.format(v.faltan)}). Ritmo necesario: ${v.ritmoDia}/día · tu ritmo reciente: ${Math.round(reciente*10)/10}/día.`;
     if(estado==='ALCANZABLE') return base+' Está a tu alcance con un poco más de foco.';
     if(estado==='DIFICIL') return base+' Requiere un esfuerzo grande — priorizá los clientes de tu ruta que todavía no compraron este mes (ver Ruta / No compradores).';
-    return base+' Al ritmo actual, llegar a la meta original ya no es realista este mes. No te frenes: sumá los clientes de ruta que puedas y arrancá el mes que viene con esa base ya visitada.';
+    return base+' Es un objetivo grande, pero cada cliente nuevo suma — priorizá los clientes de tu ruta que todavía no compraron este mes (ver Ruta / No compradores) y no aflojes el ritmo.';
   }
   function tileEstado(lab,estado,detalle){
     const e=EST[estado];
@@ -3044,8 +3064,8 @@ function renderMiDia(cod,targetWrap){
     if(DATA.msu){
       const estadoPillMd=e=>{
         if(e==='ALCANZABLE') return '<span class="pill ok">✓ Alcanzable</span>';
-        if(e==='DIFICIL') return '<span class="pill" style="background:var(--warn2);color:#fff">⚠️ Difícil pero posible</span>';
-        if(e==='FUERA_DE_ALCANCE') return '<span class="pill bad">🔴 Fuera de alcance realista</span>';
+        if(e==='DIFICIL') return '<span class="pill" style="background:var(--warn2);color:#fff">💪 Desafiante — se puede</span>';
+        if(e==='FUERA_DE_ALCANCE') return '<span class="pill bad">🔥 Muy desafiante — ¡se puede dar vuelta!</span>';
         return '';
       };
       const msuVen=(DATA.msu.porVendedor||[]).find(x=>x.cod===cod);
