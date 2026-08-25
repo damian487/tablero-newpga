@@ -555,7 +555,7 @@ const TAB_GROUPS=[
     {id:'p-covmarca',label:'Cobertura de marcas'},
     {id:'p-infaltables',label:'Infaltables'} ],
   [ {id:'p-plansup',label:'Plan de acción por supervisor'} ],
-  [ {id:'p-msu',label:'🎯 Meta MSU'},
+  [ {id:'p-msu',label:'🎯 Meta del trimestre'},
     {id:'p-accion',label:'🏷️ Acción precio'},
     {id:'p-combos',label:'🎁 Combos'},
     {id:'p-concurso',label:'🏆 Concurso Nubi'},
@@ -1295,43 +1295,46 @@ function renderAccion(){
 function renderMSU(){
   const p=document.getElementById('p-msu'); p.innerHTML='';
   const M=DATA.msu;
-  if(!M){ p.innerHTML='<div class="card"><div class="ctitle"><h2>🎯 Meta MSU</h2></div><p style="color:var(--muted)">Sin datos de MSU todavía.</p></div>'; return; }
+  if(!M){ p.innerHTML='<div class="card"><div class="ctitle"><h2>🎯 Meta del trimestre</h2></div><p style="color:var(--muted)">Sin datos todavía.</p></div>'; return; }
   const barColorFor=pc=>pc>=100?'var(--good)':(pc>=75?'var(--warn)':(pc>=40?'var(--warn2)':'var(--bad)'));
+  const cajasN=n=>AR.format(Math.round(n));
 
   const head=el('div','card');
-  head.appendChild(el('div','ctitle',`<h2>🎯 Meta MSU — Objetivo Nubi Sell-Out</h2><span class="hint">vigencia 01/07 al 30/09 · día ${M.diasTranscurridos} de ${M.diasTotales} · quedan ${M.diasRestantes} días</span>`));
+  head.appendChild(el('div','ctitle',`<h2>🎯 Meta del trimestre — Objetivo Nubi Sell-Out</h2><span class="hint">vigencia 01/07 al 30/09 · día ${M.diasTranscurridos} de ${M.diasTotales} · quedan ${M.diasRestantes} días</span>`));
   const g=el('div','grid g2');
   const pctBar1=Math.min(100,M.pctAvance);
-  const o1=el('div','supcard'); o1.innerHTML=`<h3>MSU acumulados</h3><div class="who">todas las categorías New PGA (Stat Factor oficial P&G)</div>
-    <div class="big num">${AR.format(M.real)}</div>
-    <div class="row"><span class="l">Meta trimestre</span><span class="v">${AR.format(M.meta)} MSU</span></div>
+  const o1=el('div','supcard'); o1.innerHTML=`<h3>Cajas vendidas</h3><div class="who">todas las categorías New PGA</div>
+    <div class="big num">${cajasN(M.cajasReal)}</div>
+    <div class="row"><span class="l">Meta trimestre</span><span class="v">${cajasN(M.metaCajas)} cajas</span></div>
     <div class="cov" style="margin-top:8px;justify-content:flex-start"><span class="track" style="width:100%"><span class="fill" style="width:${pctBar1}%;background:${barColorFor(M.pctAvance)}"></span></span><span class="pct num">${M.pctAvance}%</span></div>
-    <div class="row" style="margin-top:6px"><span class="l">Faltan</span><span class="v">${AR.format(M.faltan)} MSU</span></div>
-    <div class="row"><span class="l">Ritmo actual</span><span class="v">${M.ritmoActual} MSU/día</span></div>
-    <div class="row"><span class="l">Ritmo necesario (resto del trimestre)</span><span class="v" style="color:${M.ritmoNecesario>M.ritmoActual?'var(--bad)':'var(--good)'}">${M.ritmoNecesario} MSU/día</span></div>`;
-  const o2=el('div','supcard'); o2.innerHTML=`<h3>Equivalente en $</h3><div class="who">al mix de precios real vendido en el trimestre</div>
+    <div class="row" style="margin-top:6px"><span class="l">Faltan</span><span class="v">${cajasN(M.faltanCajas)} cajas</span></div>
+    <div class="row"><span class="l">Ritmo necesario (resto del trimestre)</span><span class="v">${cajasN(M.ritmoNecesarioCajas)} cajas/día</span></div>`;
+  const o2=el('div','supcard'); o2.innerHTML=`<h3>$ vendido</h3><div class="who">neto de devoluciones</div>
     <div class="big num">${peso(M.importeReal)}</div>
-    <div class="row"><span class="l">Meta equivalente (10 MSU)</span><span class="v">${peso(M.metaPesos)}</span></div>
-    <div class="row"><span class="l">$ por MSU</span><span class="v">${peso(M.pesoPorMSU)}</span></div>
-    <div class="cov" style="margin-top:8px;justify-content:flex-start"><span class="track" style="width:100%"><span class="fill" style="width:${pctBar1}%;background:${barColorFor(M.pctAvance)}"></span></span><span class="pct num">${M.pctAvance}%</span></div>`;
+    <div class="row"><span class="l">Meta trimestre</span><span class="v">${peso(M.metaPesos)}</span></div>
+    <div class="cov" style="margin-top:8px;justify-content:flex-start"><span class="track" style="width:100%"><span class="fill" style="width:${pctBar1}%;background:${barColorFor(M.pctAvance)}"></span></span><span class="pct num">${M.pctAvance}%</span></div>
+    <div class="row" style="margin-top:6px"><span class="l">Faltan</span><span class="v">${peso(M.faltanPesos)}</span></div>
+    <div class="row"><span class="l">Ritmo necesario (resto del trimestre)</span><span class="v">${peso(M.ritmoNecesarioPesos)}/día</span></div>`;
   g.appendChild(o1); g.appendChild(o2); head.appendChild(g);
-  head.appendChild(el('div','note','MSU = (Stat Factor oficial / 1000) x Unidades vendidas. El Stat Factor es el provisto por P&G (Data Logística.xlsx), no un valor derivado — validado contra el registro interno de P&G con menos de 5% de diferencia. A diferencia del viejo objetivo de $ (10 marcas del concurso), este cubre TODAS las categorías New PGA, incluyendo Cuidado de la Ropa (Downy).'));
+  head.appendChild(el('div','note',`Uso interno de gerencia: esto equivale a ${M.real} de ${M.meta} MSU (unidad estadística de P&G, Stat Factor oficial — validado contra el registro interno de P&G con menos de 5% de diferencia). Cajas y $ son la conversión de esa meta al mix real vendido; a diferencia del viejo objetivo de $ (10 marcas del concurso), esto cubre TODAS las categorías New PGA, incluyendo Cuidado de la Ropa (Downy).`));
   p.appendChild(head);
 
   /* ---- cascade por equipo ---- */
   if(M.porEquipo && M.porEquipo.length){
     const eqCard=el('div','card');
-    eqCard.appendChild(el('div','ctitle','<h2>Meta MSU cascadeada por equipo</h2><span class="hint">meta proporcional al universo de clientes vigente (no al peso histórico de venta) — para que la meta empuje a que todos vendan, no solo a quien ya vende más</span>'));
+    eqCard.appendChild(el('div','ctitle','<h2>Meta cascadeada por equipo</h2><span class="hint">meta proporcional al universo de clientes vigente (no al peso histórico de venta) — para que la meta empuje a que todos vendan, no solo a quien ya vende más</span>'));
     const sg=el('div','supgrid');
     M.porEquipo.forEach(eq=>{
       const bc=barColorFor(eq.pctAvance);
       const c=el('div','supcard');
       c.innerHTML=`<h3>${eq.supervisor}</h3><div class="who">universo: ${AR.format(eq.universo)} clientes</div>
-        <div class="big num">${eq.real} MSU</div>
-        <div class="row"><span class="l">Meta del equipo</span><span class="v">${eq.metaEquipo} MSU</span></div>
+        <div class="big num">${cajasN(eq.realCajas)} cajas</div>
+        <div class="row"><span class="l">Meta del equipo</span><span class="v">${cajasN(eq.metaEquipoCajas)} cajas</span></div>
+        <div class="row"><span class="l">$ vendido</span><span class="v">${peso(eq.realImporte)}</span></div>
+        <div class="row"><span class="l">Meta del equipo ($)</span><span class="v">${peso(eq.metaEquipoPesos)}</span></div>
         <div class="cov" style="margin-top:8px;justify-content:flex-start"><span class="track" style="width:100%"><span class="fill" style="width:${Math.min(100,eq.pctAvance)}%;background:${bc}"></span></span><span class="pct num">${eq.pctAvance}%</span></div>
-        <div class="row" style="margin-top:6px"><span class="l">Faltan</span><span class="v">${eq.faltan} MSU</span></div>
-        <div class="row"><span class="l">Ritmo necesario</span><span class="v">${eq.ritmoNecesario} MSU/día</span></div>`;
+        <div class="row" style="margin-top:6px"><span class="l">Faltan</span><span class="v">${cajasN(eq.faltanCajas)} cajas · ${peso(eq.faltanPesos)}</span></div>
+        <div class="row"><span class="l">Ritmo necesario</span><span class="v">${peso(eq.ritmoNecesarioPesos)}/día</span></div>`;
       sg.appendChild(c);
     });
     eqCard.appendChild(sg); p.appendChild(eqCard);
@@ -1340,25 +1343,26 @@ function renderMSU(){
   /* ---- por vendedor (seguimiento diario) ---- */
   if(M.porVendedor && M.porVendedor.length){
     const vCard=el('div','card');
-    vCard.appendChild(el('div','ctitle','<h2>Meta MSU por vendedor</h2><span class="hint">meta proporcional al universo de clientes · ritmo = faltan / días restantes al 30/09</span>'));
-    let h='<div class="twrap"><table><thead><tr><th>Vendedor</th><th>Equipo</th><th class="num">Universo</th><th class="num">Meta MSU</th><th class="num">Real MSU</th><th>Avance</th><th class="num">Ritmo necesario/día</th><th class="num">$ vendido</th></tr></thead><tbody>';
+    vCard.appendChild(el('div','ctitle','<h2>Meta por vendedor</h2><span class="hint">meta proporcional al universo de clientes · ritmo = faltan / días restantes al 30/09</span>'));
+    let h='<div class="twrap"><table><thead><tr><th>Vendedor</th><th>Equipo</th><th class="num">Universo</th><th class="num">Meta (cajas)</th><th class="num">Real (cajas)</th><th class="num">Meta ($)</th><th class="num">Real ($)</th><th>Avance</th><th class="num">Ritmo necesario/día</th></tr></thead><tbody>';
     M.porVendedor.slice().sort((a,b)=>a.pctAvance-b.pctAvance).forEach(v=>{
       const bc=barColorFor(v.pctAvance);
-      h+=`<tr><td class="name">${v.nombre}</td><td style="color:var(--muted)">${v.supervisor}</td><td class="num">${AR.format(v.universo)}</td><td class="num">${v.metaVen}</td><td class="num">${v.real}</td>
+      h+=`<tr><td class="name">${v.nombre}</td><td style="color:var(--muted)">${v.supervisor}</td><td class="num">${AR.format(v.universo)}</td><td class="num">${cajasN(v.metaVenCajas)}</td><td class="num">${cajasN(v.realCajas)}</td><td class="num">${peso(v.metaVenPesos)}</td><td class="num">${peso(v.importe)}</td>
         <td><div class="cov"><span class="pct num">${v.pctAvance}%</span><span class="track"><span class="fill" style="width:${Math.min(100,v.pctAvance)}%;background:${bc}"></span></span></div></td>
-        <td class="num">${v.ritmoNecesario}</td><td class="num">${peso(v.importe)}</td></tr>`;
+        <td class="num">${peso(v.ritmoNecesarioPesos)}</td></tr>`;
     });
     h+='</tbody></table></div>'; vCard.innerHTML+=h; p.appendChild(vCard);
   }
 
-  /* ---- por rubro ---- */
+  /* ---- por rubro (familia) ---- */
   if(M.porRubro && M.porRubro.length){
     const rCard=el('div','card');
-    rCard.appendChild(el('div','ctitle','<h2>MSU por rubro</h2><span class="hint">de cualquier familia se puede llegar a la meta — usar el stock disponible</span>'));
-    let h='<div class="twrap"><table><thead><tr><th>Rubro</th><th class="num">MSU</th><th class="num">% del total</th><th class="num">$ vendido</th></tr></thead><tbody>';
+    rCard.appendChild(el('div','ctitle','<h2>Cajas y $ por familia</h2><span class="hint">de cualquier familia se puede llegar a la meta — usar el stock disponible (pestaña Foco de venta)</span>'));
+    const totalImp=M.porRubro.reduce((a,r)=>a+r.importe,0);
+    let h='<div class="twrap"><table><thead><tr><th>Familia</th><th class="num">Cajas</th><th class="num">$ vendido</th><th class="num">% del total</th></tr></thead><tbody>';
     M.porRubro.forEach(r=>{
-      const shr=M.real>0?Math.round(1000*r.msu/M.real)/10:0;
-      h+=`<tr><td class="name">${r.rubro}</td><td class="num">${r.msu}</td><td class="num">${shr}%</td><td class="num">${peso(r.importe)}</td></tr>`;
+      const shr=totalImp>0?Math.round(1000*r.importe/totalImp)/10:0;
+      h+=`<tr><td class="name">${r.rubro}</td><td class="num">${cajasN(r.cajas)}</td><td class="num">${peso(r.importe)}</td><td class="num">${shr}%</td></tr>`;
     });
     h+='</tbody></table></div>'; rCard.innerHTML+=h; p.appendChild(rCard);
   }
@@ -3031,18 +3035,18 @@ function renderMiDia(cod,targetWrap){
       const msuVen=(DATA.msu.porVendedor||[]).find(x=>x.cod===cod);
       if(msuVen && msuVen.metaVen>0){
         const mvBar=msuVen.pctAvance>=100?'var(--good)':(msuVen.pctAvance>=75?'var(--warn)':(msuVen.pctAvance>=40?'var(--warn2)':'var(--bad)'));
-        h+=`<div class="md-progrow" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)"><span style="font-size:12.5px;color:var(--muted);font-weight:700">🎯 Objetivo MSU Personal (todas las categorías) · ${msuVen.metaVen} MSU</span><span style="font-size:14px;font-weight:800;color:${mvBar}">${msuVen.pctAvance}%</span></div>
+        h+=`<div class="md-progrow" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)"><span style="font-size:12.5px;color:var(--muted);font-weight:700">🎯 Objetivo Personal (todas las categorías) · ${peso(msuVen.metaVenPesos)}</span><span style="font-size:14px;font-weight:800;color:${mvBar}">${msuVen.pctAvance}%</span></div>
           <div class="md-track"><div class="md-fill" style="width:${Math.min(100,msuVen.pctAvance)}%;background:${mvBar}"></div></div>
-          <div class="md-subrow"><span>Real: ${msuVen.real} MSU</span><span>Ritmo necesario: ${msuVen.ritmoNecesario} MSU/día</span></div>`;
+          <div class="md-subrow"><span>Real: ${peso(msuVen.importe)} (≈${AR.format(Math.round(msuVen.realCajas))} cajas)</span><span>Ritmo necesario: ${peso(msuVen.ritmoNecesarioPesos)}/día</span></div>`;
       }
       const msuEq=(DATA.msu.porEquipo||[]).find(x=>x.supervisor===v.supervisor);
       if(msuEq){
         const meBar=msuEq.pctAvance>=100?'var(--good)':(msuEq.pctAvance>=75?'var(--warn)':(msuEq.pctAvance>=40?'var(--warn2)':'var(--bad)'));
-        h+=`<div class="md-progrow" style="margin-top:10px"><span style="font-size:12.5px;color:var(--muted);font-weight:700">🎯 Objetivo MSU Equipo · ${msuEq.metaEquipo} MSU</span><span style="font-size:14px;font-weight:800;color:${meBar}">${msuEq.pctAvance}%</span></div>
+        h+=`<div class="md-progrow" style="margin-top:10px"><span style="font-size:12.5px;color:var(--muted);font-weight:700">🎯 Objetivo Equipo · ${peso(msuEq.metaEquipoPesos)}</span><span style="font-size:14px;font-weight:800;color:${meBar}">${msuEq.pctAvance}%</span></div>
           <div class="md-track"><div class="md-fill" style="width:${Math.min(100,msuEq.pctAvance)}%;background:${meBar}"></div></div>
-          <div class="md-subrow"><span>Faltan ${msuEq.faltan} MSU</span><span>Ritmo necesario: ${msuEq.ritmoNecesario} MSU/día</span></div>`;
+          <div class="md-subrow"><span>Faltan ${peso(msuEq.faltanPesos)} (≈${AR.format(Math.round(msuEq.faltanCajas))} cajas)</span><span>Ritmo necesario: ${peso(msuEq.ritmoNecesarioPesos)}/día</span></div>`;
       }
-      h+='<span class="md-hint" style="margin-top:4px">Se puede llegar con cualquier familia de productos — priorizá el producto accionado y los combos activos (pestaña 🎯 Meta MSU) según lo que tengas disponible en stock.</span>';
+      h+='<span class="md-hint" style="margin-top:4px">Se puede llegar con cualquier familia de productos — priorizá el producto accionado y los combos activos (pestaña 🎯 Meta del trimestre) según lo que tengas disponible en stock.</span>';
     }
     if(DATA.concurso.cobertura){
       const covMeta=DATA.concurso.cobertura.meta, covReal=DATA.concurso.cobertura.real;
