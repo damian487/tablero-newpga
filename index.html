@@ -1324,7 +1324,7 @@ function renderMSU(){
     <div class="row" style="margin-top:6px"><span class="l">Faltan</span><span class="v">${peso(M.faltanPesos)}</span></div>
     <div class="row"><span class="l">Ritmo necesario (resto del trimestre)</span><span class="v">${peso(M.ritmoNecesarioPesos)}/día</span></div>`;
   g.appendChild(o1); g.appendChild(o2); head.appendChild(g);
-  head.appendChild(el('div','note',`Uso interno de gerencia: esto equivale a ${M.real} de ${M.meta} MSU (unidad estadística de P&G, Stat Factor oficial — validado contra el registro interno de P&G con menos de 5% de diferencia). Cajas y $ son la conversión de esa meta al mix real vendido; a diferencia del viejo objetivo de $ (10 marcas del concurso), esto cubre TODAS las categorías New PGA, incluyendo Cuidado de la Ropa (Downy).`));
+  head.appendChild(el('div','note',`Uso interno de gerencia: esto equivale a ${M.real} de ${M.meta} MSU (unidad estadística de P&G, Stat Factor oficial). Calibrado contra el registro interno de P&G (factor 1,0645, validado 25/8) para medir igual que ellos — así la meta en $ y cajas no queda corta respecto de lo que P&G reconoce para el premio. Cajas y $ son la conversión de esa meta al mix real vendido; a diferencia del viejo objetivo de $ (10 marcas del concurso), esto cubre TODAS las categorías New PGA, incluyendo Cuidado de la Ropa (Downy).`));
   p.appendChild(head);
 
   /* ---- cascade por equipo ---- */
