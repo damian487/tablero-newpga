@@ -490,6 +490,10 @@ const covColor = c => (c==null)?'var(--muted)':(c>=40?'var(--good)':c>=20?'var(-
 const TEAM_THRESH = { 'LUCY CEJAS':{g:80,y:60}, 'JUAN ARMANDOLA':{g:65,y:45} };
 const covColorTeam = (c,sup) => { const th=TEAM_THRESH[sup]; if(c==null) return 'var(--muted)'; if(!th) return covColor(c); return c>=th.g?'var(--good)':(c>=th.y?'var(--warn)':'var(--bad)'); };
 const alertClass = a => a==='OK'?'ok':a==='BAJA'?'warn':a==='SIN VENTA'?'bad':'neu';
+// umbral de color generico para barras de "% de avance de una meta" (no cobertura de universo,
+// esas usan covColor/covColorTeam) - mismo criterio ya usado en el panel MSU: 100%=cumplido,
+// 75-99%=bien encaminado, 40-74%=atencion, <40%=atrasado.
+const avanceColor = pc => pc>=100?'var(--good)':(pc>=75?'var(--warn)':(pc>=40?'var(--warn2)':'var(--bad)'));
 function grupoLabel(sup){
   if(sup.indexOf('N/A')<0) return sup;
   const base = sup.indexOf('Deposito')>=0?'Canal Depósito':(sup.indexOf('Mayorista')>=0?'Canal Mayorista':sup.replace('N/A - ',''));
@@ -801,7 +805,7 @@ function renderResultadosMes(){
     </div>`;
     if(CN.selloutPorEquipo&&CN.selloutPorEquipo.length){
       let h='<div class="twrap"><table><thead><tr><th>Equipo</th><th class="num">% avance sell-out</th></tr></thead><tbody>';
-      CN.selloutPorEquipo.forEach(e=>{ h+=`<tr><td>${grupoLabel(e.supervisor)}</td><td class="num"><div class="cov"><span class="pct num">${pct(e.pctAvance)}</span><span class="track"><span class="fill" style="width:${Math.min(100,e.pctAvance)}%;background:var(--accent)"></span></span></div></td></tr>`; });
+      CN.selloutPorEquipo.forEach(e=>{ h+=`<tr><td>${grupoLabel(e.supervisor)}</td><td class="num"><div class="cov"><span class="pct num">${pct(e.pctAvance)}</span><span class="track"><span class="fill" style="width:${Math.min(100,e.pctAvance)}%;background:${avanceColor(e.pctAvance)}"></span></span></div></td></tr>`; });
       h+='</tbody></table></div>'; cnCard.innerHTML+=h;
     }
     p.appendChild(cnCard);
@@ -2138,12 +2142,12 @@ function renderConcurso(){
   const o1=el('div','supcard'); o1.innerHTML=`<h3>Objetivo 1 · Sell-out (40 pts)</h3><div class="who">suma Jul+Ago+Sep</div>
     <div class="big num">${peso(C.sellout.real)}</div>
     <div class="row"><span class="l">Meta trimestre</span><span class="v">${peso(C.sellout.meta)}</span></div>
-    <div class="cov" style="margin-top:8px;justify-content:flex-start"><span class="track" style="width:100%"><span class="fill" style="width:${Math.min(100,soPct)}%"></span></span><span class="pct num">${soPct}%</span></div>`;
+    <div class="cov" style="margin-top:8px;justify-content:flex-start"><span class="track" style="width:100%"><span class="fill" style="width:${Math.min(100,soPct)}%;background:${avanceColor(soPct)}"></span></span><span class="pct num">${soPct}%</span></div>`;
   const coPct=Math.round(100*C.cobertura.real/C.cobertura.meta);
   const o2=el('div','supcard'); o2.innerHTML=`<h3>Objetivo 2 · Cobertura (40+ pts)</h3><div class="who">clientes únicos en el trimestre (10 marcas)</div>
     <div class="big num">${AR.format(C.cobertura.real)}</div>
     <div class="row"><span class="l">Meta trimestre</span><span class="v">${AR.format(C.cobertura.meta)}</span></div>
-    <div class="cov" style="margin-top:8px;justify-content:flex-start"><span class="track" style="width:100%"><span class="fill" style="width:${Math.min(100,coPct)}%"></span></span><span class="pct num">${coPct}%</span></div>`;
+    <div class="cov" style="margin-top:8px;justify-content:flex-start"><span class="track" style="width:100%"><span class="fill" style="width:${Math.min(100,coPct)}%;background:${avanceColor(coPct)}"></span></span><span class="pct num">${coPct}%</span></div>`;
   g.appendChild(o1);g.appendChild(o2); head.appendChild(g);
   head.appendChild(el('div','note','El sell-out corresponde a la distribuidora Pehuenia (referencia). La cobertura oficial sale de Thalamus; acá es la estimación desde la bajada con las 10 marcas del concurso.'));
   p.appendChild(head);
@@ -3005,8 +3009,8 @@ function renderMiDia(cod,targetWrap){
     const pct1=ma.metaCCC>0?Math.min(100,Math.round(100*ma.cccActual/ma.metaCCC)):0;
     h+=`<div class="md-card"><h2>Meta Cobertura Agosto</h2>
       <span class="md-hint">${ma.metaPct}% de tu universo (${AR.format(ma.universo)} clientes) → objetivo ${AR.format(ma.metaCCC)} con compra</span>
-      <div class="md-progrow"><b>${AR.format(ma.cccActual)} de ${AR.format(ma.metaCCC)} clientes</b><span style="font-size:14px;font-weight:800;color:var(--accent)">${pct1}%</span></div>
-      <div class="md-track"><div class="md-fill" style="width:${pct1}%;background:var(--accent)"></div></div>
+      <div class="md-progrow"><b>${AR.format(ma.cccActual)} de ${AR.format(ma.metaCCC)} clientes</b><span style="font-size:14px;font-weight:800;color:${avanceColor(pct1)}">${pct1}%</span></div>
+      <div class="md-track"><div class="md-fill" style="width:${pct1}%;background:${avanceColor(pct1)}"></div></div>
       <div class="md-subrow"><span>Faltan ${AR.format(ma.faltan)}</span><span>Ritmo necesario: ${ma.ritmoDia}/día</span></div>`;
     const semanasDef=DATA.metaAgosto.semanas||[];
     let semActual=null;
