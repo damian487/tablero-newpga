@@ -877,6 +877,25 @@ function renderCanales(){
   });
   ah+='</tbody></table></div>';ap.innerHTML+=ah;p.appendChild(ap);
 
+  // canal Mayorista y canal Deposito: no tienen universo/ruta real, quedan fuera de la apertura
+  // por subsegmento de arriba - se muestran aparte, con el detalle de sus vendedores.
+  const especiales=(DATA.porSupervisor||[]).filter(s=>s.supervisor.indexOf('N/A')>=0);
+  if(especiales.length){
+    const esp=el('div','card');
+    esp.appendChild(el('div','ctitle','<h2>Canal Mayorista y Depósito</h2><span class="hint">sin universo/ruta asignada — no entran en la apertura por subsegmento de arriba</span>'));
+    let eh='<div class="twrap"><table><thead><tr><th>Canal / Vendedor</th><th>CCC</th><th>Venta $ (c/IVA)</th><th>Líneas</th></tr></thead><tbody>';
+    especiales.slice().sort((a,b)=>b.venta-a.venta).forEach(s=>{
+      const vends=DATA.porVendedor.filter(v=>v.supervisor===s.supervisor).sort((a,b)=>b.venta-a.venta);
+      const lineasTot=vends.reduce((a,v)=>a+(v.lineas||0),0);
+      eh+=`<tr class="subhead"><td>${grupoLabel(s.supervisor)}</td><td class="num">${AR.format(s.ccc)}</td><td class="num">${peso(s.venta)}</td><td class="num">${AR.format(lineasTot)}</td></tr>`;
+      vends.forEach(v=>{
+        eh+=`<tr><td class="name">${v.nombre}</td><td class="num">${AR.format(v.ccc)}</td><td class="num">${peso(v.venta)}</td><td class="num">${AR.format(v.lineas||0)}</td></tr>`;
+      });
+    });
+    eh+='</tbody></table></div>';
+    esp.innerHTML+=eh; p.appendChild(esp);
+  }
+
   // apertura por supervisor y vendedor, dentro de cada canal agrupado
   if(DATA.porCanalVendedor){
     const cv=el('div','card');
