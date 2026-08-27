@@ -521,7 +521,12 @@ function renderHeaderKpis(){
   document.getElementById('st-fecha').textContent = fdate(DATA.meta.ultimaFecha)+'/'+DATA.meta.ultimaFecha.slice(0,4);
   document.getElementById('st-uni').textContent = 'Universo '+AR.format(DATA.meta.universoTotal)+' clientes';
   K=DATA.kpis;
+  const M=DATA.msu;
   const uni=AR.format(DATA.meta.universoTotal);
+  const msuFmt=n=>(n==null?'—':n.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}));
+  const cajasFmt=n=>(n==null?'—':AR.format(Math.round(n)));
+  const proyMSU = M ? M.real + M.ritmoReciente*M.diasRestantes : null;
+  const proyMSUCajas = (M && proyMSU!=null) ? proyMSU*M.cajasPorMSU : null;
   const kpiDefs=[
     {lab:'Venta P&G neta (c/IVA)',val:peso(K.venta),foot:'neta de devoluciones y NC · '+K.lineas.toLocaleString('es-AR')+' líneas',cls:'accent',
       tag: K.proyeccionCierre ? `<span class="kpi-tag-lab">Tendencia cierre</span>${peso(K.proyeccionCierre)}` : null,
@@ -535,6 +540,10 @@ function renderHeaderKpis(){
       if(!pc.length) return null;
       return pc.map(c=>`${c.canal.slice(0,4)} ${c.indice}%`).join(' · ');
     })()},
+    {lab:'Objetivo MSU',val:M?(msuFmt(M.meta)+' MSU'):'—',foot:'meta trimestral · Stat Factor oficial P&G',tag:M?`≈ ${cajasFmt(M.metaCajas)}&nbsp;cajas`:null},
+    {lab:'Alcance en MSU',val:M?(msuFmt(M.real)+' MSU'):'—',foot:M?(pct(M.pctAvance)+' del objetivo'):'',tag:M?`≈ ${cajasFmt(M.cajasReal)}&nbsp;cajas reales`:null},
+    {lab:'Tendencia cierre MSU',val:proyMSU!=null?(msuFmt(proyMSU)+' MSU'):'—',foot:'proyección al cierre del trimestre',tag:proyMSUCajas!=null?`≈ ${cajasFmt(proyMSUCajas)}&nbsp;cajas`:null,
+      tagTitle:M?`Alcance actual + ritmo de los últimos ${M.ritmoRecienteDias} días × ${M.diasRestantes} días restantes`:null},
     {lab:'Markup',val:pct(K.markup),foot:'ganancia sobre costo (sin IVA)',tag:'(venta − costo) ÷ costo'},
     {lab:'Margen',val:pct(K.margen),foot:'ganancia sobre venta (sin IVA)',tag:'(venta − costo) ÷ venta'},
   ];
