@@ -530,13 +530,13 @@ function renderHeaderKpis(){
     {lab:'% Cobertura P&G',val:pct(K.cobertura),foot:'sobre universo '+uni,tag:`CCC ${AR.format(K.cccEquipo)} / Universo ${uni}&nbsp;cli.`},
     {lab:'Ticket promedio',val:peso(K.ticket),foot:'venta / CCC',tag:`${peso(K.venta)} ÷ ${AR.format(K.cccEquipo)}&nbsp;cli.`},
     {lab:'Devoluciones',val:peso(K.devoluciones),foot:K.devPct+'% s/venta',cls:'bad',tag:`${AR.format(K.devClientes)}&nbsp;cli. afectados`},
-    {lab:'Margen',val:pct(K.margen),foot:'ganancia sobre venta (sin IVA)',tag:'(venta − costo) ÷ venta'},
-    {lab:'Markup',val:pct(K.markup),foot:'ganancia sobre costo (sin IVA)',tag:'(venta − costo) ÷ costo'},
     {lab:'% Infaltables',val:pct(K.infaltablesPct||0),foot:'cobertura de SKU clave del mes',tag:(function(){
       const pc=(DATA.infaltables&&DATA.infaltables.porCanal)||[];
       if(!pc.length) return null;
       return pc.map(c=>`${c.canal.slice(0,4)} ${c.indice}%`).join(' · ');
     })()},
+    {lab:'Markup',val:pct(K.markup),foot:'ganancia sobre costo (sin IVA)',tag:'(venta − costo) ÷ costo'},
+    {lab:'Margen',val:pct(K.margen),foot:'ganancia sobre venta (sin IVA)',tag:'(venta − costo) ÷ venta'},
   ];
   const kel=document.getElementById('kpis'); kel.innerHTML='';
   kpiDefs.forEach(k=>{const c=el('div','kpi'+(k.cls?' '+k.cls:'')); c.innerHTML=`<div class="lab">${k.lab}</div><div class="val num">${k.val}</div><div class="foot">${k.foot}</div>`;
