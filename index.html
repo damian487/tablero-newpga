@@ -61,7 +61,7 @@ header{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--surfa
 .mesbox select{font-size:13px;font-weight:700;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--ink);cursor:pointer}
 
 /* KPI strip */
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;padding:18px 0}
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;padding:18px 0}
 .kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 15px;box-shadow:var(--shadow);position:relative;overflow:hidden}
 .kpi .lab{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700}
 .kpi .val{font-size:23px;font-weight:800;letter-spacing:-.02em;margin-top:6px}
@@ -544,12 +544,13 @@ function renderHeaderKpis(){
     {lab:'Alcance en MSU',val:M?(msuFmt(M.real)+' MSU'):'—',foot:M?(pct(M.pctAvance)+' del objetivo'):'',tag:M?`≈ ${cajasFmt(M.cajasReal)}&nbsp;cajas reales`:null},
     {lab:'Tendencia cierre MSU',val:proyMSU!=null?(msuFmt(proyMSU)+' MSU'):'—',foot:'proyección al cierre del trimestre',tag:proyMSUCajas!=null?`≈ ${cajasFmt(proyMSUCajas)}&nbsp;cajas`:null,
       tagTitle:M?`Alcance actual + ritmo de los últimos ${M.ritmoRecienteDias} días × ${M.diasRestantes} días restantes`:null},
-    {lab:'Markup',val:pct(K.markup),foot:'ganancia sobre costo (sin IVA)',tag:'(venta − costo) ÷ costo'},
-    {lab:'Margen',val:pct(K.margen),foot:'ganancia sobre venta (sin IVA)',tag:'(venta − costo) ÷ venta'},
+    {lab:'Markup',val:pct(K.markup),foot:'ganancia sobre costo (sin IVA)',tag:'(venta − costo) ÷ costo',gridCol:5},
+    {lab:'Margen',val:pct(K.margen),foot:'ganancia sobre venta (sin IVA)',tag:'(venta − costo) ÷ venta',gridCol:6},
   ];
   const kel=document.getElementById('kpis'); kel.innerHTML='';
   kpiDefs.forEach(k=>{const c=el('div','kpi'+(k.cls?' '+k.cls:'')); c.innerHTML=`<div class="lab">${k.lab}</div><div class="val num">${k.val}</div><div class="foot">${k.foot}</div>`;
     if(k.tag){ c.innerHTML+=`<div class="kpi-tag"${k.tagTitle?` title="${k.tagTitle}"`:''}>${k.tag}</div>`; }
+    if(k.gridCol && window.innerWidth>900){ c.style.gridColumn=String(k.gridCol); }
     kel.appendChild(c);});
 }
 
