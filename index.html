@@ -336,6 +336,9 @@ td.name{font-weight:600}
 .bot-inputrow button{border:none;background:var(--accent);color:#fff;font-weight:700;font-size:13px;
   padding:9px 16px;border-radius:10px;cursor:pointer}
 .bot-inputrow button:disabled{opacity:.6;cursor:default}
+#botMic{background:var(--surface2);color:var(--ink);border:1px solid var(--border);padding:9px 12px;font-size:15px}
+#botMic.listening{background:var(--bad);color:#fff;border-color:transparent;animation:botmicpulse 1.1s ease-in-out infinite}
+@keyframes botmicpulse{0%,100%{box-shadow:0 0 0 0 rgba(192,68,46,.45)}50%{box-shadow:0 0 0 8px rgba(192,68,46,0)}}
 @media (max-width:480px){.bot-panel{right:12px;left:12px;width:auto;bottom:82px}.bot-fab{right:16px;bottom:16px}}
 </style>
 
@@ -411,6 +414,7 @@ td.name{font-weight:600}
   <div id="botMsgs" class="bot-msgs"></div>
   <div class="bot-inputrow">
     <input id="botInput" type="text" placeholder="¿Cómo viene la venta de hoy?" autocomplete="off">
+    <button id="botMic" type="button" title="Preguntar por voz" aria-label="Preguntar por voz">🎤</button>
     <button id="botSend">Enviar</button>
   </div>
 </div>
@@ -3397,8 +3401,28 @@ function botMd(s){ return escapeHtml(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').re
 (function initBot(){
   const fab=document.getElementById('botFab'), panel=document.getElementById('botPanel'),
         closeBtn=document.getElementById('botClose'), msgs=document.getElementById('botMsgs'),
-        input=document.getElementById('botInput'), sendBtn=document.getElementById('botSend');
+        input=document.getElementById('botInput'), sendBtn=document.getElementById('botSend'),
+        micBtn=document.getElementById('botMic');
   if(!fab) return;
+
+  // Consulta por voz (Web Speech API - nativo del navegador, sin backend ni costo). Chrome/Edge la
+  // soportan bien; Firefox de escritorio no la tiene - en ese caso se oculta el boton solo.
+  (function initMic(){
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if(!micBtn) return;
+    if(!SR){ micBtn.style.display='none'; return; }
+    const rec = new SR();
+    rec.lang='es-AR'; rec.interimResults=false; rec.maxAlternatives=1;
+    let escuchando=false;
+    rec.onresult=(e)=>{ input.value=e.results[0][0].transcript; sendMsg(); };
+    rec.onerror=()=>{ escuchando=false; micBtn.classList.remove('listening'); };
+    rec.onend=()=>{ escuchando=false; micBtn.classList.remove('listening'); };
+    micBtn.onclick=()=>{
+      if(escuchando){ rec.stop(); return; }
+      escuchando=true; micBtn.classList.add('listening');
+      try{ rec.start(); }catch(e){ escuchando=false; micBtn.classList.remove('listening'); }
+    };
+  })();
 
   function addMsg(html,who){
     const b=el('div','bot-msg '+who,html);
