@@ -1603,44 +1603,68 @@ function renderRuta(){
   const R=DATA.ruta;
   if(!R){ p.innerHTML='<div class="card"><div class="ctitle"><h2>Ruta / No compradores</h2></div><p style="color:var(--muted)">Sin datos de ruta.</p></div>'; return; }
   const DIAS={Lu:'Lunes',Ma:'Martes',Mi:'Miércoles',Ju:'Jueves',Vi:'Viernes'};
+  const MESES_LBL={'01':'Enero','02':'Febrero','03':'Marzo','04':'Abril','05':'Mayo','06':'Junio','07':'Julio','08':'Agosto','09':'Septiembre','10':'Octubre','11':'Noviembre','12':'Diciembre'};
+  const mesLbl=m=>MESES_LBL[m.slice(5,7)]||m;
   const dias=R.dias||['Lu','Ma','Mi','Ju','Vi'], vends=R.vendedores, CLI=R.clientes;
+  const mesesDisp=R.meses||[]; // ej ['2026-07','2026-08'] - crece solo mes a mes
+  const mesActual=mesesDisp[mesesDisp.length-1];
+  const mesesChk=new Set(mesesDisp); // por defecto: todos marcados (rango completo disponible)
   const card=el('div','card');
-  let head='<div class="ctitle"><h2>Ruta por día y no compradores del mes</h2><span class="hint">clientes de la ruta que NO compraron en todo el mes (afectan la cobertura)</span></div>';
+  let head='<div class="ctitle"><h2>Ruta por día y no compradores</h2><span class="hint">clientes de la ruta que NO compraron en el período elegido (afectan la cobertura)</span></div>';
   head+='<div style="display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 12px">';
   head+='<select id="ruF" class="fsel">'+dias.map((d,i)=>`<option value="${d}"${i===0?' selected':''}>Ruta ${DIAS[d]||d}</option>`).join('')+'<option value="__all">Todas (semana completa)</option></select>';
   head+='<select id="ruV" class="fsel">'+vends.map(v=>`<option value="${v.cod}">${v.nombre}</option>`).join('')+'</select>';
-  head+='<select id="ruFil" class="fsel"><option value="no">Solo NO compradores del mes</option><option value="all">Toda la ruta</option></select>';
+  head+='<select id="ruFil" class="fsel"><option value="no">Solo NO compradores del mes actual</option><option value="rango">No compradores en meses elegidos</option><option value="all">Toda la ruta</option></select>';
   head+='<button id="ruPrint" class="tab no-print">🖨️ Imprimir / PDF</button>';
-  head+='</div><div id="ruSum"></div><div id="ruBox"></div>';
+  head+='</div><div id="ruMeses" style="display:none;margin:-4px 0 12px;padding:10px 12px;background:var(--surface2);border-radius:10px"></div><div id="ruSum"></div><div id="ruBox"></div>';
   card.innerHTML=head; p.appendChild(card);
-  const ruF=card.querySelector('#ruF'), ruV=card.querySelector('#ruV'), ruFil=card.querySelector('#ruFil'), sumEl=card.querySelector('#ruSum'), box=card.querySelector('#ruBox');
+  const ruF=card.querySelector('#ruF'), ruV=card.querySelector('#ruV'), ruFil=card.querySelector('#ruFil'), mesesBox=card.querySelector('#ruMeses'), sumEl=card.querySelector('#ruSum'), box=card.querySelector('#ruBox');
   card.querySelector('#ruPrint').addEventListener('click',()=>{ document.body.classList.add('print-ruta'); setTimeout(()=>{ try{window.print();}catch(e){} setTimeout(()=>document.body.classList.remove('print-ruta'),400); },60); });
+  function drawMesesUI(){
+    if(ruFil.value!=='rango'){ mesesBox.style.display='none'; return; }
+    mesesBox.style.display='block';
+    mesesBox.innerHTML='<span style="font-size:11.5px;color:var(--muted);font-weight:700;margin-right:8px">Meses a considerar (sin compra en NINGUNO de los marcados):</span>'+
+      mesesDisp.map(m=>`<label style="margin-right:14px;font-size:13px;cursor:pointer"><input type="checkbox" data-mes="${m}" ${mesesChk.has(m)?'checked':''} style="margin-right:4px;vertical-align:middle">${mesLbl(m)}${m===mesActual?' (actual)':''}</label>`).join('');
+    mesesBox.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+      cb.onchange=()=>{ const m=cb.dataset.mes; if(cb.checked) mesesChk.add(m); else mesesChk.delete(m); draw(); };
+    });
+  }
+  function sinCompraEnRango(porMes){
+    if(!mesesChk.size) return false;
+    for(const m of mesesChk){ if(porMes[m]) return false; }
+    return true;
+  }
   function draw(){
+    drawMesesUI();
     const d=ruF.value, vc=ruV.value, fil=ruFil.value;
     let dv;
     if(d==='__all'){
       const seen=new Map();
-      dias.forEach(dd=>{ const dvd=(R.data[dd]||{})[vc]; if(dvd) dvd.cl.forEach(r=>{ seen.set(r[0],r[1]); }); });
-      const cl=[...seen.entries()];
+      dias.forEach(dd=>{ const dvd=(R.data[dd]||{})[vc]; if(dvd) dvd.cl.forEach(r=>{ seen.set(r[0],r); }); });
+      const cl=[...seen.values()];
       dv = cl.length? {p:cl.length, c:cl.filter(r=>r[1]===1).length, cl} : null;
     }else{
       dv=(R.data[d]||{})[vc];
     }
     if(!dv){ sumEl.innerHTML=''; box.innerHTML='<div class="card"><p style="color:var(--muted)">Este vendedor no tiene ruta '+(d==='__all'?'asignada':'ese día')+'.</p></div>'; return; }
     const plan=dv.p, comp=dv.c, no=plan-comp, ef=plan?Math.round(1000*comp/plan)/10:0;
+    const noRango=fil==='rango'?dv.cl.filter(r=>sinCompraEnRango(r[2])).length:null;
     sumEl.innerHTML=`<div class="kpitiles" style="grid-template-columns:repeat(4,1fr)">
       <div class="supcard"><h3>Clientes de la ruta</h3><div class="big num">${AR.format(plan)}</div><div class="who">${d==='__all'?'toda la semana (Lu-Vi)':'día '+(DIAS[d]||d)}</div></div>
-      <div class="supcard"><h3>Compraron en el mes</h3><div class="big num" style="color:var(--good)">${AR.format(comp)}</div><div class="who">ya son CCC</div></div>
-      <div class="supcard"><h3>No compraron</h3><div class="big num" style="color:var(--bad)">${AR.format(no)}</div><div class="who">a buscar (sin compra en el mes)</div></div>
-      <div class="supcard"><h3>Cobertura</h3><div class="big num">${pct(ef)}</div><div class="who">de la ruta</div></div></div>`;
+      <div class="supcard"><h3>Compraron el mes actual</h3><div class="big num" style="color:var(--good)">${AR.format(comp)}</div><div class="who">ya son CCC</div></div>
+      <div class="supcard"><h3>${fil==='rango'?'No compraron en el rango':'No compraron'}</h3><div class="big num" style="color:var(--bad)">${AR.format(fil==='rango'?noRango:no)}</div><div class="who">${fil==='rango'?'sin compra en ningún mes marcado':'a buscar (sin compra en el mes)'}</div></div>
+      <div class="supcard"><h3>Cobertura</h3><div class="big num">${pct(ef)}</div><div class="who">de la ruta (mes actual)</div></div></div>`;
     let rows=dv.cl.slice();
     if(fil==='no') rows=rows.filter(r=>r[1]===0);
+    else if(fil==='rango') rows=rows.filter(r=>sinCompraEnRango(r[2]));
     rows.sort((a,b)=>a[1]-b[1]);
     const vendName=(vends.find(v=>v.cod===vc)||{}).nombre||'';
     const diaLbl = d==='__all' ? 'Todas las rutas (semana completa)' : ('Ruta '+(DIAS[d]||d));
-    let h='<div class="card"><div class="ctitle"><h2>'+(fil==='no'?'No compradores del mes':'Ruta')+' — '+vendName+'</h2><span class="hint">'+diaLbl+' · '+rows.length+' clientes</span></div><div class="twrap"><table><thead><tr><th>Cliente</th><th>Dirección</th><th>Subsegmento</th><th>Estado</th></tr></thead><tbody>';
-    rows.forEach(r=>{ const ci=CLI[r[0]]||['(s/d)','','']; const ok=r[1]===1;
-      h+=`<tr><td class="name">${r[0]} - ${ci[0]}</td><td style="color:var(--muted);font-size:11px">${ci[2]||''}</td><td style="color:var(--muted)">${ci[1]||''}</td><td class="num" style="color:${ok?'var(--good)':'var(--bad)'};font-weight:700">${ok?'✅ compró en el mes':'❌ sin compra en el mes'}</td></tr>`; });
+    const tituloFil = fil==='rango' ? ('No compradores ('+[...mesesChk].sort().map(mesLbl).join('+')+')') : (fil==='no'?'No compradores del mes actual':'Ruta');
+    let h='<div class="card"><div class="ctitle"><h2>'+tituloFil+' — '+vendName+'</h2><span class="hint">'+diaLbl+' · '+rows.length+' clientes</span></div><div class="twrap"><table><thead><tr><th>Cliente</th><th>Dirección</th><th>Subsegmento</th><th>Estado</th></tr></thead><tbody>';
+    rows.forEach(r=>{ const ci=CLI[r[0]]||['(s/d)','','']; const ok = fil==='rango' ? !sinCompraEnRango(r[2]) : r[1]===1;
+      const txt = fil==='rango' ? (ok?'✅ compró en algún mes marcado':'❌ sin compra en el rango marcado') : (ok?'✅ compró en el mes':'❌ sin compra en el mes');
+      h+=`<tr><td class="name">${r[0]} - ${ci[0]}</td><td style="color:var(--muted);font-size:11px">${ci[2]||''}</td><td style="color:var(--muted)">${ci[1]||''}</td><td class="num" style="color:${ok?'var(--good)':'var(--bad)'};font-weight:700">${txt}</td></tr>`; });
     h+='</tbody></table></div></div>'; box.innerHTML=h;
   }
   ruF.onchange=draw; ruV.onchange=draw; ruFil.onchange=draw; draw();
