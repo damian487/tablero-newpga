@@ -534,7 +534,7 @@ function renderHeaderKpis(){
   const kpiDefs=[
     {lab:'Venta P&G neta (c/IVA)',val:peso(K.venta),foot:'neta de devoluciones y NC · '+K.lineas.toLocaleString('es-AR')+' líneas',cls:'accent',
       tag: K.proyeccionCierre ? `<span class="kpi-tag-lab">Tendencia cierre</span>${peso(K.proyeccionCierre)}` : null,
-      tagTitle: K.proyeccionCierre ? `Venta acumulada ÷ ${K.diasTranscurridos} días con actividad × ${K.diasHabilesMes} días hábiles del mes (Lun-Sáb)` : null},
+      tagTitle: K.proyeccionCierre ? `Venta acumulada ÷ ${K.diasTranscurridos} días con actividad × ${K.diasHabilesMes} días hábiles del mes (Lun-Vie)` : null},
     {lab:'Clientes con compra',val:AR.format(K.cccEquipo),foot:'CCC equipo',tag:`Universo ${uni}&nbsp;cli.`},
     {lab:'% Cobertura P&G',val:pct(K.cobertura),foot:'sobre universo '+uni,tag:`CCC ${AR.format(K.cccEquipo)} / Universo ${uni}&nbsp;cli.`},
     {lab:'Ticket promedio',val:peso(K.ticket),foot:'venta / CCC',tag:`${peso(K.venta)} ÷ ${AR.format(K.cccEquipo)}&nbsp;cli.`},
@@ -765,7 +765,7 @@ function renderResultadosMes(){
   const mesAnt=HM[HM.length-2], mesAct=HM[HM.length-1];
   function mesLabel(s){ const [y,m]=s.split('-'); return MESES_ES[parseInt(m,10)-1]+' '+y; }
   function diasHabilesDelMes(s){ const [y,m]=s.split('-').map(Number); const ult=new Date(Date.UTC(y,m,0)).getUTCDate();
-    let n=0; for(let d=1;d<=ult;d++){ if(new Date(Date.UTC(y,m-1,d)).getUTCDay()!==0) n++; } return n; }
+    let n=0; for(let d=1;d<=ult;d++){ const dow=new Date(Date.UTC(y,m-1,d)).getUTCDay(); if(dow>=1&&dow<=5) n++; } return n; }
   function deltaPct(nuevo,viejo){ return viejo?Math.round(1000*(nuevo-viejo)/viejo)/10:null; }
   function deltaTag(d,invertido){ if(d==null) return ''; const bueno=invertido?d<0:d>0; const color=Math.abs(d)<1?'var(--muted)':(bueno?'var(--good)':'var(--bad)'); const flecha=d>0?'▲':(d<0?'▼':'·');
     return `<div class="who" style="color:${color};font-weight:700">${flecha} ${Math.abs(d)}% vs ${mesLabel(mesAnt.mes)}</div>`; }
