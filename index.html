@@ -1383,6 +1383,13 @@ function renderMSU(){
     <div class="row" style="margin-top:6px"><span class="l">Faltan</span><span class="v">${peso(M.faltanPesos)}</span></div>
     <div class="row"><span class="l">Ritmo necesario (resto del trimestre)</span><span class="v">${peso(M.ritmoNecesarioPesos)}/día</span></div>`;
   g.appendChild(o1); g.appendChild(o2); head.appendChild(g);
+  if(M.alcanceSinMayorista){
+    const SM=M.alcanceSinMayorista;
+    head.appendChild(el('div','note',
+      `<b>Doble alcance:</b> el número de arriba incluye canal Mayorista/Depósito. Sin esos canales (solo equipos Lucy/Juan): `+
+      `${cajasN(SM.cajasReal)} cajas (${pct(SM.pctAvance)} del objetivo) · ${peso(SM.importeReal)} (${pct(SM.pctAvancePesos)} de la meta en $) — `+
+      `diferencia de ${cajasN(M.cajasReal-SM.cajasReal)} cajas / ${peso(M.importeReal-SM.importeReal)} atribuible a Mayorista/Depósito.`));
+  }
   head.appendChild(el('div','note',`Uso interno de gerencia: esto equivale a ${M.real} de ${M.meta} MSU (unidad estadística de P&G, Stat Factor oficial). Calibrado contra el registro interno de P&G (factor 1,0645, validado 25/8) para medir igual que ellos — así la meta en $ y cajas no queda corta respecto de lo que P&G reconoce para el premio. Cajas y $ son la conversión de esa meta al mix real vendido; a diferencia del viejo objetivo de $ (10 marcas del concurso), esto cubre TODAS las categorías New PGA, incluyendo Cuidado de la Ropa (Downy). ¿No te queda claro cómo se calcula? Hay un Glosario completo en la pestaña 🏆 Concurso Nubi.`));
   p.appendChild(head);
 
@@ -2211,6 +2218,11 @@ function renderConcurso(){
     <div class="cov" style="margin-top:8px;justify-content:flex-start"><span class="track" style="width:100%"><span class="fill" style="width:${Math.min(100,coPct)}%;background:${avanceColor(coPct)}"></span></span><span class="pct num">${coPct}%</span></div>`;
   g.appendChild(o1);g.appendChild(o2); head.appendChild(g);
   head.appendChild(el('div','note','El sell-out corresponde a la distribuidora Pehuenia (referencia). La cobertura oficial sale de Thalamus; acá es la estimación desde la bajada con las 10 marcas del concurso.'));
+  if(C.selloutSinMayorista){
+    const SM=C.selloutSinMayorista;
+    const smPct=C.sellout.meta>0?Math.round(100*SM.real/C.sellout.meta):0;
+    head.appendChild(el('div','note',`<b>Doble alcance:</b> el Sell-out de arriba incluye canal Mayorista/Depósito. Sin esos canales: ${peso(SM.real)} (${smPct}% de la meta) — diferencia de ${peso(C.sellout.real-SM.real)} atribuible a Mayorista/Depósito.`));
+  }
   p.appendChild(head);
 
   /* ---- Glosario: como se mide el concurso, para quien no conoce el tema ---- */
