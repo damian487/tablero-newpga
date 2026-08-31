@@ -579,7 +579,7 @@ const TAB_GROUPS=[
     {id:'p-combos',label:'🎁 Combos'},
     {id:'p-concurso',label:'🏆 Concurso Nubi'},
     {id:'p-msu',label:'🎯 Meta del trimestre'},
-    {id:'p-metaago',label:'🎯 Meta Cobertura Agosto'},
+    {id:'p-metaago',label:'🎯 Meta Cobertura del mes'},
     {id:'p-matinal',label:'🌅 Matinal'},
     {id:'p-mapa',label:'🗺️ Mapa'} ],
 ];
@@ -1741,16 +1741,17 @@ function renderCoberturaMarcas(){
   selV.onchange=draw; selSort.onchange=draw; draw();
 }
 
-/* ---------- PANEL: Meta de Cobertura Agosto (independiente del Concurso Nubi) ---------- */
+/* ---------- PANEL: Meta de Cobertura del mes vigente (independiente del Concurso Nubi) ---------- */
 function renderMetaAgosto(){
   const p=document.getElementById('p-metaago'); p.innerHTML='';
   const M=DATA.metaAgosto;
-  if(!M){ p.innerHTML='<div class="card"><div class="ctitle"><h2>Meta Cobertura Agosto</h2></div><p style="color:var(--muted)">Sin datos de meta de agosto.</p></div>'; return; }
+  if(!M){ p.innerHTML='<div class="card"><div class="ctitle"><h2>Meta Cobertura del mes</h2></div><p style="color:var(--muted)">Sin datos de meta del mes.</p></div>'; return; }
+  const mesMetaLbl = MESES_ES[parseInt(M.vigenciaDesde.slice(5,7),10)-1]+' '+M.vigenciaHasta.slice(0,4);
   const head=el('div','card');
   const nota = M.esAgosto
     ? 'En curso · progreso real del mes cargado abajo.'
-    : `Plan armado con el universo actual · arranca el ${fdate(M.vigenciaDesde)} · el progreso real (CCC/faltan/ritmo) se activa solo cuando la corrida automática empiece a traer datos de agosto.`;
-  head.appendChild(el('div','ctitle',`<h2>🎯 Meta de Cobertura — Agosto 2026</h2><span class="hint">objetivo de clientes con compra (CCC) por vendedor, independiente del Concurso Nubi · ${nota}</span>`));
+    : `Plan armado con el universo actual · arranca el ${fdate(M.vigenciaDesde)} · el progreso real (CCC/faltan/ritmo) se activa solo cuando la corrida automática empiece a traer datos del mes.`;
+  head.appendChild(el('div','ctitle',`<h2>🎯 Meta de Cobertura — ${mesMetaLbl}</h2><span class="hint">objetivo de clientes con compra (CCC) por vendedor, independiente del Concurso Nubi · ${nota}</span>`));
   const sg=el('div','supgrid');
   M.porSupervisor.forEach(s=>{
     const cob=s.universo>0?Math.round(1000*s.cccActual/s.universo)/10:0;
@@ -1793,7 +1794,7 @@ function renderMetaAgosto(){
   });
   h+='</tbody></table></div>'; t.innerHTML+=h; p.appendChild(t);
   p.appendChild(el('div','note','Real acumulado = clientes distintos con compra desde el 01/08 hasta el corte de esa semana (mismo criterio que "CCC actual"). No es la venta de esa semana sola — si superó la meta en una semana, ese excedente sigue contando en las semanas siguientes.'));
-  p.appendChild(el('div','note','Ritmo/día = clientes con compra (CCC) a sumar por cada día hábil (Lu-Vi) restante del mes para llegar a la meta. Antes de que arranque agosto, el ritmo mostrado es el ideal (parejo en los 21 días hábiles); una vez cargando datos reales de agosto, se recalcula sobre los días hábiles que quedan.'));
+  p.appendChild(el('div','note','Ritmo/día = clientes con compra (CCC) a sumar por cada día hábil (Lu-Vi) restante del mes para llegar a la meta. Antes de que arranque el mes, el ritmo mostrado es el ideal (parejo en los días hábiles totales); una vez cargando datos reales del mes, se recalcula sobre los días hábiles que quedan.'));
 }
 
 /* ---------- PANEL: Seguimiento diario Agosto (objetivo vs real, por vendedor, con arrastre) ---------- */
@@ -2371,7 +2372,7 @@ function renderConcurso(){
         }
       }
       sh+='</tbody></table></div>'; scBox.innerHTML=sh;
-      scBox.innerHTML+='<div class="note">Meta equipo: Lucy Cejas 80% · Juan Armandola 65% de cobertura sobre su universo total (mismo criterio que Meta Cobertura Agosto, aplicado al trimestre del concurso; a nivel vendedor/canal individual no aplica meta propia). El 1.702 clientes / 61,5% es la meta de cobertura del concurso Nubi sobre el universo total (dato del concurso, no reemplaza la meta por equipo).</div>';
+      scBox.innerHTML+='<div class="note">Meta equipo: Lucy Cejas 80% · Juan Armandola 65% de cobertura sobre su universo total (mismo criterio que Meta Cobertura del mes, aplicado al trimestre del concurso; a nivel vendedor/canal individual no aplica meta propia). El 1.702 clientes / 61,5% es la meta de cobertura del concurso Nubi sobre el universo total (dato del concurso, no reemplaza la meta por equipo).</div>';
     }
     selFecha.onchange=drawSupCanal; selVend.onchange=drawSupCanal;
     drawSupCanal();
@@ -3063,10 +3064,11 @@ function renderMiDia(cod,targetWrap){
     h+='</div>';
   }
 
-  /* ---- META COBERTURA AGOSTO ---- */
+  /* ---- META COBERTURA DEL MES ---- */
   if(ma){
     const pct1=ma.metaCCC>0?Math.min(100,Math.round(100*ma.cccActual/ma.metaCCC)):0;
-    h+=`<div class="md-card"><h2>Meta Cobertura Agosto</h2>
+    const mesMdLbl=MESES_ES[parseInt(DATA.metaAgosto.vigenciaDesde.slice(5,7),10)-1]+' '+DATA.metaAgosto.vigenciaHasta.slice(0,4);
+    h+=`<div class="md-card"><h2>Meta Cobertura — ${mesMdLbl}</h2>
       <span class="md-hint">${ma.metaPct}% de tu universo (${AR.format(ma.universo)} clientes) → objetivo ${AR.format(ma.metaCCC)} con compra</span>
       <div class="md-progrow"><b>${AR.format(ma.cccActual)} de ${AR.format(ma.metaCCC)} clientes</b><span style="font-size:14px;font-weight:800;color:${avanceColor(pct1)}">${pct1}%</span></div>
       <div class="md-track"><div class="md-fill" style="width:${pct1}%;background:${avanceColor(pct1)}"></div></div>
