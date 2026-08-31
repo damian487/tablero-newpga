@@ -3423,7 +3423,8 @@ function botMd(s){ return escapeHtml(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').re
     if(!vozActiva || !texto || !window.speechSynthesis) return;
     try{
       window.speechSynthesis.cancel(); // no se pisan respuestas habladas una arriba de otra
-      const u=new SpeechSynthesisUtterance(texto);
+      const limpio=texto.replace(/\*\*(.+?)\*\*/g,'$1').replace(/[*_#]/g,'');
+      const u=new SpeechSynthesisUtterance(limpio);
       u.lang='es-AR'; u.rate=1.02;
       const voces=window.speechSynthesis.getVoices();
       const voz=voces.find(v=>v.lang==='es-AR')||voces.find(v=>v.lang&&v.lang.startsWith('es'));
