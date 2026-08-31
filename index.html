@@ -3348,11 +3348,61 @@ function respCoberturaEquipo(){
   s+=(DATA.porSupervisor||[]).filter(sp=>sp.supervisor.indexOf('N/A')<0).map(sp=>`• ${sp.supervisor}: ${pct(sp.cobertura)} (${AR.format(sp.ccc)} de ${AR.format(sp.universo)})`).join('\n');
   return s;
 }
+function respCombosMasVendidos(){
+  const lista=(DATA.combos&&DATA.combos.lista)||[];
+  if(!lista.length) return null;
+  const top=lista.slice().sort((a,b)=>(b.total?.acumImp||0)-(a.total?.acumImp||0)).filter(c=>(c.total?.acumImp||0)>0).slice(0,5);
+  if(!top.length) return 'Todavía no hay ventas registradas en ningún combo este mes.';
+  let s='**Combos más vendidos** (acumulado del mes):\n\n';
+  s+=top.map((c,i)=>`${i+1}. **${c.nombre}** — ${peso(c.total.acumImp)} pesos, ${AR.format(c.total.acumU)} unidades, ${AR.format(c.total.acumCli)} clientes`).join('\n');
+  return s;
+}
+function respRiesgoMeta(){
+  const M=DATA.metaAgosto;
+  if(!M || !M.porVendedor) return null;
+  const criticos=M.porVendedor.filter(v=>v.prioridad==='CRITICO');
+  if(!criticos.length) return 'Ningún vendedor está marcado como CRÍTICO en la meta de cobertura del mes — el ritmo actual alcanza para todos.';
+  let s=`**${criticos.length} vendedor(es) en riesgo (CRÍTICO)** en la meta de cobertura del mes:\n\n`;
+  s+=criticos.map(v=>`• **${v.nombre}** (${v.supervisor}): ${AR.format(v.cccActual)} de ${AR.format(v.metaCCC)} — faltan ${AR.format(v.faltan)}, ritmo actual ${v.ritmoDia}/día vs ideal ${v.ritmoIdeal}/día`).join('\n');
+  return s;
+}
+function respMotivoDevoluciones(){
+  const D=DATA.devoluciones;
+  if(!D || !D.length) return null;
+  const ordenado=D.slice().sort((a,b)=>a.importe-b.importe); // mas negativo primero
+  const principal=ordenado[0];
+  let s=`**Principal motivo de devoluciones:** "${principal.motivo}" — ${peso(principal.importe)} pesos (${AR.format(principal.cantidad)} unidades, ${AR.format(principal.clientes)} clientes).\n\n**Todos los motivos:**\n`;
+  s+=ordenado.map(m=>`• ${m.motivo}: ${peso(m.importe)}`).join('\n');
+  return s;
+}
+function respEquipoConcurso(){
+  const C=DATA.concurso;
+  if(!C || !C.selloutPorEquipo || C.selloutPorEquipo.length<2) return null;
+  const ordenado=C.selloutPorEquipo.slice().sort((a,b)=>b.pctAvance-a.pctAvance);
+  const mejor=ordenado[0], resto=ordenado.slice(1);
+  let s=`**${mejor.supervisor}** viene mejor en el Concurso Nubi: ${pct(mejor.pctAvance)} de su meta de Sell-Out (${peso(mejor.real)} de ${peso(mejor.metaEquipo)}).\n\n`;
+  s+='**Comparativo por equipo:**\n'+ordenado.map(e=>`• ${e.supervisor}: ${pct(e.pctAvance)} (${peso(e.real)} de ${peso(e.metaEquipo)}, faltan ${peso(e.faltan)})`).join('\n');
+  return s;
+}
+function respMarcasFaltantesConcurso(){
+  const porVend=(DATA.concurso&&DATA.concurso.porVendedor)||[];
+  if(!porVend.length) return null;
+  const conFaltantes=porVend.filter(v=>(v.marcasFaltantes||[]).length>0).sort((a,b)=>(b.marcasFaltantes||[]).length-(a.marcasFaltantes||[]).length);
+  if(!conFaltantes.length) return 'Todos los vendedores ya vendieron las 10 marcas del Concurso Nubi este mes/trimestre.';
+  let s=`**${conFaltantes.length} vendedor(es) todavía no vendieron alguna marca del concurso** (acumulado del trimestre):\n\n`;
+  s+=conFaltantes.slice(0,10).map(v=>`• **${v.nombre}**: le falta${v.marcasFaltantes.length>1?'n':''} ${v.marcasFaltantes.join(', ')}`).join('\n');
+  return s;
+}
 const RESPUESTAS_RAPIDAS=[
   {match:normQ('¿Cómo viene la venta de hoy?'), fn:respVentaHoy},
   {match:normQ('¿Cómo viene el concurso Nubi?'), fn:respConcurso},
   {match:normQ('Compará este mes con el anterior'), fn:respCompararMes},
   {match:normQ('¿Cómo está la cobertura del equipo?'), fn:respCoberturaEquipo},
+  {match:normQ('¿Cuáles son los combos más vendidos?'), fn:respCombosMasVendidos},
+  {match:normQ('¿Qué vendedores están en riesgo en su meta?'), fn:respRiesgoMeta},
+  {match:normQ('¿Cuál es el principal motivo de devoluciones?'), fn:respMotivoDevoluciones},
+  {match:normQ('¿Qué equipo viene mejor en el Concurso Nubi?'), fn:respEquipoConcurso},
+  {match:normQ('¿Qué vendedor tiene más marcas del concurso pendientes?'), fn:respMarcasFaltantesConcurso},
 ];
 function respuestaRapida(pregunta){
   const nq=normQ(pregunta);
@@ -3468,7 +3518,7 @@ function botMd(s){ return escapeHtml(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').re
   }
   function addSuggestions(){
     const wrap=el('div','bot-suggestions','');
-    ['¿Cómo viene la venta de hoy?','¿Cómo viene el concurso Nubi?','Compará este mes con el anterior','¿Cómo está la cobertura del equipo?'].forEach(s=>{
+    ['¿Cómo viene la venta de hoy?','¿Cómo viene el concurso Nubi?','Compará este mes con el anterior','¿Cómo está la cobertura del equipo?','¿Cuáles son los combos más vendidos?','¿Qué vendedores están en riesgo en su meta?','¿Cuál es el principal motivo de devoluciones?','¿Qué equipo viene mejor en el Concurso Nubi?','¿Qué vendedor tiene más marcas del concurso pendientes?'].forEach(s=>{
       const chip=el('button','bot-chip',escapeHtml(s));
       chip.type='button';
       chip.onclick=()=>{ input.value=s; sendMsg(); };
