@@ -2867,11 +2867,24 @@ function renderMapa(){
     filtered.forEach(r=>{
       const color=MAPA_COLORS[r.vendCod]||'#888';
       if(!usados.has(r.vendCod)) usados.set(r.vendCod,{nombre:r.vendedor,color});
-      const m=L.circleMarker([r.lat,r.lon],{radius:6,color:color,fillColor:color,fillOpacity:.85,weight:1.5});
-      m.bindPopup(`<b>${r.cod} - ${r.nombre}</b><br>${r.dir||''}<br>Vendedor: ${r.vendedor}<br>Día visita: ${r.dia||'—'} · ${r.sub||''}`);
+      // El color sigue siendo SIEMPRE el del vendedor (fillColor) - la frecuencia se distingue por el
+      // borde, no por el color, para no pisar el código de colores por vendedor ya establecido.
+      // Semanal = borde igual al relleno (look de siempre, "color fijo"). Quincenal = anillo blanco.
+      // Mensual = anillo oscuro punteado. Así se puede reconocer la frecuencia sin perder de vista
+      // de quién es la ruta.
+      const frec=r.frecuencia||'Semanal';
+      let borde={color:color,weight:1.5,dashArray:null}, radio=6;
+      if(frec==='Quincenal'){ borde={color:'#ffffff',weight:2.5,dashArray:null}; radio=7; }
+      else if(frec==='Mensual'){ borde={color:'#1a1a1a',weight:2.5,dashArray:'3,2'}; radio=7; }
+      const m=L.circleMarker([r.lat,r.lon],{radius:radio,color:borde.color,weight:borde.weight,dashArray:borde.dashArray,fillColor:color,fillOpacity:.85});
+      m.bindPopup(`<b>${r.cod} - ${r.nombre}</b><br>${r.dir||''}<br>Vendedor: ${r.vendedor}<br>Día visita: ${r.dia||'—'} · ${r.sub||''}<br>Frecuencia: ${frec}`);
       mapaMarkersLayer.addLayer(m);
     });
-    legend.innerHTML='<b style="width:100%;color:var(--muted)">'+AR.format(filtered.length)+' clientes en el mapa</b>'+[...usados.entries()].sort((a,b)=>a[1].nombre.localeCompare(b[1].nombre)).map(([cod,inf])=>`<span style="display:inline-flex;align-items:center;gap:4px"><i style="width:9px;height:9px;border-radius:50%;background:${inf.color};display:inline-block"></i>${inf.nombre.replace('KAF ','').replace('Kaf ','')}</span>`).join('');
+    const leyendaFrec='<span style="display:inline-flex;align-items:center;gap:4px"><i style="width:9px;height:9px;border-radius:50%;background:#999;display:inline-block"></i>Semanal</span>'+
+      '<span style="display:inline-flex;align-items:center;gap:4px"><i style="width:9px;height:9px;border-radius:50%;background:#999;border:2px solid #fff;box-shadow:0 0 0 1px #999;display:inline-block"></i>Quincenal</span>'+
+      '<span style="display:inline-flex;align-items:center;gap:4px"><i style="width:9px;height:9px;border-radius:50%;background:#999;border:2px dashed #1a1a1a;display:inline-block"></i>Mensual</span>';
+    legend.innerHTML='<b style="width:100%;color:var(--muted)">'+AR.format(filtered.length)+' clientes en el mapa</b>'+[...usados.entries()].sort((a,b)=>a[1].nombre.localeCompare(b[1].nombre)).map(([cod,inf])=>`<span style="display:inline-flex;align-items:center;gap:4px"><i style="width:9px;height:9px;border-radius:50%;background:${inf.color};display:inline-block"></i>${inf.nombre.replace('KAF ','').replace('Kaf ','')}</span>`).join('')+
+      '<span style="width:100%;height:0"></span><b style="width:100%;color:var(--muted);margin-top:4px">Frecuencia (borde):</b>'+leyendaFrec;
     // encuadra el mapa a los clientes filtrados (arranca centrado en la zona real, y se
     // reencuadra solo al elegir un vendedor/equipo puntual) en vez de depender de un centro fijo
     if(mapaInstance && filtered.length){
