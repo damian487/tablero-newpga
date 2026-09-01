@@ -1673,10 +1673,12 @@ function renderRuta(){
     const vendName=(vends.find(v=>v.cod===vc)||{}).nombre||'';
     const diaLbl = d==='__all' ? 'Todas las rutas (semana completa)' : ('Ruta '+(DIAS[d]||d));
     const tituloFil = fil==='rango' ? ('No compradores ('+[...mesesChk].sort().map(mesLbl).join('+')+')') : (fil==='no'?'No compradores del mes actual':'Ruta');
-    let h='<div class="card"><div class="ctitle"><h2>'+tituloFil+' — '+vendName+'</h2><span class="hint">'+diaLbl+' · '+rows.length+' clientes</span></div><div class="twrap"><table><thead><tr><th>Cliente</th><th>Dirección</th><th>Subsegmento</th><th>Estado</th></tr></thead><tbody>';
+    const CIC=R.ciclos||{};
+    let h='<div class="card"><div class="ctitle"><h2>'+tituloFil+' — '+vendName+'</h2><span class="hint">'+diaLbl+' · '+rows.length+' clientes</span></div><div class="twrap"><table><thead><tr><th>Cliente</th><th>Dirección</th><th>Subsegmento</th><th>Frecuencia</th><th>Estado</th></tr></thead><tbody>';
     rows.forEach(r=>{ const ci=CLI[r[0]]||['(s/d)','','']; const ok = fil==='rango' ? !sinCompraEnRango(r[2]) : r[1]===1;
       const txt = fil==='rango' ? (ok?'✅ compró en algún mes marcado':'❌ sin compra en el rango marcado') : (ok?'✅ compró en el mes':'❌ sin compra en el mes');
-      h+=`<tr><td class="name">${r[0]} - ${ci[0]}</td><td style="color:var(--muted);font-size:11px">${ci[2]||''}</td><td style="color:var(--muted)">${ci[1]||''}</td><td class="num" style="color:${ok?'var(--good)':'var(--bad)'};font-weight:700">${txt}</td></tr>`; });
+      const frec=(CIC[r[0]]||['Semanal'])[0]||'Semanal';
+      h+=`<tr><td class="name">${r[0]} - ${ci[0]}</td><td style="color:var(--muted);font-size:11px">${ci[2]||''}</td><td style="color:var(--muted)">${ci[1]||''}</td><td style="color:var(--muted);font-size:11px">${frec}</td><td class="num" style="color:${ok?'var(--good)':'var(--bad)'};font-weight:700">${txt}</td></tr>`; });
     h+='</tbody></table></div></div>'; box.innerHTML=h;
   }
   ruF.onchange=draw; ruV.onchange=draw; ruFil.onchange=draw; draw();
