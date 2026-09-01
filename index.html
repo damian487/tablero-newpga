@@ -3497,6 +3497,22 @@ function botMd(s){ return escapeHtml(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').re
   let vozActiva=false;
   try{ vozActiva = localStorage.getItem('bot_voz')==='1'; }catch(_){ }
   function actualizarVozBtn(){ if(!vozBtn) return; vozBtn.textContent=vozActiva?'🔊':'🔇'; vozBtn.title=vozActiva?'Apagar respuesta por voz':'Activar respuesta por voz'; vozBtn.setAttribute('aria-pressed',vozActiva?'true':'false'); }
+  // El navegador solo deja arrancar un <audio> si hubo un gesto del usuario "reciente" - la
+  // respuesta del bot tarda unos segundos (fetch a Gemini/al servicio de voz), y para cuando
+  // llega ya paso esa ventana, asi que el .play() quedaba bloqueado en silencio. Truco estandar:
+  // "destrabar" un elemento <audio> reutilizable con un clip mudo, de forma SINCRONICA, dentro del
+  // click que dispara el envio del mensaje (antes de cualquier await) - una vez que un elemento
+  // reprodujo algo dentro de un gesto real, el navegador permite seguir usandolo despues.
+  const botAudioEl=new Audio();
+  let audioDesbloqueado=false;
+  function desbloquearAudio(){
+    if(audioDesbloqueado) return;
+    audioDesbloqueado=true;
+    try{
+      botAudioEl.src='data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+      botAudioEl.play().then(()=>botAudioEl.pause()).catch(()=>{});
+    }catch(_){ }
+  }
   let botAudioActual=null;
   function hablarConVozDelNavegador(limpio){
     // Respaldo: la voz que trae el propio navegador (funciona siempre, pero depende de que Windows
@@ -3519,20 +3535,22 @@ function botMd(s){ return escapeHtml(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').re
     // El signo "$" lo lee la voz como "dolares" (aunque el texto ya diga "pesos" a continuacion,
     // como corresponde) - se saca antes de hablar para que no diga las dos cosas.
     const limpio=texto.replace(/\*\*(.+?)\*\*/g,'$1').replace(/[*_#]/g,'').replace(/\$\s?/g,'');
-    if(botAudioActual){ try{ botAudioActual.pause(); }catch(_){ } botAudioActual=null; } // no se pisan respuestas habladas una arriba de otra
+    try{ botAudioEl.pause(); }catch(_){ } // no se pisan respuestas habladas una arriba de otra
     try{ window.speechSynthesis && window.speechSynthesis.cancel(); }catch(_){ }
+    if(botAudioActual){ URL.revokeObjectURL(botAudioActual); botAudioActual=null; }
     try{
       // Voz real "Tomas" (motor gratuito de Microsoft Edge, vía el Worker) - suena argentina en
-      // cualquier PC/navegador, sin depender de idiomas instalados en Windows.
+      // cualquier PC/navegador, sin depender de idiomas instalados en Windows. Reusa el MISMO
+      // elemento <audio> que se "destrabo" en el click original (ver desbloquearAudio arriba).
       let pw=''; try{ pw=sessionStorage.getItem('gpw')||''; }catch(_){ }
       const res = await fetch(TTS_ENDPOINT+'?texto='+encodeURIComponent(limpio.slice(0,900)), {headers:{'X-Dashboard-Password':pw}});
       if(!res.ok) throw new Error('tts http '+res.status);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      botAudioActual = audio;
-      audio.addEventListener('ended', ()=>{ URL.revokeObjectURL(url); if(botAudioActual===audio) botAudioActual=null; });
-      await audio.play();
+      botAudioActual = url;
+      botAudioEl.src = url;
+      botAudioEl.addEventListener('ended', ()=>{ if(botAudioActual===url){ URL.revokeObjectURL(url); botAudioActual=null; } }, {once:true});
+      await botAudioEl.play();
     }catch(_){
       hablarConVozDelNavegador(limpio); // si Microsoft falla (sin internet, servicio caido, etc.)
     }
@@ -3597,6 +3615,7 @@ function botMd(s){ return escapeHtml(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').re
 
   async function sendMsg(){
     const q=(input.value||'').trim(); if(!q) return;
+    desbloquearAudio(); // sincronico, adentro del gesto de click/enter que dispara esta funcion
     addMsg(escapeHtml(q),'user'); input.value='';
     // respuesta instantanea (sin Gemini) si matchea alguna de las preguntas sugeridas - no gasta cuota
     const rapida=respuestaRapida(q);
