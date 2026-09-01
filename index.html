@@ -3323,6 +3323,7 @@ if(miVendParam){
 
 /* ---------- Bot de consulta (Gemini, corre del lado del servidor - ver gescom-worker) ---------- */
 const BOT_ENDPOINT = 'https://tablero-newpga-worker.damian-8ad.workers.dev/api/bot';
+const TTS_ENDPOINT = 'https://tablero-newpga-worker.damian-8ad.workers.dev/api/tts';
 
 // ---- respuestas rapidas: las 4 preguntas sugeridas (chips) se responden armando el texto acá
 // mismo con datos que YA estan cargados en el navegador, sin llamar a Gemini - no gastan cuota
@@ -3496,25 +3497,45 @@ function botMd(s){ return escapeHtml(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').re
   let vozActiva=false;
   try{ vozActiva = localStorage.getItem('bot_voz')==='1'; }catch(_){ }
   function actualizarVozBtn(){ if(!vozBtn) return; vozBtn.textContent=vozActiva?'🔊':'🔇'; vozBtn.title=vozActiva?'Apagar respuesta por voz':'Activar respuesta por voz'; vozBtn.setAttribute('aria-pressed',vozActiva?'true':'false'); }
-  function hablar(texto){
-    if(!vozActiva || !texto || !window.speechSynthesis) return;
+  let botAudioActual=null;
+  function hablarConVozDelNavegador(limpio){
+    // Respaldo: la voz que trae el propio navegador (funciona siempre, pero depende de que Windows
+    // tenga instalado el paquete de idioma Espanol Argentina para sonar realmente "argentina").
     try{
-      window.speechSynthesis.cancel(); // no se pisan respuestas habladas una arriba de otra
-      // El signo "$" lo lee la voz del navegador como "dolares" (aunque el texto ya diga "pesos"
-      // a continuacion, como corresponde) - se saca antes de hablar para que no diga las dos cosas.
-      const limpio=texto.replace(/\*\*(.+?)\*\*/g,'$1').replace(/[*_#]/g,'').replace(/\$\s?/g,'');
+      if(!window.speechSynthesis) return;
+      window.speechSynthesis.cancel();
       const u=new SpeechSynthesisUtterance(limpio);
       u.lang='es-AR'; u.rate=1.02;
       const voces=window.speechSynthesis.getVoices();
-      // Preferencia de voz (de mejor a peor): "Tomas" de Microsoft Edge (voz neuronal Online Natural,
-      // argentina, gratis - solo aparece si el tablero se abre con el navegador Edge en Windows) >
-      // cualquier otra voz es-AR (ej. Elena, u otra que traiga el sistema) > cualquier voz en español.
       const voz = voces.find(v=>v.lang==='es-AR' && /tomas/i.test(v.name))
         || voces.find(v=>v.lang==='es-AR')
         || voces.find(v=>v.lang&&v.lang.startsWith('es'));
       if(voz) u.voice=voz;
       window.speechSynthesis.speak(u);
     }catch(_){ }
+  }
+  async function hablar(texto){
+    if(!vozActiva || !texto) return;
+    // El signo "$" lo lee la voz como "dolares" (aunque el texto ya diga "pesos" a continuacion,
+    // como corresponde) - se saca antes de hablar para que no diga las dos cosas.
+    const limpio=texto.replace(/\*\*(.+?)\*\*/g,'$1').replace(/[*_#]/g,'').replace(/\$\s?/g,'');
+    if(botAudioActual){ try{ botAudioActual.pause(); }catch(_){ } botAudioActual=null; } // no se pisan respuestas habladas una arriba de otra
+    try{ window.speechSynthesis && window.speechSynthesis.cancel(); }catch(_){ }
+    try{
+      // Voz real "Tomas" (motor gratuito de Microsoft Edge, vía el Worker) - suena argentina en
+      // cualquier PC/navegador, sin depender de idiomas instalados en Windows.
+      let pw=''; try{ pw=sessionStorage.getItem('gpw')||''; }catch(_){ }
+      const res = await fetch(TTS_ENDPOINT+'?texto='+encodeURIComponent(limpio.slice(0,900)), {headers:{'X-Dashboard-Password':pw}});
+      if(!res.ok) throw new Error('tts http '+res.status);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      botAudioActual = audio;
+      audio.addEventListener('ended', ()=>{ URL.revokeObjectURL(url); if(botAudioActual===audio) botAudioActual=null; });
+      await audio.play();
+    }catch(_){
+      hablarConVozDelNavegador(limpio); // si Microsoft falla (sin internet, servicio caido, etc.)
+    }
   }
   if(vozBtn){
     actualizarVozBtn();
