@@ -2197,7 +2197,8 @@ function renderEfec(){
   const p=document.getElementById('p-efec');p.innerHTML='';
   const E=DATA.efectividad; if(!E){p.innerHTML='<div class="card">Sin datos de efectividad.</div>';return;}
   const top=el('div','card');
-  top.appendChild(el('div','ctitle','<h2>Efectividad de ruta</h2><span class="hint">clientes que compraron / clientes planificados por ruta · acumulado desde 30/06</span>'));
+  const rangoTxt=(E.diaria&&E.diaria.length)?('del '+fdate(E.diaria[0].fecha)+' al '+fdate(E.diaria[E.diaria.length-1].fecha)):'';
+  top.appendChild(el('div','ctitle',`<h2>Efectividad de ruta</h2><span class="hint">clientes que compraron / clientes planificados por ruta · ${rangoTxt} · respeta el mes elegido arriba</span>`));
   const sg=el('div','supgrid');
   const tot=el('div','supcard'); tot.innerHTML=`<h3>Equipo completo</h3><div class="who">planificados vs efectivos</div>
     <div class="big num">${pct(E.total.efectividad)}</div>
