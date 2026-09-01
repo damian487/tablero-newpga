@@ -988,9 +988,15 @@ function tablaPorMarcaVendedor(kind,item){
     }
     if(venta===0 && clientes===0) return;
     const s=v.supervisor||'(sin equipo)';
-    if(!bySup[s]) bySup[s]={venta:0,clientes:0,vend:[]};
+    if(!bySup[s]) bySup[s]={venta:0,clientes:0,vend:new Map()};
     bySup[s].venta+=venta; bySup[s].clientes+=clientes;
-    bySup[s].vend.push({nombre:v.nombre,venta,clientes});
+    // Fusiona por NOMBRE, no por codigo: algunos vendedores tienen 2 codigos activos en paralelo
+    // (el nuevo + un codigo viejo residual de la migracion de Gescom, ver [[gescom-tablero-newpga]]
+    // reestructuracion 1/9) - sin esto, esa misma persona aparecia 2 veces en la tabla.
+    const nombreNorm=(v.nombre||'').trim();
+    const cur=bySup[s].vend.get(nombreNorm)||{venta:0,clientes:0};
+    cur.venta+=venta; cur.clientes+=clientes;
+    bySup[s].vend.set(nombreNorm,cur);
   });
   const sups=Object.keys(bySup).sort((a,b)=>bySup[b].venta-bySup[a].venta);
   let tot={venta:0,clientes:0};
@@ -998,7 +1004,7 @@ function tablaPorMarcaVendedor(kind,item){
   sups.forEach(s=>{
     const g=bySup[s]; tot.venta+=g.venta; tot.clientes+=g.clientes;
     h+=`<tr class="subhead"><td>Equipo ${s}</td><td class="num">${AR.format(g.clientes)}</td><td class="num">${peso(g.venta)}</td></tr>`;
-    g.vend.slice().sort((a,b)=>b.venta-a.venta).forEach(vv=>{
+    [...g.vend.entries()].map(([nombre,vv])=>({nombre,...vv})).sort((a,b)=>b.venta-a.venta).forEach(vv=>{
       h+=`<tr><td class="name">${vv.nombre}</td><td class="num">${AR.format(vv.clientes)}</td><td class="num">${peso(vv.venta)}</td></tr>`;
     });
   });
