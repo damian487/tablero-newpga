@@ -3506,7 +3506,12 @@ function botMd(s){ return escapeHtml(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').re
       const u=new SpeechSynthesisUtterance(limpio);
       u.lang='es-AR'; u.rate=1.02;
       const voces=window.speechSynthesis.getVoices();
-      const voz=voces.find(v=>v.lang==='es-AR')||voces.find(v=>v.lang&&v.lang.startsWith('es'));
+      // Preferencia de voz (de mejor a peor): "Tomas" de Microsoft Edge (voz neuronal Online Natural,
+      // argentina, gratis - solo aparece si el tablero se abre con el navegador Edge en Windows) >
+      // cualquier otra voz es-AR (ej. Elena, u otra que traiga el sistema) > cualquier voz en español.
+      const voz = voces.find(v=>v.lang==='es-AR' && /tomas/i.test(v.name))
+        || voces.find(v=>v.lang==='es-AR')
+        || voces.find(v=>v.lang&&v.lang.startsWith('es'));
       if(voz) u.voice=voz;
       window.speechSynthesis.speak(u);
     }catch(_){ }
