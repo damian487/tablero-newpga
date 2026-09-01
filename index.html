@@ -3500,7 +3500,9 @@ function botMd(s){ return escapeHtml(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').re
     if(!vozActiva || !texto || !window.speechSynthesis) return;
     try{
       window.speechSynthesis.cancel(); // no se pisan respuestas habladas una arriba de otra
-      const limpio=texto.replace(/\*\*(.+?)\*\*/g,'$1').replace(/[*_#]/g,'');
+      // El signo "$" lo lee la voz del navegador como "dolares" (aunque el texto ya diga "pesos"
+      // a continuacion, como corresponde) - se saca antes de hablar para que no diga las dos cosas.
+      const limpio=texto.replace(/\*\*(.+?)\*\*/g,'$1').replace(/[*_#]/g,'').replace(/\$\s?/g,'');
       const u=new SpeechSynthesisUtterance(limpio);
       u.lang='es-AR'; u.rate=1.02;
       const voces=window.speechSynthesis.getVoices();
