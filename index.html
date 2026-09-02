@@ -1209,9 +1209,27 @@ function vistaDiasStock(p){
   };
   bar.appendChild(segEl); bar.appendChild(printBtn); p.appendChild(bar);
 
+  const bar2=el('div','card no-print'); bar2.style.cssText='padding:10px 14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap';
+  const familias=[...new Set(S.lineas.map(l=>l.familia).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  bar2.innerHTML=`<span style="display:flex;align-items:center;gap:6px"><span style="font-size:12px;color:var(--muted);font-weight:700">Familia</span>
+      <select id="stockFamilia" class="fsel" style="min-width:170px;padding:6px 10px;font-size:13px">
+        <option value="">Todas</option>${familias.map(f=>`<option value="${f}">${f}</option>`).join('')}
+      </select></span>
+    <span style="display:flex;align-items:center;gap:6px"><span style="font-size:12px;color:var(--muted);font-weight:700">Días de stock ≤</span>
+      <input id="stockDiasMax" type="number" min="0" placeholder="ej. 20" style="width:80px;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:inherit"></span>
+    <button id="stockLimpiar" class="tab">Limpiar</button>`;
+  p.appendChild(bar2);
+  const selFamilia=bar2.querySelector('#stockFamilia'), inpDiasMax=bar2.querySelector('#stockDiasMax'), btnLimpiar=bar2.querySelector('#stockLimpiar');
+  selFamilia.addEventListener('change',draw);
+  inpDiasMax.addEventListener('input',draw);
+  btnLimpiar.addEventListener('click',()=>{ selFamilia.value=''; inpDiasMax.value=''; draw(); });
+
   const box=el('div'); p.appendChild(box);
   function draw(){
-    const rows=filtros.size===0?S.lineas:S.lineas.filter(l=>filtros.has(l.alerta));
+    let rows=filtros.size===0?S.lineas:S.lineas.filter(l=>filtros.has(l.alerta));
+    if(selFamilia.value) rows=rows.filter(l=>l.familia===selFamilia.value);
+    const diasMax=parseFloat(inpDiasMax.value);
+    if(!isNaN(diasMax)) rows=rows.filter(l=>l.diasStock!==null && l.diasStock<=diasMax);
     let h='<div class="card"><div class="twrap" style="max-height:min(620px,calc(100vh - 320px));overflow-y:auto"><table><thead><tr><th>Código</th><th>Producto</th><th>Marca</th><th>Stock (unid.)</th><th>Venta diaria prom.</th><th>Días de stock</th><th>Estado</th></tr></thead><tbody>';
     rows.forEach(l=>{
       const dias=l.diasStock===null?'—':AR.format(l.diasStock);
