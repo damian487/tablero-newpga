@@ -1153,9 +1153,24 @@ function renderDev(){
   }
 }
 
-/* ---------- PANEL: Dias de stock ---------- */
+/* ---------- PANEL: Dias de stock + Ciclo mensual de pedido ---------- */
 function renderStock(){
   const p=document.getElementById('p-stock'); p.innerHTML='';
+  const seg=el('div','seg'); seg.style.marginBottom='10px';
+  const vistas=[['dias','Días de stock'],['pedido','Ciclo mensual de pedido']];
+  let vista='dias';
+  const cont=el('div');
+  vistas.forEach(([k,lbl])=>{
+    const b=el('button',null,lbl); b.setAttribute('aria-pressed',k===vista?'true':'false');
+    b.onclick=()=>{ vista=k; [...seg.children].forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false')); dibujar(); };
+    seg.appendChild(b);
+  });
+  p.appendChild(seg); p.appendChild(cont);
+  function dibujar(){ cont.innerHTML=''; if(vista==='dias') vistaDiasStock(cont); else vistaCicloPedido(cont); }
+  dibujar();
+}
+
+function vistaDiasStock(p){
   const S=DATA.stock;
   if(!S){ p.innerHTML='<div class="card"><div class="ctitle"><h2>Días de stock</h2></div><p style="color:var(--muted)">Sin datos de stock.</p></div>'; return; }
   const ALERTA_COLOR={CRITICO:'var(--bad)',BAJO:'var(--warn)',OK:'var(--good)','SIN VENTA':'var(--muted)'};
@@ -1191,6 +1206,50 @@ function renderStock(){
     h+='</tbody></table></div></div>';
     box.innerHTML=h;
   }
+  draw();
+}
+
+function vistaCicloPedido(p){
+  const C=DATA.pedido;
+  if(!C){ p.innerHTML='<div class="card"><div class="ctitle"><h2>Ciclo mensual de pedido</h2></div><p style="color:var(--muted)">Sin datos de pedido todavía.</p></div>'; return; }
+  const top=el('div','card');
+  top.appendChild(el('div','ctitle',`<h2>🔄 Ciclo mensual de pedido — New PGA</h2><span class="hint">stock inicial del mes vs. proyección al cierre · factor de seguridad +${Math.round((C.factorSeguridad-1)*100)}% sobre la venta diaria promedio del ciclo</span>`));
+  top.innerHTML+=`<div class="kpitiles" style="grid-template-columns:repeat(4,1fr)">
+    <div class="supcard"><h3>Días hábiles totales</h3><div class="big num">${AR.format(C.diasHabilesTotales)}</div></div>
+    <div class="supcard"><h3>Transcurridos</h3><div class="big num">${AR.format(C.diasHabilesTranscurridos)}</div></div>
+    <div class="supcard"><h3>Restantes</h3><div class="big num">${AR.format(C.diasHabilesRestantes)}</div></div>
+    <div class="supcard"><h3>SKUs con pedido &gt; 0</h3><div class="big num" style="color:var(--accent)">${AR.format(C.conPedido)}</div></div></div>`;
+  p.appendChild(top);
+
+  const bar=el('div','card'); bar.style.padding='10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap';
+  bar.style.cssText='padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap';
+  bar.innerHTML=`<span style="font-size:12px;color:var(--muted);font-weight:700">Objetivo días de stock al cierre</span>
+    <input id="pedObjetivo" type="number" min="1" value="${C.objetivoDiasStock}" style="width:70px;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:inherit">
+    <label style="font-size:12.5px;display:flex;align-items:center;gap:5px;cursor:pointer"><input id="pedSoloConPedido" type="checkbox">Solo con pedido sugerido</label>`;
+  p.appendChild(bar);
+  const inpObjetivo=bar.querySelector('#pedObjetivo'), chkSolo=bar.querySelector('#pedSoloConPedido');
+
+  const box=el('div'); p.appendChild(box);
+  function draw(){
+    const objetivo=parseFloat(inpObjetivo.value)||C.objetivoDiasStock;
+    const soloConPedido=chkSolo.checked;
+    // Recalcula el pedido sugerido en el navegador si cambia el objetivo de dias (misma formula que el backend)
+    let rows=C.lineas.map(l=>{
+      const pedidoSugerido = objetivo===C.objetivoDiasStock ? l.pedidoSugerido : Math.max(0,Math.ceil(objetivo*l.ventaDiariaSeguridad - l.stockProyectadoAlCierre));
+      return {...l, pedidoSugerido};
+    });
+    if(soloConPedido) rows=rows.filter(l=>l.pedidoSugerido>0);
+    rows.sort((a,b)=>b.pedidoSugerido-a.pedidoSugerido);
+    let h='<div class="card"><div class="twrap"><table><thead><tr><th>Código</th><th>Producto</th><th>Marca</th><th>Stock inicial</th><th>Stock actual</th><th>Venta del ciclo</th><th>Venta diaria (+seg.)</th><th>Proyectado al cierre</th><th>Pedido sugerido</th></tr></thead><tbody>';
+    rows.forEach(l=>{
+      const proy=l.diasStockProyectado===null?'—':(l.diasStockProyectado+'d');
+      h+=`<tr><td class="name">${l.codigo}</td><td class="name">${l.descripcion}</td><td>${l.marca}</td><td class="num">${AR.format(l.stockInicial)}</td><td class="num">${AR.format(l.stockActual)}</td><td class="num">${AR.format(l.ventaCiclo)}</td><td class="num">${l.ventaDiariaSeguridad}</td><td class="num">${AR.format(Math.round(l.stockProyectadoAlCierre))} <span style="color:var(--muted);font-size:10.5px">(${proy})</span></td><td class="num" style="font-weight:700;color:${l.pedidoSugerido>0?'var(--accent)':'var(--muted)'}">${AR.format(l.pedidoSugerido)}</td></tr>`;
+    });
+    if(!rows.length) h+='<tr><td colspan="9" style="color:var(--muted)">Sin artículos en este filtro.</td></tr>';
+    h+='</tbody></table></div></div>';
+    box.innerHTML=h;
+  }
+  inpObjetivo.addEventListener('input',draw); chkSolo.addEventListener('change',draw);
   draw();
 }
 
