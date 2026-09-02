@@ -169,13 +169,14 @@ td.name{font-weight:600}
   header, nav.tabs, .wrap > section.kpis, select.fsel, .tab, .no-print{ display:none !important; }
   main.wrap{ padding:0 !important; max-width:100% !important; }
   .panel{ display:none !important; }
-  body:not(.print-ruta):not(.print-devcli):not(.print-metaago-seg) #p-diario{ display:block !important; }
+  body:not(.print-ruta):not(.print-devcli):not(.print-metaago-seg):not(.print-stock) #p-diario{ display:block !important; }
   body.print-ruta #p-ruta{ display:block !important; }
   body.print-devcli #p-dev{ display:block !important; }
   body.print-devcli #p-dev > *:not(#devCliCard){ display:none !important; }
   body.print-metaago-seg #p-metaago{ display:block !important; }
   body.print-metaago-seg #p-metaago > *:not(#mdPrintCard){ display:none !important; }
   body.print-metaago-seg #mdPrintTitle{ display:block !important; }
+  body.print-stock #p-stock{ display:block !important; }
   .card{ box-shadow:none !important; border:1px solid #cfd6e0 !important; break-inside:avoid; margin:0 0 8px 0 !important; padding:10px 12px !important; }
   .card+.card,.grid+.grid,.grid+.card,.card+.grid{ margin-top:8px !important; }
   .grid{ gap:8px !important; }
@@ -1183,24 +1184,38 @@ function vistaDiasStock(p){
     <div class="supcard"><h3>Total SKUs medidos</h3><div class="who">con stock cargado en depósito principal</div><div class="big num">${AR.format(S.lineas.length)}</div></div></div>`;
   p.appendChild(top);
 
-  const bar=el('div','card'); bar.style.padding='10px 14px';
-  let filtro='TODOS';
-  const FILTROS=[['TODOS','Todos'],['CRITICO','🔴 Críticos'],['BAJO','🟡 Bajos'],['SIN VENTA','⚪ Sin venta']];
-  const segEl=el('div','seg');
-  FILTROS.forEach(([k,lbl])=>{
-    const b=el('button',null,lbl); b.setAttribute('aria-pressed',k===filtro?'true':'false');
-    b.onclick=()=>{ filtro=k; [...segEl.children].forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false')); draw(); };
+  const bar=el('div','card'); bar.style.cssText='padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between';
+  const filtros=new Set(); // vacio = Todos - se pueden combinar varios a la vez (ej. Bajos + OK)
+  const FILTROS=[['CRITICO','🔴 Críticos'],['BAJO','🟡 Bajos'],['OK','🟢 OK'],['SIN VENTA','⚪ Sin venta']];
+  const segEl=el('div','seg no-print');
+  const btnTodos=el('button',null,'Todos');
+  btnTodos.onclick=()=>{ filtros.clear(); refreshBtns(); draw(); };
+  segEl.appendChild(btnTodos);
+  const chipBtns=FILTROS.map(([k,lbl])=>{
+    const b=el('button',null,lbl);
+    b.onclick=()=>{ if(filtros.has(k)) filtros.delete(k); else filtros.add(k); refreshBtns(); draw(); };
     segEl.appendChild(b);
+    return [k,b];
   });
-  bar.appendChild(segEl); p.appendChild(bar);
+  function refreshBtns(){
+    btnTodos.setAttribute('aria-pressed', filtros.size===0?'true':'false');
+    chipBtns.forEach(([k,b])=>b.setAttribute('aria-pressed', filtros.has(k)?'true':'false'));
+  }
+  refreshBtns();
+  const printBtn=el('button','tab no-print','🖨️ Imprimir / PDF');
+  printBtn.onclick=()=>{
+    document.body.classList.add('print-stock');
+    setTimeout(()=>{ try{window.print();}catch(e){} setTimeout(()=>document.body.classList.remove('print-stock'),400); },60);
+  };
+  bar.appendChild(segEl); bar.appendChild(printBtn); p.appendChild(bar);
 
   const box=el('div'); p.appendChild(box);
   function draw(){
-    const rows=filtro==='TODOS'?S.lineas:S.lineas.filter(l=>l.alerta===filtro);
+    const rows=filtros.size===0?S.lineas:S.lineas.filter(l=>filtros.has(l.alerta));
     let h='<div class="card"><div class="twrap" style="max-height:min(620px,calc(100vh - 320px));overflow-y:auto"><table><thead><tr><th>Código</th><th>Producto</th><th>Marca</th><th>Stock (unid.)</th><th>Venta diaria prom.</th><th>Días de stock</th><th>Estado</th></tr></thead><tbody>';
     rows.forEach(l=>{
       const dias=l.diasStock===null?'—':AR.format(l.diasStock);
-      h+=`<tr><td class="name">${l.codigo}</td><td class="name" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px" title="${l.descripcion}">${l.descripcion}</td><td>${l.marca}</td><td class="num">${AR.format(l.stock)}</td><td class="num">${l.ventaDiariaProm}</td><td class="num" style="font-weight:700;color:${ALERTA_COLOR[l.alerta]}">${dias}</td><td><span class="md-chip" style="background:transparent;border:1px solid ${ALERTA_COLOR[l.alerta]};color:${ALERTA_COLOR[l.alerta]}">${ALERTA_LBL[l.alerta]}</span></td></tr>`;
+      h+=`<tr><td class="name">${l.codigo}</td><td class="name" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px" title="${l.descripcion}">${l.descripcion}</td><td style="font-size:11.5px">${l.marca}</td><td class="num">${AR.format(l.stock)}</td><td class="num">${l.ventaDiariaProm}</td><td class="num" style="font-weight:700;color:${ALERTA_COLOR[l.alerta]}">${dias}</td><td><span class="md-chip" style="background:transparent;border:1px solid ${ALERTA_COLOR[l.alerta]};color:${ALERTA_COLOR[l.alerta]}">${ALERTA_LBL[l.alerta]}</span></td></tr>`;
     });
     if(!rows.length) h+='<tr><td colspan="7" style="color:var(--muted)">Sin artículos en este filtro.</td></tr>';
     h+='</tbody></table></div></div>';
@@ -1244,7 +1259,7 @@ function vistaCicloPedido(p){
     let h='<div class="card"><div class="twrap" style="max-height:min(620px,calc(100vh - 320px));overflow-y:auto"><table><thead><tr><th>Código</th><th>Producto</th><th>Marca</th><th>Stock inicial</th><th>Stock actual</th><th>Venta del ciclo</th><th>Venta diaria (+seg.)</th><th>Proyectado al cierre</th><th>Pedido sugerido</th></tr></thead><tbody>';
     rows.forEach(l=>{
       const proy=l.diasStockProyectado===null?'—':(l.diasStockProyectado+'d');
-      h+=`<tr><td class="name">${l.codigo}</td><td class="name" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px" title="${l.descripcion}">${l.descripcion}</td><td>${l.marca}</td><td class="num">${AR.format(l.stockInicial)}</td><td class="num">${AR.format(l.stockActual)}</td><td class="num">${AR.format(l.ventaCiclo)}</td><td class="num">${l.ventaDiariaSeguridad}</td><td class="num">${AR.format(Math.round(l.stockProyectadoAlCierre))} <span style="color:var(--muted);font-size:10.5px">(${proy})</span></td><td class="num" style="font-weight:700;color:${l.pedidoSugerido>0?'var(--accent)':'var(--muted)'}">${AR.format(l.pedidoSugerido)}</td></tr>`;
+      h+=`<tr><td class="name">${l.codigo}</td><td class="name" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px" title="${l.descripcion}">${l.descripcion}</td><td style="font-size:11.5px">${l.marca}</td><td class="num">${AR.format(l.stockInicial)}</td><td class="num">${AR.format(l.stockActual)}</td><td class="num">${AR.format(l.ventaCiclo)}</td><td class="num">${l.ventaDiariaSeguridad}</td><td class="num">${AR.format(Math.round(l.stockProyectadoAlCierre))} <span style="color:var(--muted);font-size:10.5px">(${proy})</span></td><td class="num" style="font-weight:700;color:${l.pedidoSugerido>0?'var(--accent)':'var(--muted)'}">${AR.format(l.pedidoSugerido)}</td></tr>`;
     });
     if(!rows.length) h+='<tr><td colspan="9" style="color:var(--muted)">Sin artículos en este filtro.</td></tr>';
     h+='</tbody></table></div></div>';
