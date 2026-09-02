@@ -380,6 +380,7 @@ td.name{font-weight:600}
   <section class="panel" id="p-evo" role="tabpanel"></section>
   <section class="panel" id="p-dev" role="tabpanel"></section>
   <section class="panel" id="p-infaltables" role="tabpanel"></section>
+  <section class="panel" id="p-stock" role="tabpanel"></section>
   <section class="panel" id="p-msu" role="tabpanel"></section>
   <section class="panel" id="p-accion" role="tabpanel"></section>
   <section class="panel" id="p-combos" role="tabpanel"></section>
@@ -574,7 +575,8 @@ const TAB_GROUPS=[
   [ {id:'p-canales',label:'Canales'},
     {id:'p-marcas',label:'Marcas & familias'},
     {id:'p-covmarca',label:'Cobertura de marcas'},
-    {id:'p-infaltables',label:'Infaltables'} ],
+    {id:'p-infaltables',label:'Infaltables'},
+    {id:'p-stock',label:'📦 Días de stock'} ],
   [ {id:'p-plansup',label:'Plan de acción por supervisor'} ],
   [ {id:'p-accion',label:'🏷️ Acción precio'},
     {id:'p-combos',label:'🎁 Combos'},
@@ -1149,6 +1151,47 @@ function renderDev(){
     });
     drawCli('TODOS','TODOS');
   }
+}
+
+/* ---------- PANEL: Dias de stock ---------- */
+function renderStock(){
+  const p=document.getElementById('p-stock'); p.innerHTML='';
+  const S=DATA.stock;
+  if(!S){ p.innerHTML='<div class="card"><div class="ctitle"><h2>Días de stock</h2></div><p style="color:var(--muted)">Sin datos de stock.</p></div>'; return; }
+  const ALERTA_COLOR={CRITICO:'var(--bad)',BAJO:'var(--warn)',OK:'var(--good)','SIN VENTA':'var(--muted)'};
+  const ALERTA_LBL={CRITICO:'🔴 Crítico',BAJO:'🟡 Bajo',OK:'🟢 OK','SIN VENTA':'⚪ Sin venta'};
+  const top=el('div','card');
+  top.appendChild(el('div','ctitle',`<h2>📦 Días de stock — New PGA</h2><span class="hint">días de stock = stock en depósito principal ÷ venta diaria promedio (trimestre a la fecha, ${S.diasTranscurridos} días) · versión acotada a New PGA de la herramienta de Gerencia</span>`));
+  top.innerHTML+=`<div class="kpitiles" style="grid-template-columns:repeat(3,1fr)">
+    <div class="supcard"><h3>🔴 Críticos</h3><div class="who">≤ ${S.alertaRojaDias} días de stock</div><div class="big num" style="color:var(--bad)">${AR.format(S.criticos)}</div></div>
+    <div class="supcard"><h3>🟡 Bajos</h3><div class="who">≤ ${S.alertaAmarillaDias} días de stock</div><div class="big num" style="color:var(--warn)">${AR.format(S.bajos)}</div></div>
+    <div class="supcard"><h3>Total SKUs medidos</h3><div class="who">con stock cargado en depósito principal</div><div class="big num">${AR.format(S.lineas.length)}</div></div></div>`;
+  p.appendChild(top);
+
+  const bar=el('div','card'); bar.style.padding='10px 14px';
+  let filtro='TODOS';
+  const FILTROS=[['TODOS','Todos'],['CRITICO','🔴 Críticos'],['BAJO','🟡 Bajos'],['SIN VENTA','⚪ Sin venta']];
+  const segEl=el('div','seg');
+  FILTROS.forEach(([k,lbl])=>{
+    const b=el('button',null,lbl); b.setAttribute('aria-pressed',k===filtro?'true':'false');
+    b.onclick=()=>{ filtro=k; [...segEl.children].forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false')); draw(); };
+    segEl.appendChild(b);
+  });
+  bar.appendChild(segEl); p.appendChild(bar);
+
+  const box=el('div'); p.appendChild(box);
+  function draw(){
+    const rows=filtro==='TODOS'?S.lineas:S.lineas.filter(l=>l.alerta===filtro);
+    let h='<div class="card"><div class="twrap"><table><thead><tr><th>Código</th><th>Producto</th><th>Marca</th><th>Stock (unid.)</th><th>Venta diaria prom.</th><th>Días de stock</th><th>Estado</th></tr></thead><tbody>';
+    rows.forEach(l=>{
+      const dias=l.diasStock===null?'—':AR.format(l.diasStock);
+      h+=`<tr><td class="name">${l.codigo}</td><td class="name">${l.descripcion}</td><td>${l.marca}</td><td class="num">${AR.format(l.stock)}</td><td class="num">${l.ventaDiariaProm}</td><td class="num" style="font-weight:700;color:${ALERTA_COLOR[l.alerta]}">${dias}</td><td><span class="md-chip" style="background:transparent;border:1px solid ${ALERTA_COLOR[l.alerta]};color:${ALERTA_COLOR[l.alerta]}">${ALERTA_LBL[l.alerta]}</span></td></tr>`;
+    });
+    if(!rows.length) h+='<tr><td colspan="7" style="color:var(--muted)">Sin artículos en este filtro.</td></tr>';
+    h+='</tbody></table></div></div>';
+    box.innerHTML=h;
+  }
+  draw();
 }
 
 /* ---------- PANEL: Infaltables ---------- */
@@ -3310,7 +3353,7 @@ const DIAS_ES=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sába
 
 /* ---------- init ---------- */
 function renderAll(){
-  renderHeaderKpis(); renderVend(); renderVentaDia(); renderFicha(); renderDiario(); renderResumen(); renderResultadosMes(); renderEfec(); renderConcurso(); renderMSU(); renderCanales(); renderMarcas(); renderEvo(); renderDev(); renderInfaltables(); renderAccion(); renderCombos(); renderRuta(); renderCoberturaMarcas(); renderMetaAgosto(); renderSeguimientoDiario(); renderMatinal(); renderMapa(); renderPlanSupervisor();
+  renderHeaderKpis(); renderVend(); renderVentaDia(); renderFicha(); renderDiario(); renderResumen(); renderResultadosMes(); renderEfec(); renderConcurso(); renderMSU(); renderCanales(); renderMarcas(); renderEvo(); renderDev(); renderInfaltables(); renderStock(); renderAccion(); renderCombos(); renderRuta(); renderCoberturaMarcas(); renderMetaAgosto(); renderSeguimientoDiario(); renderMatinal(); renderMapa(); renderPlanSupervisor();
 }
 (function initMesSelector(){
   const sel=document.getElementById('mesSel'); if(!sel) return;
