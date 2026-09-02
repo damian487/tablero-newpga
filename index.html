@@ -1197,7 +1197,7 @@ function vistaDiasStock(p){
   const box=el('div'); p.appendChild(box);
   function draw(){
     const rows=filtro==='TODOS'?S.lineas:S.lineas.filter(l=>l.alerta===filtro);
-    let h='<div class="card"><div class="twrap"><table><thead><tr><th>Código</th><th>Producto</th><th>Marca</th><th>Stock (unid.)</th><th>Venta diaria prom.</th><th>Días de stock</th><th>Estado</th></tr></thead><tbody>';
+    let h='<div class="card"><div class="twrap" style="max-height:min(620px,calc(100vh - 320px));overflow-y:auto"><table><thead><tr><th>Código</th><th>Producto</th><th>Marca</th><th>Stock (unid.)</th><th>Venta diaria prom.</th><th>Días de stock</th><th>Estado</th></tr></thead><tbody>';
     rows.forEach(l=>{
       const dias=l.diasStock===null?'—':AR.format(l.diasStock);
       h+=`<tr><td class="name">${l.codigo}</td><td class="name">${l.descripcion}</td><td>${l.marca}</td><td class="num">${AR.format(l.stock)}</td><td class="num">${l.ventaDiariaProm}</td><td class="num" style="font-weight:700;color:${ALERTA_COLOR[l.alerta]}">${dias}</td><td><span class="md-chip" style="background:transparent;border:1px solid ${ALERTA_COLOR[l.alerta]};color:${ALERTA_COLOR[l.alerta]}">${ALERTA_LBL[l.alerta]}</span></td></tr>`;
@@ -1240,7 +1240,7 @@ function vistaCicloPedido(p){
     });
     if(soloConPedido) rows=rows.filter(l=>l.pedidoSugerido>0);
     rows.sort((a,b)=>b.pedidoSugerido-a.pedidoSugerido);
-    let h='<div class="card"><div class="twrap"><table><thead><tr><th>Código</th><th>Producto</th><th>Marca</th><th>Stock inicial</th><th>Stock actual</th><th>Venta del ciclo</th><th>Venta diaria (+seg.)</th><th>Proyectado al cierre</th><th>Pedido sugerido</th></tr></thead><tbody>';
+    let h='<div class="card"><div class="twrap" style="max-height:min(620px,calc(100vh - 320px));overflow-y:auto"><table><thead><tr><th>Código</th><th>Producto</th><th>Marca</th><th>Stock inicial</th><th>Stock actual</th><th>Venta del ciclo</th><th>Venta diaria (+seg.)</th><th>Proyectado al cierre</th><th>Pedido sugerido</th></tr></thead><tbody>';
     rows.forEach(l=>{
       const proy=l.diasStockProyectado===null?'—':(l.diasStockProyectado+'d');
       h+=`<tr><td class="name">${l.codigo}</td><td class="name">${l.descripcion}</td><td>${l.marca}</td><td class="num">${AR.format(l.stockInicial)}</td><td class="num">${AR.format(l.stockActual)}</td><td class="num">${AR.format(l.ventaCiclo)}</td><td class="num">${l.ventaDiariaSeguridad}</td><td class="num">${AR.format(Math.round(l.stockProyectadoAlCierre))} <span style="color:var(--muted);font-size:10.5px">(${proy})</span></td><td class="num" style="font-weight:700;color:${l.pedidoSugerido>0?'var(--accent)':'var(--muted)'}">${AR.format(l.pedidoSugerido)}</td></tr>`;
