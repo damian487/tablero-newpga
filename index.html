@@ -1157,8 +1157,43 @@ function renderDev(){
 }
 
 /* ---------- PANEL: Dias de stock + Ciclo mensual de pedido ---------- */
+const GLOSARIO_STOCK_HTML = `
+  <p style="margin:0 0 10px;color:var(--muted);font-size:12.5px">Qué se tiene en cuenta para calcular la reposición de mercadería en esta pestaña.</p>
+  <h3 style="font-size:13px;margin:14px 0 6px">📦 Días de stock (vista simple)</h3>
+  <ul style="margin:0 0 10px;padding-left:18px;font-size:12.5px;line-height:1.7">
+    <li><b>Días de stock</b> = stock actual en el depósito principal ÷ venta diaria promedio del trimestre a la fecha. Indica cuántos días más dura el stock al ritmo de venta habitual.</li>
+    <li><b>Venta diaria promedio</b>: unidades vendidas de New PGA desde el 1° de julio (inicio del trimestre) ÷ días CORRIDOS transcurridos (no hábiles — el stock se consume los 7 días de la semana aunque no haya venta registrada el fin de semana).</li>
+    <li><b>Alertas</b>: 🔴 Crítico ≤2 días · 🟡 Bajo ≤5 días · 🟢 OK · ⚪ Sin venta (tiene stock pero no vendió nada en el período, no se puede estimar).</li>
+    <li><b>Familia</b>: categoría/rubro real de Gescom (ej. "Cuidado del bebé" es donde caen los Pampers).</li>
+  </ul>
+  <h3 style="font-size:13px;margin:14px 0 6px">🔄 Ciclo mensual de pedido (reposición semanal)</h3>
+  <ul style="margin:0 0 10px;padding-left:18px;font-size:12.5px;line-height:1.7">
+    <li><b>Venta del ciclo</b>: unidades vendidas del producto en lo que va del mes fiscal actual (desde el día 1 hasta hoy), <u>sin contar las vendidas bajo una promo/combo activo</u> (esas son colocación inicial, no recompra real).</li>
+    <li><b>Venta mes anterior</b>: lo mismo pero del mes fiscal previo ya cerrado, también sin combos.</li>
+    <li><b>Venta diaria (+seg.)</b>: promedio de venta por día hábil, mezclando el mes anterior y el ciclo actual — al principio del mes pesa más el mes anterior (para no depender de solo 2-3 días de venta reciente), y ese peso se invierte solo a medida que avanza el mes. A ese promedio se le suma un <b>+20% fijo</b> de margen de seguridad.</li>
+    <li><b>Horizonte</b>: días hábiles hacia adelante que se usan para proyectar la venta hasta el próximo pedido — <b>7 días hábiles</b> por defecto (pensado para pedir semanalmente, no todo el mes de una vez), <b>12 días</b> para los productos de alta rotación.</li>
+    <li><b>🔥 Alta rotación</b>: el 25% de productos que más venden por día (ya sin combos) — reciben 5 días hábiles extra de horizonte, para tener más colchón y no quedarse sin stock entre un pedido semanal y el siguiente.</li>
+    <li><b>Proyectado</b>: stock que va a quedar disponible al cabo del horizonte (stock actual menos la venta estimada de esos días).</li>
+    <li><b>Objetivo días de stock</b>: cuántos días de cobertura querés tener EN MANO al llegar el próximo pedido (editable, default 18 días) — define cuánto pedir además de lo que ya vas a tener proyectado.</li>
+    <li><b>Pedido sugerido</b> = objetivo de días de stock × venta diaria proyectada − stock proyectado (nunca negativo), <b>redondeado hacia arriba al múltiplo de "Unidades por caja"</b> — no se pueden pedir cajas partidas.</li>
+    <li><b>Stock inicial</b>: el stock que había el primer día del mes fiscal (se congela una sola vez, no cambia durante el mes) — referencia para comparar contra el stock actual.</li>
+  </ul>
+  <p style="margin:10px 0 0;font-size:11.5px;color:var(--muted)"><b>Ojo con las unidades:</b> Gescom mide algunos productos (ej. hojas de afeitar) en "medio cartel" en vez de piezas individuales — un "medio cartel" puede equivaler a varias piezas físicas. Antes de convertir a piezas o comparar contra el "Unidades por caja" del catálogo de P&G, confirmar la equivalencia para ese producto puntual.</p>
+`;
 function renderStock(){
   const p=document.getElementById('p-stock'); p.innerHTML='';
+  const glosCard=el('div','card no-print');
+  const glosHead=el('div'); glosHead.style.cssText='display:flex;align-items:center;justify-content:space-between;cursor:pointer';
+  glosHead.innerHTML='<h2 style="font-size:14px;margin:0">ℹ️ Glosario — qué se tiene en cuenta para el cálculo</h2><span id="glosStockToggle" style="font-size:12px;color:var(--accent);font-weight:700">Ver ▾</span>';
+  const glosBody=el('div'); glosBody.style.display='none'; glosBody.style.marginTop='10px'; glosBody.innerHTML=GLOSARIO_STOCK_HTML;
+  glosHead.onclick=()=>{
+    const abierto=glosBody.style.display!=='none';
+    glosBody.style.display=abierto?'none':'block';
+    glosHead.querySelector('#glosStockToggle').textContent=abierto?'Ver ▾':'Ocultar ▴';
+  };
+  glosCard.appendChild(glosHead); glosCard.appendChild(glosBody);
+  p.appendChild(glosCard);
+
   const seg=el('div','seg'); seg.style.marginBottom='10px';
   const vistas=[['dias','Días de stock'],['pedido','Ciclo mensual de pedido']];
   let vista='dias';
@@ -1319,8 +1354,14 @@ function vistaCicloPedido(p){
         if(conteoEan.get(ean)===1){
           const ped=linea.pedidoSugerido||0;
           if(ped>0){
-            qty=ped;
-            if(c.unidadesPorCaja) cajas=Math.round((ped/c.unidadesPorCaja)*100)/100;
+            // Redondea hacia arriba al multiplo de "Unidades por caja" - no se pueden pedir
+            // cajas partidas, y asi "Cant. cajas" siempre da un numero entero (pedido de Damian 4/9).
+            if(c.unidadesPorCaja){
+              cajas=Math.ceil(ped/c.unidadesPorCaja);
+              qty=cajas*c.unidadesPorCaja;
+            } else {
+              qty=ped;
+            }
           }
         }
       }
