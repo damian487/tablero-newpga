@@ -2763,6 +2763,9 @@ function renderPerformance(){
   mesesDisponibles.forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=mesLabel(m)+(m===mesActualKey?' (actual)':'');sel.appendChild(o);});
   sel.value=mesActualKey;
   head.appendChild(sel);
+  const equipoSel=document.createElement('select'); equipoSel.className='fsel'; equipoSel.style.marginLeft='8px';
+  equipoSel.innerHTML='<option value="TODOS">Todos los equipos</option>';
+  head.appendChild(equipoSel);
   p.appendChild(head);
   const box=el('div',null,'<p style="color:var(--muted);padding:14px">Cargando…</p>'); p.appendChild(box);
 
@@ -2830,10 +2833,22 @@ function renderPerformance(){
         <div class="supcard"><h3>Ticket promedio</h3><div class="big num" style="font-size:24px">${peso(ticketProm)}</div>${varPill(ticketProm,ticketAnt)}</div>
       </div></div>`;
 
-    const familias=aggFamilias(porVend);
+    // Filtro de equipo (pedido de Damian 4/9): "Cobertura por familia" y "Performance de combos" se
+    // pueden acotar a un solo equipo, para poder mirar en la reunion solo lo de Lucy o solo lo de Juan.
+    const equiposDisponibles=[...new Set(lista.map(v=>v.supervisor))].sort((a,b)=>a.localeCompare(b));
+    const valorPrevioEquipo=equipoSel.value;
+    equipoSel.innerHTML='<option value="TODOS">Todos los equipos</option>'+equiposDisponibles.map(eq=>`<option value="${eq}">Equipo ${eq.split(' ')[0]}${eq.split(' ')[1]?(' '+eq.split(' ')[1]):''} y sus vendedores</option>`).join('');
+    equipoSel.value=equiposDisponibles.includes(valorPrevioEquipo)||valorPrevioEquipo==='TODOS'?valorPrevioEquipo:'TODOS';
+    const equipoFiltro=equipoSel.value;
+    const filtrarPorEquipo=(pv)=>{ if(equipoFiltro==='TODOS'||!pv) return pv; const out={}; Object.keys(pv).forEach(cod=>{ if(pv[cod].supervisor===equipoFiltro) out[cod]=pv[cod]; }); return out; };
+    const porVendEq=filtrarPorEquipo(porVend);
+    const porVendAntEq=filtrarPorEquipo(porVendAnt);
+    const etiquetaEquipo=equipoFiltro==='TODOS'?'todos los equipos':('Equipo '+equipoFiltro.split(' ')[0]+(equipoFiltro.split(' ')[1]?(' '+equipoFiltro.split(' ')[1]):''));
+
+    const familias=aggFamilias(porVendEq);
     if(familias.length){
-      const familiasAntMap={}; aggFamilias(porVendAnt||{}).forEach(f=>familiasAntMap[f.familia]=f);
-      h+=`<div class="card"><div class="ctitle"><h2>Cobertura por familia</h2><span class="hint">venta y clientes compradores por familia · variación de RITMO DIARIO vs mes anterior (no del total acumulado, para que sea comparable a mitad de mes)</span></div>
+      const familiasAntMap={}; aggFamilias(porVendAntEq||{}).forEach(f=>familiasAntMap[f.familia]=f);
+      h+=`<div class="card"><div class="ctitle"><h2>Cobertura por familia</h2><span class="hint">${etiquetaEquipo} · venta y clientes compradores por familia · variación de RITMO DIARIO vs mes anterior (no del total acumulado, para que sea comparable a mitad de mes)</span></div>
         <div class="twrap"><table><thead><tr><th>Familia</th><th>Clientes</th><th>Venta $</th><th>VAR vs mes ant.</th></tr></thead><tbody>`;
       familias.forEach(fa=>{
         const ant=familiasAntMap[fa.familia];
@@ -2844,9 +2859,9 @@ function renderPerformance(){
       h+='</tbody></table></div></div>';
     }
 
-    const combosAgg=aggCombos(porVend);
+    const combosAgg=aggCombos(porVendEq);
     if(combosAgg.length){
-      h+='<div class="card"><div class="ctitle"><h2>Performance de combos</h2><span class="hint">colocación acumulada del mes por combo activo</span></div><div class="kpitiles" style="grid-template-columns:repeat('+Math.min(4,combosAgg.length)+',1fr)">';
+      h+='<div class="card"><div class="ctitle"><h2>Performance de combos</h2><span class="hint">'+etiquetaEquipo+' · colocación acumulada del mes por combo activo</span></div><div class="kpitiles" style="grid-template-columns:repeat('+Math.min(4,combosAgg.length)+',1fr)">';
       combosAgg.forEach(c=>{
         h+=`<div class="supcard"><h3>${c.nombre}</h3><div class="big num" style="color:var(--accent)">${AR.format(c.acumCli)}</div><div class="who">clientes · ${AR.format(c.acumU)} u. · ${peso(c.acumImp)}</div></div>`;
       });
@@ -2899,6 +2914,7 @@ function renderPerformance(){
     box.innerHTML=h;
   }
   sel.onchange=()=>draw(sel.value);
+  equipoSel.onchange=()=>draw(sel.value);
   draw(mesActualKey);
 }
 
