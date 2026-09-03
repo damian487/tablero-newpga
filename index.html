@@ -2833,11 +2833,13 @@ function renderPerformance(){
     const familias=aggFamilias(porVend);
     if(familias.length){
       const familiasAntMap={}; aggFamilias(porVendAnt||{}).forEach(f=>familiasAntMap[f.familia]=f);
-      h+=`<div class="card"><div class="ctitle"><h2>Cobertura por familia</h2><span class="hint">venta y clientes compradores por familia · variación vs mes anterior</span></div>
+      h+=`<div class="card"><div class="ctitle"><h2>Cobertura por familia</h2><span class="hint">venta y clientes compradores por familia · variación de RITMO DIARIO vs mes anterior (no del total acumulado, para que sea comparable a mitad de mes)</span></div>
         <div class="twrap"><table><thead><tr><th>Familia</th><th>Clientes</th><th>Venta $</th><th>VAR vs mes ant.</th></tr></thead><tbody>`;
       familias.forEach(fa=>{
         const ant=familiasAntMap[fa.familia];
-        h+=`<tr><td class="name">${fa.familia}</td><td class="num">${AR.format(fa.clientes)}</td><td class="num">${peso(fa.venta)}</td><td class="num">${varPill(fa.venta,ant?ant.venta:null)}</td></tr>`;
+        const ritmoFa=diasMes>0?fa.venta/diasMes:0;
+        const ritmoFaAnt=(ant&&diasMesAnt>0)?ant.venta/diasMesAnt:null;
+        h+=`<tr><td class="name">${fa.familia}</td><td class="num">${AR.format(fa.clientes)}</td><td class="num">${peso(fa.venta)}</td><td class="num">${varPill(ritmoFa,ritmoFaAnt)}</td></tr>`;
       });
       h+='</tbody></table></div></div>';
     }
@@ -2881,7 +2883,7 @@ function renderPerformance(){
         const sugerencia=problemas.length?('⚠️ '+problemas.join(' · ')):'✅ Buen desempeño general';
         h+=`<tr>
           <td class="name">${v.nombre}</td>
-          <td class="num">${peso(v.venta)}${ant?varPill(v.venta,ant.venta):''}</td>
+          <td class="num">${peso(v.venta)}${ant&&diasMes>0&&diasMesAnt>0?varPill(v.venta/diasMes,ant.venta/diasMesAnt):''}</td>
           <td class="num" style="color:${covCol};font-weight:700">${v.cobertura!=null?pct(v.cobertura):'—'}</td>
           <td class="num" style="color:${efCol};font-weight:700">${efPct!=null?pct(efPct):'—'}</td>
           <td class="num" style="color:${msuCol};font-weight:700">${v.msu?pct(v.msu.pctAvance):'—'}</td>
