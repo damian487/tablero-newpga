@@ -571,7 +571,7 @@ const TAB_GROUPS=[
     {id:'p-ventadia',label:'📈 Venta del Día'},
     {id:'p-evo',label:'Evolución diaria'} ],
   [ {id:'p-vend',label:'Vendedores & CCC'},
-    {id:'p-ficha',label:'Ficha por vendedor'},
+    {id:'p-ficha',label:'📊 Informe Performance'},
     {id:'p-ruta',label:'Ruta / No compradores'},
     {id:'p-efec',label:'Efectividad de ruta'},
     {id:'p-dev',label:'Devoluciones'} ],
@@ -2670,51 +2670,208 @@ function renderConcurso(){
   selFam.onchange=()=>drawFam(selFam.value); drawFam(C.porVendedor[0].cod);
 }
 
-/* ---------- PANEL: Ficha por vendedor ---------- */
+/* ---------- PANEL: Informe Performance ---------- */
 function ftile(lab,val){ return `<div class="supcard"><div class="who">${lab}</div><div class="big num">${val}</div></div>`; }
+const HISTORICO_ENDPOINT='https://tablero-newpga-worker.damian-8ad.workers.dev/api/historico-vendedor';
+const _histCache={};
+async function fetchHistoricoVendedor(mes){
+  if(_histCache[mes]) return _histCache[mes];
+  let pw=''; try{ pw=sessionStorage.getItem('gpw')||''; }catch(_){ }
+  const res=await fetch(HISTORICO_ENDPOINT+'?mes='+mes+'&pw='+encodeURIComponent(pw),{headers:{'X-Dashboard-Password':pw}});
+  if(!res.ok) throw new Error('sin snapshot para '+mes);
+  const data=await res.json();
+  _histCache[mes]=data;
+  return data;
+}
+// Arma, con los datos YA cargados en DATA (mes en vivo), el mismo shape que /api/historico-vendedor
+// para no tener que pegarle al Worker de nuevo por el mes actual.
+function snapshotDelMesActual(){
+  const out={};
+  const efMap={}; (DATA.efectividad?DATA.efectividad.porVendedor:[]).forEach(e=>efMap[e.cod]=e);
+  const msuMap={}; (DATA.msu?DATA.msu.porVendedor:[]).forEach(m=>msuMap[m.cod]=m);
+  const infMap={}; (DATA.infaltablesEquipo?DATA.infaltablesEquipo.vendedores:[]).forEach(v=>infMap[v.cod]=v);
+  const combosMap={};
+  (DATA.combos?DATA.combos.lista:[]).forEach(combo=>{
+    (combo.porVendedor||[]).forEach(pv=>{
+      if(!combosMap[pv.cod]) combosMap[pv.cod]=[];
+      combosMap[pv.cod].push({id:combo.id,nombre:combo.nombre,acumU:pv.acumU,acumImp:pv.acumImp,acumCli:pv.acumCli});
+    });
+  });
+  DATA.porVendedor.filter(v=>!v.mayorista).forEach(v=>{
+    const ef=efMap[v.cod], msuV=msuMap[v.cod], inf=infMap[v.cod];
+    out[v.cod]={
+      cod:v.cod, nombre:v.nombre, supervisor:v.supervisor,
+      venta:v.venta, ccc:v.ccc, cobertura:v.cobertura, universo:v.universo,
+      ticket: v.ccc>0?Math.round(v.venta/v.ccc):0,
+      efectividad: ef?{planificados:ef.planificados,efectivos:ef.efectivos,pct:ef.efectividad}:null,
+      msu: msuV?{metaVen:msuV.metaVen,real:msuV.real,pctAvance:msuV.pctAvance,estado:msuV.estado,metaVenPesos:msuV.metaVenPesos,realCajas:msuV.realCajas,metaVenCajas:msuV.metaVenCajas}:null,
+      combos: combosMap[v.cod]||[],
+      infaltablesClientes: inf?inf.clientes:0,
+      familias: (DATA.fichas&&DATA.fichas[v.cod])?DATA.fichas[v.cod].familias:[],
+    };
+  });
+  return {mes:(DATA.meta&&DATA.meta.generado?DATA.meta.generado.slice(0,7):''), generado:new Date().toISOString(), carteraDistinta:false, porVendedor:out};
+}
+const MESES_NOM=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+function mesLabel(mes){ const [y,m]=mes.split('-').map(Number); return MESES_NOM[m-1]+' '+y; }
+function aggFamilias(porVend){
+  const map={};
+  Object.values(porVend).forEach(v=>{
+    (v.familias||[]).forEach(fa=>{
+      if(!map[fa.familia]) map[fa.familia]={familia:fa.familia,venta:0,clientes:0};
+      map[fa.familia].venta+=fa.venta||0; map[fa.familia].clientes+=fa.clientes||0;
+    });
+  });
+  return Object.values(map).sort((a,b)=>b.venta-a.venta);
+}
+function aggCombos(porVend){
+  const map={};
+  Object.values(porVend).forEach(v=>{
+    (v.combos||[]).forEach(c=>{
+      if(!map[c.id]) map[c.id]={id:c.id,nombre:c.nombre,acumU:0,acumImp:0,acumCli:0};
+      map[c.id].acumU+=c.acumU||0; map[c.id].acumImp+=c.acumImp||0; map[c.id].acumCli+=c.acumCli||0;
+    });
+  });
+  return Object.values(map).sort((a,b)=>b.acumImp-a.acumImp);
+}
+function varPill(actual,anterior,invertido){
+  if(anterior==null||anterior===0||actual==null) return '<span style="color:var(--muted);font-size:11px">— s/d mes ant.</span>';
+  const d=Math.round(1000*(actual-anterior)/Math.abs(anterior))/10;
+  const mejor=invertido?d<0:d>0;
+  const col=Math.abs(d)<1?'var(--muted)':(mejor?'var(--good)':'var(--bad)');
+  const flecha=d>0?'▲':(d<0?'▼':'▬');
+  return `<span style="color:${col};font-weight:700;font-size:12px">${flecha} ${d>0?'+':''}${d}% vs mes ant.</span>`;
+}
 function renderFicha(){
   const p=document.getElementById('p-ficha'); p.innerHTML='';
-  const vends=DATA.porVendedor.filter(v=>!v.mayorista);
-  const efMap={}; (DATA.efectividad?DATA.efectividad.porVendedor:[]).forEach(e=>efMap[e.cod]=e);
-  const ranked=[...vends].sort((a,b)=>b.venta-a.venta);
+  const mesesDisponibles=[...new Set((DATA.historicoMensual||[]).map(h=>h.mes))].sort();
+  const mesActualKey=mesesDisponibles.length?mesesDisponibles[mesesDisponibles.length-1]:snapshotDelMesActual().mes;
   const head=el('div','card');
-  head.appendChild(el('div','ctitle','<h2>Ficha individual por vendedor</h2><span class="hint">elegí un vendedor · para proyectar en la reunión</span>'));
+  head.appendChild(el('div','ctitle','<h2>📊 Informe Performance</h2><span class="hint">resumen ejecutivo + detalle por equipo y vendedor · pensado para la reunión mensual</span>'));
   const sel=document.createElement('select'); sel.className='fsel';
-  ranked.forEach(v=>{const o=document.createElement('option');o.value=v.cod;o.textContent=v.nombre+'  ('+v.supervisor.split(' ')[0]+')';sel.appendChild(o);});
+  mesesDisponibles.forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=mesLabel(m)+(m===mesActualKey?' (actual)':'');sel.appendChild(o);});
+  sel.value=mesActualKey;
   head.appendChild(sel);
-  const box=el('div',null,''); p.appendChild(head); p.appendChild(box);
-  function draw(cod){
-    const v=vends.find(x=>x.cod===cod); const ef=efMap[cod]||{}; const f=(DATA.fichas&&DATA.fichas[cod])?DATA.fichas[cod]:null;
-    const rank=ranked.findIndex(x=>x.cod===cod)+1;
-    const ticket=v.ccc>0?Math.round(v.venta/v.ccc):0;
-    let h=`<div class="card"><div class="ctitle"><h2>${v.nombre}</h2><span class="hint">${v.supervisor} · puesto #${rank} de ${ranked.length} en venta</span></div>
-      <div class="supgrid">
-      ${ftile('Venta neta',peso(v.venta))}
-      ${ftile('CCC / universo',AR.format(v.ccc)+' / '+AR.format(v.universo))}
-      ${ftile('% Cobertura',pct(v.cobertura))}
-      ${ftile('% Efectividad ruta',pct(ef.efectividad!=null?ef.efectividad:0))}
-      ${ftile('Ticket promedio',peso(ticket))}
+  p.appendChild(head);
+  const box=el('div',null,'<p style="color:var(--muted);padding:14px">Cargando…</p>'); p.appendChild(box);
+
+  async function draw(mes){
+    box.innerHTML='<p style="color:var(--muted);padding:14px">Cargando…</p>';
+    let snap, snapAnt=null;
+    try{
+      snap = (mes===mesActualKey) ? snapshotDelMesActual() : await fetchHistoricoVendedor(mes);
+    }catch(e){ box.innerHTML='<div class="card"><p style="color:var(--bad)">No hay datos guardados para '+mesLabel(mes)+'.</p></div>'; return; }
+    const idx=mesesDisponibles.indexOf(mes);
+    if(idx>0){
+      const mesAnt=mesesDisponibles[idx-1];
+      try{ snapAnt = (mesAnt===mesActualKey) ? snapshotDelMesActual() : await fetchHistoricoVendedor(mesAnt); }catch(e){ snapAnt=null; }
+    }
+    const porVend=snap.porVendedor||{};
+    const porVendAnt=snapAnt?snapAnt.porVendedor:null;
+    const lista=Object.values(porVend);
+    const listaAnt=porVendAnt?Object.values(porVendAnt):[];
+
+    // ---- agregados para el resumen ejecutivo ----
+    const ventaTotal=lista.reduce((a,v)=>a+v.venta,0);
+    const cccTotal=lista.reduce((a,v)=>a+v.ccc,0);
+    const universoTotal=lista.reduce((a,v)=>a+v.universo,0);
+    const msuReal=lista.reduce((a,v)=>a+(v.msu?v.msu.real:0),0);
+    const msuMeta=lista.reduce((a,v)=>a+(v.msu?v.msu.metaVen:0),0);
+    const coberturaTotal=universoTotal>0?Math.round(1000*cccTotal/universoTotal)/10:null;
+    const ticketProm=cccTotal>0?Math.round(ventaTotal/cccTotal):0;
+    const msuPct=msuMeta>0?Math.round(1000*msuReal/msuMeta)/10:0;
+
+    const ventaAnt=listaAnt.reduce((a,v)=>a+v.venta,0);
+    const cccAnt=listaAnt.reduce((a,v)=>a+v.ccc,0);
+    const universoAnt=listaAnt.reduce((a,v)=>a+v.universo,0);
+    const msuRealAnt=listaAnt.reduce((a,v)=>a+(v.msu?v.msu.real:0),0);
+    const msuMetaAnt=listaAnt.reduce((a,v)=>a+(v.msu?v.msu.metaVen:0),0);
+    const coberturaAnt=universoAnt>0?Math.round(1000*cccAnt/universoAnt)/10:null;
+    const ticketAnt=cccAnt>0?Math.round(ventaAnt/cccAnt):0;
+    const msuPctAnt=msuMetaAnt>0?Math.round(1000*msuRealAnt/msuMetaAnt)/10:null;
+
+    let h='';
+    if(snap.carteraDistinta){
+      h+='<div class="card no-print" style="border-left:4px solid var(--warn)"><p style="margin:0;font-size:13px"><b>⚠️ Cartera de clientes distinta a la actual</b> — hubo una reestructuración de zonas en septiembre. La venta/MSU de este mes son un registro real del trabajo hecho, pero la cobertura/efectividad/CCC no son 100% comparables vendedor a vendedor contra los meses posteriores a la reestructuración.</p></div>';
+    }
+
+    // ---- Bloque A: resumen ejecutivo ----
+    h+=`<div class="card"><div class="ctitle"><h2>Resumen ejecutivo — ${mesLabel(mes)}</h2><span class="hint">principales KPIs de la red, con variación vs mes anterior</span></div>
+      <div class="kpitiles" style="grid-template-columns:repeat(4,1fr)">
+        <div class="supcard"><h3>Venta neta</h3><div class="big num" style="font-size:24px;color:var(--accent)">${peso(ventaTotal)}</div>${varPill(ventaTotal,ventaAnt)}</div>
+        <div class="supcard"><h3>MSU (%avance)</h3><div class="big num" style="font-size:24px">${pct(msuPct)}</div>${varPill(msuPct,msuPctAnt)}</div>
+        <div class="supcard"><h3>Cobertura CC</h3><div class="big num" style="font-size:24px">${coberturaTotal!=null?pct(coberturaTotal):'—'}</div>${varPill(coberturaTotal,coberturaAnt)}</div>
+        <div class="supcard"><h3>Ticket promedio</h3><div class="big num" style="font-size:24px">${peso(ticketProm)}</div>${varPill(ticketProm,ticketAnt)}</div>
       </div></div>`;
-    if(f&&f.familias&&f.familias.length){
-      const brutoTotal=f.familias.reduce((a,fa)=>a+fa.venta,0)||1;
-      h+=`<div class="card"><div class="ctitle"><h2>Mix por familia y marca</h2><span class="hint">rubro y, dentro, sus marcas (venta bruta) · clientes compradores · % sobre la venta bruta del vendedor</span></div>
-        <div class="twrap"><table><thead><tr><th>Familia / Marca</th><th>Clientes</th><th>Venta $</th><th>% del vendedor</th></tr></thead><tbody>`;
-      f.familias.forEach(fa=>{
-        h+=`<tr class="subhead"><td>${fa.familia}</td><td class="num">${AR.format(fa.clientes||0)}</td><td class="num">${peso(fa.venta)}</td><td class="num">${pct(Math.round(1000*fa.venta/brutoTotal)/10)}</td></tr>`;
-        fa.marcas.forEach(m=>{ h+=`<tr class="submarca"><td>${m.marca}</td><td class="num">${AR.format(m.clientes||0)}</td><td class="num">${peso(m.venta)}</td><td class="num">${pct(Math.round(1000*m.venta/brutoTotal)/10)}</td></tr>`; });
+
+    const familias=aggFamilias(porVend);
+    if(familias.length){
+      const familiasAntMap={}; aggFamilias(porVendAnt||{}).forEach(f=>familiasAntMap[f.familia]=f);
+      h+=`<div class="card"><div class="ctitle"><h2>Cobertura por familia</h2><span class="hint">venta y clientes compradores por familia · variación vs mes anterior</span></div>
+        <div class="twrap"><table><thead><tr><th>Familia</th><th>Clientes</th><th>Venta $</th><th>VAR vs mes ant.</th></tr></thead><tbody>`;
+      familias.forEach(fa=>{
+        const ant=familiasAntMap[fa.familia];
+        h+=`<tr><td class="name">${fa.familia}</td><td class="num">${AR.format(fa.clientes)}</td><td class="num">${peso(fa.venta)}</td><td class="num">${varPill(fa.venta,ant?ant.venta:null)}</td></tr>`;
       });
-      h+=`<tr class="subhead"><td>Devoluciones / NC</td><td class="num">—</td><td class="num">${peso(f.devoluciones||0)}</td><td class="num">—</td></tr>`;
-      h+=`<tr class="subhead"><td>= Venta neta</td><td class="num">—</td><td class="num">${peso(brutoTotal+(f.devoluciones||0))}</td><td class="num">100%</td></tr>`;
       h+='</tbody></table></div></div>';
     }
-    if(f&&f.topClientes&&f.topClientes.length){
-      h+=`<div class="card"><div class="ctitle"><h2>Top 10 clientes</h2><span class="hint">por venta neta</span></div><div class="twrap"><table><thead><tr><th>#</th><th>Cliente</th><th>Venta $</th></tr></thead><tbody>`;
-      f.topClientes.forEach((c,i)=>{ h+=`<tr><td class="num">${i+1}</td><td class="name">${c.cod?c.cod+' - ':''}${c.cliente}</td><td class="num">${peso(c.venta)}</td></tr>`; });
-      h+='</tbody></table></div></div>';
+
+    const combosAgg=aggCombos(porVend);
+    if(combosAgg.length){
+      h+='<div class="card"><div class="ctitle"><h2>Performance de combos</h2><span class="hint">colocación acumulada del mes por combo activo</span></div><div class="kpitiles" style="grid-template-columns:repeat('+Math.min(4,combosAgg.length)+',1fr)">';
+      combosAgg.forEach(c=>{
+        h+=`<div class="supcard"><h3>${c.nombre}</h3><div class="big num" style="color:var(--accent)">${AR.format(c.acumCli)}</div><div class="who">clientes · ${AR.format(c.acumU)} u. · ${peso(c.acumImp)}</div></div>`;
+      });
+      h+='</div></div>';
     }
+
+    // ---- Bloque B: detalle por equipo -> vendedor ----
+    const accionMap={}; (DATA.accion&&DATA.accion.todos&&DATA.accion.todos.porVendedor?DATA.accion.todos.porVendedor:[]).forEach(v=>accionMap[v.cod]=v);
+    const anteriorMap={}; listaAnt.forEach(v=>anteriorMap[v.cod]=v);
+    const equipos=[...new Set(lista.map(v=>v.supervisor))].sort((a,b)=>a.localeCompare(b));
+    equipos.forEach(eq=>{
+      const vendsEq=lista.filter(v=>v.supervisor===eq).sort((a,b)=>b.venta-a.venta);
+      const ventaEq=vendsEq.reduce((a,v)=>a+v.venta,0);
+      const cccEq=vendsEq.reduce((a,v)=>a+v.ccc,0);
+      const uniEq=vendsEq.reduce((a,v)=>a+v.universo,0);
+      const covEq=uniEq>0?Math.round(1000*cccEq/uniEq)/10:null;
+      h+=`<div class="card"><div class="ctitle"><h2>Equipo ${eq.split(' ')[0]}${eq.split(' ')[1]?(' '+eq.split(' ')[1]):''}</h2><span class="hint">${vendsEq.length} vendedores · ${peso(ventaEq)} · cobertura ${covEq!=null?pct(covEq):'—'}</span></div>`;
+      h+='<div class="twrap"><table><thead><tr><th>Vendedor</th><th>Venta</th><th>Cobertura</th><th>Efectividad</th><th>MSU</th><th>Ticket</th><th>Acción precio</th><th>Combos</th><th>Sugerencia</th></tr></thead><tbody>';
+      vendsEq.forEach(v=>{
+        const ant=anteriorMap[v.cod];
+        const covCol=covColor(v.cobertura);
+        const efPct=v.efectividad?v.efectividad.pct:null;
+        const efCol=efPct==null?'var(--muted)':(efPct>=15?'var(--good)':(efPct>=10?'var(--warn)':'var(--bad)'));
+        const msuCol=!v.msu?'var(--muted)':(v.msu.estado==='ALCANZABLE'?'var(--good)':(v.msu.estado==='DIFICIL'?'var(--warn)':'var(--bad)'));
+        const acc=accionMap[v.cod];
+        const accUsa=acc&&acc.acumU>0;
+        const comboUnidades=(v.combos||[]).reduce((a,c)=>a+c.acumU,0);
+        const comboUsa=comboUnidades>0;
+        const problemas=[];
+        if(v.cobertura!=null&&v.cobertura<20) problemas.push('cobertura baja');
+        if(efPct!=null&&efPct<10) problemas.push('efectividad de ruta baja');
+        if(v.msu&&v.msu.estado==='FUERA_DE_ALCANCE') problemas.push('MSU fuera de alcance');
+        if(!accUsa&&!comboUsa) problemas.push('no usó ninguna herramienta comercial');
+        const sugerencia=problemas.length?('⚠️ '+problemas.join(' · ')):'✅ Buen desempeño general';
+        h+=`<tr>
+          <td class="name">${v.nombre}</td>
+          <td class="num">${peso(v.venta)}${ant?varPill(v.venta,ant.venta):''}</td>
+          <td class="num" style="color:${covCol};font-weight:700">${v.cobertura!=null?pct(v.cobertura):'—'}</td>
+          <td class="num" style="color:${efCol};font-weight:700">${efPct!=null?pct(efPct):'—'}</td>
+          <td class="num" style="color:${msuCol};font-weight:700">${v.msu?pct(v.msu.pctAvance):'—'}</td>
+          <td class="num">${peso(v.ticket)}</td>
+          <td class="num" style="color:${accUsa?'var(--good)':'var(--bad)'};font-weight:700">${accUsa?('Sí · '+AR.format(acc.acumU)+'u.'):'No'}</td>
+          <td class="num" style="color:${comboUsa?'var(--good)':'var(--bad)'};font-weight:700">${comboUsa?(AR.format(comboUnidades)+'u.'):'No'}</td>
+          <td style="font-size:11.5px;max-width:220px">${sugerencia}</td>
+        </tr>`;
+      });
+      h+='</tbody></table></div></div>';
+    });
+
     box.innerHTML=h;
   }
-  sel.onchange=()=>draw(sel.value); draw(ranked[0].cod);
+  sel.onchange=()=>draw(sel.value);
+  draw(mesActualKey);
 }
 
 /* ---------- PANEL: Reporte diario ---------- */
