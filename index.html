@@ -343,6 +343,8 @@ td.name{font-weight:600}
 @media (max-width:480px){.bot-panel{right:12px;left:12px;width:auto;bottom:82px}.bot-fab{right:16px;bottom:16px}}
 </style>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
 <header>
   <div class="wrap head">
     <div class="brand">
@@ -1259,10 +1261,12 @@ function vistaCicloPedido(p){
   bar.style.cssText='padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap';
   bar.innerHTML=`<span style="font-size:12px;color:var(--muted);font-weight:700">Objetivo días de stock al cierre</span>
     <input id="pedObjetivo" type="number" min="1" value="${C.objetivoDiasStock}" style="width:70px;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:inherit">
-    <label style="font-size:12.5px;display:flex;align-items:center;gap:5px;cursor:pointer"><input id="pedSoloConPedido" type="checkbox">Solo con pedido sugerido</label>`;
+    <label style="font-size:12.5px;display:flex;align-items:center;gap:5px;cursor:pointer"><input id="pedSoloConPedido" type="checkbox">Solo con pedido sugerido</label>
+    <button id="pedDescargarXlsx" class="tab no-print" style="margin-left:auto">📥 Descargar pedido (.xlsx)</button>`;
   p.appendChild(bar);
-  const inpObjetivo=bar.querySelector('#pedObjetivo'), chkSolo=bar.querySelector('#pedSoloConPedido');
+  const inpObjetivo=bar.querySelector('#pedObjetivo'), chkSolo=bar.querySelector('#pedSoloConPedido'), btnXlsx=bar.querySelector('#pedDescargarXlsx');
 
+  let rowsActuales=[];
   const box=el('div'); p.appendChild(box);
   function draw(){
     const objetivo=parseFloat(inpObjetivo.value)||C.objetivoDiasStock;
@@ -1272,6 +1276,7 @@ function vistaCicloPedido(p){
       const pedidoSugerido = objetivo===C.objetivoDiasStock ? l.pedidoSugerido : Math.max(0,Math.ceil(objetivo*l.ventaDiariaSeguridad - l.stockProyectadoAlCierre));
       return {...l, pedidoSugerido};
     });
+    rowsActuales=rows;
     if(soloConPedido) rows=rows.filter(l=>l.pedidoSugerido>0);
     rows.sort((a,b)=>b.pedidoSugerido-a.pedidoSugerido);
     let h='<div class="card"><div class="twrap" style="max-height:min(620px,calc(100vh - 320px));overflow-y:auto"><table><thead><tr><th>Código</th><th>Producto</th><th>Marca</th><th>Stock inicial</th><th>Stock actual</th><th>Venta del ciclo</th><th>Venta diaria (+seg.)</th><th>Proyectado al cierre</th><th>Pedido sugerido</th></tr></thead><tbody>';
@@ -1285,6 +1290,42 @@ function vistaCicloPedido(p){
     const tw=box.querySelector('.twrap'); if(tw){ tw.scrollLeft=0; tw.scrollTop=0; }
   }
   inpObjetivo.addEventListener('input',draw); chkSolo.addEventListener('change',draw);
+  btnXlsx.addEventListener('click',()=>{
+    const catalogo=C.catalogoPG||[];
+    if(!catalogo.length){ alert('El catálogo de P&G todavía no está cargado en el tablero (se agregó recién - esperá a la próxima actualización automática).'); return; }
+    if(typeof XLSX==='undefined'){ alert('No se pudo cargar la librería para generar el Excel. Probá de nuevo en un rato.'); return; }
+    // Mismo criterio que la generacion manual: EAN es la clave confiable entre Gescom y el
+    // catalogo de P&G. Si un EAN aparece mas de una vez en el catalogo (P&G repite SKU en
+    // transicion) NO completamos qty/cajas - requiere resolucion manual - pero si completamos
+    // el codigo interno de referencia en todas las filas que matchean.
+    const porEan=new Map();
+    rowsActuales.forEach(l=>{ if(l.ean) porEan.set(String(l.ean).trim(), l); });
+    const conteoEan=new Map();
+    catalogo.forEach(c=>{ const e=String(c.ean).trim(); conteoEan.set(e,(conteoEan.get(e)||0)+1); });
+    const aoa=[['sku','ean','name','Unidades por caja','qty','Cant. cajas (ref.)','Código interno (Comercializadora LP)']];
+    catalogo.forEach(c=>{
+      const ean=String(c.ean).trim();
+      const linea=porEan.get(ean);
+      let qty='', cajas='', codInterno='';
+      if(linea){
+        codInterno=linea.codigo;
+        if(conteoEan.get(ean)===1){
+          const ped=linea.pedidoSugerido||0;
+          if(ped>0){
+            qty=ped;
+            if(c.unidadesPorCaja) cajas=Math.round((ped/c.unidadesPorCaja)*100)/100;
+          }
+        }
+      }
+      aoa.push([c.sku, c.ean, c.name, c.unidadesPorCaja, qty, cajas, codInterno]);
+    });
+    const ws=XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols']=[{wch:18},{wch:16},{wch:55},{wch:20},{wch:10},{wch:14},{wch:30}];
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Comercializadora LP');
+    const mes=(DATA.meta && DATA.meta.generado) ? DATA.meta.generado.slice(0,7) : new Date().toISOString().slice(0,7);
+    XLSX.writeFile(wb, `cart_import_NEWPGA_${mes}.xlsx`);
+  });
   draw();
 }
 
