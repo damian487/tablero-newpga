@@ -2744,6 +2744,15 @@ function varPill(actual,anterior,invertido){
   const flecha=d>0?'▲':(d<0?'▼':'▬');
   return `<span style="color:${col};font-weight:700;font-size:12px">${flecha} ${d>0?'+':''}${d}% vs mes ant.</span>`;
 }
+// Dias habiles (Lun-Vie) del mes calendario YYYY-MM completo - para comparar RITMO diario en vez
+// de totales crudos cuando un mes esta a mitad de camino (si no, el mes en curso siempre parece
+// "cayo" fuerte contra un mes anterior ya cerrado, aunque el ritmo real sea parejo o mejor).
+function diasHabilesDelMes(mes){
+  const [y,m]=mes.split('-').map(Number);
+  let count=0; const d=new Date(Date.UTC(y,m-1,1));
+  while(d.getUTCMonth()===m-1){ const dow=d.getUTCDay(); if(dow>=1&&dow<=5) count++; d.setUTCDate(d.getUTCDate()+1); }
+  return count;
+}
 function renderPerformance(){
   const p=document.getElementById('p-performance'); p.innerHTML='';
   const mesesDisponibles=[...new Set((DATA.historicoMensual||[]).map(h=>h.mes))].sort();
@@ -2764,9 +2773,9 @@ function renderPerformance(){
       snap = (mes===mesActualKey) ? snapshotDelMesActual() : await fetchHistoricoVendedor(mes);
     }catch(e){ box.innerHTML='<div class="card"><p style="color:var(--bad)">No hay datos guardados para '+mesLabel(mes)+'.</p></div>'; return; }
     const idx=mesesDisponibles.indexOf(mes);
-    if(idx>0){
-      const mesAnt=mesesDisponibles[idx-1];
-      try{ snapAnt = (mesAnt===mesActualKey) ? snapshotDelMesActual() : await fetchHistoricoVendedor(mesAnt); }catch(e){ snapAnt=null; }
+    const mesAntKey=idx>0?mesesDisponibles[idx-1]:null;
+    if(mesAntKey){
+      try{ snapAnt = (mesAntKey===mesActualKey) ? snapshotDelMesActual() : await fetchHistoricoVendedor(mesAntKey); }catch(e){ snapAnt=null; }
     }
     const porVend=snap.porVendedor||{};
     const porVendAnt=snapAnt?snapAnt.porVendedor:null;
@@ -2792,6 +2801,15 @@ function renderPerformance(){
     const ticketAnt=cccAnt>0?Math.round(ventaAnt/cccAnt):0;
     const msuPctAnt=msuMetaAnt>0?Math.round(1000*msuRealAnt/msuMetaAnt)/10:null;
 
+    // Ritmo diario (venta / dias habiles transcurridos) en vez de totales crudos - si el mes elegido
+    // esta EN CURSO, comparar su total acumulado (pocos dias) contra el total de un mes YA CERRADO
+    // siempre da una caida falsa enorme. Con ritmo diario la comparacion es pareja sin importar
+    // cuantos dias lleve corridos cada mes.
+    const diasMes=(mes===mesActualKey)?(DATA.kpis.diasTranscurridos||1):diasHabilesDelMes(mes);
+    const diasMesAnt=mesAntKey?((mesAntKey===mesActualKey)?(DATA.kpis.diasTranscurridos||1):diasHabilesDelMes(mesAntKey)):null;
+    const ritmoVenta=diasMes>0?Math.round(ventaTotal/diasMes):0;
+    const ritmoVentaAnt=(snapAnt&&diasMesAnt>0)?Math.round(ventaAnt/diasMesAnt):null;
+
     let h='';
     if(snap.carteraDistinta){
       h+='<div class="card no-print" style="border-left:4px solid var(--warn)"><p style="margin:0;font-size:13px"><b>⚠️ Cartera de clientes distinta a la actual</b> — hubo una reestructuración de zonas en septiembre. La venta/MSU de este mes son un registro real del trabajo hecho, pero la cobertura/efectividad/CCC no son 100% comparables vendedor a vendedor contra los meses posteriores a la reestructuración.</p></div>';
@@ -2800,7 +2818,7 @@ function renderPerformance(){
     // ---- Bloque A: resumen ejecutivo ----
     h+=`<div class="card"><div class="ctitle"><h2>Resumen ejecutivo — ${mesLabel(mes)}</h2><span class="hint">principales KPIs de la red, con variación vs mes anterior</span></div>
       <div class="kpitiles" style="grid-template-columns:repeat(4,1fr)">
-        <div class="supcard"><h3>Venta neta</h3><div class="big num" style="font-size:24px;color:var(--accent)">${peso(ventaTotal)}</div>${varPill(ventaTotal,ventaAnt)}</div>
+        <div class="supcard"><h3>Venta neta</h3><div class="big num" style="font-size:24px;color:var(--accent)">${peso(ventaTotal)}</div>${varPill(ritmoVenta,ritmoVentaAnt)}<div class="who" style="font-size:10px">ritmo diario: ${peso(ritmoVenta)}/día hábil</div></div>
         <div class="supcard"><h3>MSU (%avance)</h3><div class="big num" style="font-size:24px">${pct(msuPct)}</div>${varPill(msuPct,msuPctAnt)}</div>
         <div class="supcard"><h3>Cobertura CC</h3><div class="big num" style="font-size:24px">${coberturaTotal!=null?pct(coberturaTotal):'—'}</div>${varPill(coberturaTotal,coberturaAnt)}</div>
         <div class="supcard"><h3>Ticket promedio</h3><div class="big num" style="font-size:24px">${peso(ticketProm)}</div>${varPill(ticketProm,ticketAnt)}</div>
