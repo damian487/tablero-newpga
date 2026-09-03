@@ -373,6 +373,7 @@ td.name{font-weight:600}
   <section class="panel" id="p-vend" role="tabpanel"></section>
   <section class="panel" id="p-ventadia" role="tabpanel"></section>
   <section class="panel" id="p-ficha" role="tabpanel"></section>
+  <section class="panel" id="p-performance" role="tabpanel"></section>
   <section class="panel" id="p-resumen" role="tabpanel"></section>
   <section class="panel" id="p-resultados" role="tabpanel"></section>
   <section class="panel" id="p-canales" role="tabpanel"></section>
@@ -571,7 +572,8 @@ const TAB_GROUPS=[
     {id:'p-ventadia',label:'📈 Venta del Día'},
     {id:'p-evo',label:'Evolución diaria'} ],
   [ {id:'p-vend',label:'Vendedores & CCC'},
-    {id:'p-ficha',label:'📊 Informe Performance'},
+    {id:'p-ficha',label:'Ficha por vendedor'},
+    {id:'p-performance',label:'📊 Informe Performance'},
     {id:'p-ruta',label:'Ruta / No compradores'},
     {id:'p-efec',label:'Efectividad de ruta'},
     {id:'p-dev',label:'Devoluciones'} ],
@@ -2742,8 +2744,8 @@ function varPill(actual,anterior,invertido){
   const flecha=d>0?'▲':(d<0?'▼':'▬');
   return `<span style="color:${col};font-weight:700;font-size:12px">${flecha} ${d>0?'+':''}${d}% vs mes ant.</span>`;
 }
-function renderFicha(){
-  const p=document.getElementById('p-ficha'); p.innerHTML='';
+function renderPerformance(){
+  const p=document.getElementById('p-performance'); p.innerHTML='';
   const mesesDisponibles=[...new Set((DATA.historicoMensual||[]).map(h=>h.mes))].sort();
   const mesActualKey=mesesDisponibles.length?mesesDisponibles[mesesDisponibles.length-1]:snapshotDelMesActual().mes;
   const head=el('div','card');
@@ -2872,6 +2874,52 @@ function renderFicha(){
   }
   sel.onchange=()=>draw(sel.value);
   draw(mesActualKey);
+}
+
+/* ---------- PANEL: Ficha por vendedor ---------- */
+function renderFicha(){
+  const p=document.getElementById('p-ficha'); p.innerHTML='';
+  const vends=DATA.porVendedor.filter(v=>!v.mayorista);
+  const efMap={}; (DATA.efectividad?DATA.efectividad.porVendedor:[]).forEach(e=>efMap[e.cod]=e);
+  const ranked=[...vends].sort((a,b)=>b.venta-a.venta);
+  const head=el('div','card');
+  head.appendChild(el('div','ctitle','<h2>Ficha individual por vendedor</h2><span class="hint">elegí un vendedor · para un seguimiento puntual 1 a 1</span>'));
+  const sel=document.createElement('select'); sel.className='fsel';
+  ranked.forEach(v=>{const o=document.createElement('option');o.value=v.cod;o.textContent=v.nombre+'  ('+v.supervisor.split(' ')[0]+')';sel.appendChild(o);});
+  head.appendChild(sel);
+  const box=el('div',null,''); p.appendChild(head); p.appendChild(box);
+  function draw(cod){
+    const v=vends.find(x=>x.cod===cod); const ef=efMap[cod]||{}; const f=(DATA.fichas&&DATA.fichas[cod])?DATA.fichas[cod]:null;
+    const rank=ranked.findIndex(x=>x.cod===cod)+1;
+    const ticket=v.ccc>0?Math.round(v.venta/v.ccc):0;
+    let h=`<div class="card"><div class="ctitle"><h2>${v.nombre}</h2><span class="hint">${v.supervisor} · puesto #${rank} de ${ranked.length} en venta</span></div>
+      <div class="supgrid">
+      ${ftile('Venta neta',peso(v.venta))}
+      ${ftile('CCC / universo',AR.format(v.ccc)+' / '+AR.format(v.universo))}
+      ${ftile('% Cobertura',pct(v.cobertura))}
+      ${ftile('% Efectividad ruta',pct(ef.efectividad!=null?ef.efectividad:0))}
+      ${ftile('Ticket promedio',peso(ticket))}
+      </div></div>`;
+    if(f&&f.familias&&f.familias.length){
+      const brutoTotal=f.familias.reduce((a,fa)=>a+fa.venta,0)||1;
+      h+=`<div class="card"><div class="ctitle"><h2>Mix por familia y marca</h2><span class="hint">rubro y, dentro, sus marcas (venta bruta) · clientes compradores · % sobre la venta bruta del vendedor</span></div>
+        <div class="twrap"><table><thead><tr><th>Familia / Marca</th><th>Clientes</th><th>Venta $</th><th>% del vendedor</th></tr></thead><tbody>`;
+      f.familias.forEach(fa=>{
+        h+=`<tr class="subhead"><td>${fa.familia}</td><td class="num">${AR.format(fa.clientes||0)}</td><td class="num">${peso(fa.venta)}</td><td class="num">${pct(Math.round(1000*fa.venta/brutoTotal)/10)}</td></tr>`;
+        fa.marcas.forEach(m=>{ h+=`<tr class="submarca"><td>${m.marca}</td><td class="num">${AR.format(m.clientes||0)}</td><td class="num">${peso(m.venta)}</td><td class="num">${pct(Math.round(1000*m.venta/brutoTotal)/10)}</td></tr>`; });
+      });
+      h+=`<tr class="subhead"><td>Devoluciones / NC</td><td class="num">—</td><td class="num">${peso(f.devoluciones||0)}</td><td class="num">—</td></tr>`;
+      h+=`<tr class="subhead"><td>= Venta neta</td><td class="num">—</td><td class="num">${peso(brutoTotal+(f.devoluciones||0))}</td><td class="num">100%</td></tr>`;
+      h+='</tbody></table></div></div>';
+    }
+    if(f&&f.topClientes&&f.topClientes.length){
+      h+=`<div class="card"><div class="ctitle"><h2>Top 10 clientes</h2><span class="hint">por venta neta</span></div><div class="twrap"><table><thead><tr><th>#</th><th>Cliente</th><th>Venta $</th></tr></thead><tbody>`;
+      f.topClientes.forEach((c,i)=>{ h+=`<tr><td class="num">${i+1}</td><td class="name">${c.cod?c.cod+' - ':''}${c.cliente}</td><td class="num">${peso(c.venta)}</td></tr>`; });
+      h+='</tbody></table></div></div>';
+    }
+    box.innerHTML=h;
+  }
+  sel.onchange=()=>draw(sel.value); draw(ranked[0].cod);
 }
 
 /* ---------- PANEL: Reporte diario ---------- */
@@ -3693,7 +3741,7 @@ const DIAS_ES=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sába
 
 /* ---------- init ---------- */
 function renderAll(){
-  renderHeaderKpis(); renderVend(); renderVentaDia(); renderFicha(); renderDiario(); renderResumen(); renderResultadosMes(); renderEfec(); renderConcurso(); renderMSU(); renderCanales(); renderMarcas(); renderEvo(); renderDev(); renderInfaltables(); renderStock(); renderAccion(); renderCombos(); renderRuta(); renderCoberturaMarcas(); renderMetaAgosto(); renderSeguimientoDiario(); renderMatinal(); renderMapa(); renderPlanSupervisor();
+  renderHeaderKpis(); renderVend(); renderVentaDia(); renderFicha(); renderPerformance(); renderDiario(); renderResumen(); renderResultadosMes(); renderEfec(); renderConcurso(); renderMSU(); renderCanales(); renderMarcas(); renderEvo(); renderDev(); renderInfaltables(); renderStock(); renderAccion(); renderCombos(); renderRuta(); renderCoberturaMarcas(); renderMetaAgosto(); renderSeguimientoDiario(); renderMatinal(); renderMapa(); renderPlanSupervisor();
 }
 (function initMesSelector(){
   const sel=document.getElementById('mesSel'); if(!sel) return;
