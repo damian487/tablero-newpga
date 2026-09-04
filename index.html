@@ -3392,9 +3392,14 @@ function renderMapa(){
       m.bindPopup(`<b>${r.cod} - ${r.nombre}</b><br>${r.dir||''}<br>Vendedor: ${r.vendedor}<br>Día visita: ${r.dia||'—'} · ${r.sub||''}<br>Frecuencia: ${frec}`);
       mapaMarkersLayer.addLayer(m);
     });
-    const leyendaFrec='<span style="display:inline-flex;align-items:center;gap:4px"><i style="width:9px;height:9px;border-radius:50%;background:#999;display:inline-block"></i>Semanal</span>'+
-      '<span style="display:inline-flex;align-items:center;gap:4px"><i style="width:9px;height:9px;border-radius:50%;background:#999;border:2px solid #fff;box-shadow:0 0 0 1px #999;display:inline-block"></i>Quincenal</span>'+
-      '<span style="display:inline-flex;align-items:center;gap:4px"><i style="width:9px;height:9px;border-radius:50%;background:#999;border:2px dashed #1a1a1a;display:inline-block"></i>Mensual</span>';
+    // Conteo por frecuencia del recorte actual (equipo/vendedor/dia) - pedido de Damian para ver
+    // cuantos clientes quincenales/mensuales caen en el dia elegido (no todos los dias tienen los
+    // mismos, por el ciclo de 14/28 dias de esVisitaEnFecha).
+    const frecCounts={Semanal:0,Quincenal:0,Mensual:0};
+    filtered.forEach(r=>{ const f=r.frecuencia||'Semanal'; frecCounts[f]=(frecCounts[f]||0)+1; });
+    const leyendaFrec='<span style="display:inline-flex;align-items:center;gap:4px"><i style="width:9px;height:9px;border-radius:50%;background:#999;display:inline-block"></i>Semanal ('+AR.format(frecCounts.Semanal)+')</span>'+
+      '<span style="display:inline-flex;align-items:center;gap:4px"><i style="width:9px;height:9px;border-radius:50%;background:#999;border:2px solid #fff;box-shadow:0 0 0 1px #999;display:inline-block"></i>Quincenal ('+AR.format(frecCounts.Quincenal)+')</span>'+
+      '<span style="display:inline-flex;align-items:center;gap:4px"><i style="width:9px;height:9px;border-radius:50%;background:#999;border:2px dashed #1a1a1a;display:inline-block"></i>Mensual ('+AR.format(frecCounts.Mensual)+')</span>';
     legend.innerHTML='<b style="width:100%;color:var(--muted)">'+AR.format(filtered.length)+' clientes en el mapa</b>'+[...usados.entries()].sort((a,b)=>a[1].nombre.localeCompare(b[1].nombre)).map(([cod,inf])=>`<span style="display:inline-flex;align-items:center;gap:4px"><i style="width:9px;height:9px;border-radius:50%;background:${inf.color};display:inline-block"></i>${inf.nombre.replace('KAF ','').replace('Kaf ','')}</span>`).join('')+
       '<span style="width:100%;height:0"></span><b style="width:100%;color:var(--muted);margin-top:4px">Frecuencia (borde):</b>'+leyendaFrec;
     // encuadra el mapa a los clientes filtrados (arranca centrado en la zona real, y se
