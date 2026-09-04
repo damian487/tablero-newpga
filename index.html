@@ -169,7 +169,7 @@ td.name{font-weight:600}
   header, nav.tabs, .wrap > section.kpis, select.fsel, .tab, .no-print{ display:none !important; }
   main.wrap{ padding:0 !important; max-width:100% !important; }
   .panel{ display:none !important; }
-  body:not(.print-ruta):not(.print-devcli):not(.print-metaago-seg):not(.print-stock) #p-diario{ display:block !important; }
+  body:not(.print-ruta):not(.print-devcli):not(.print-metaago-seg):not(.print-stock):not(.print-covmarca) #p-diario{ display:block !important; }
   body.print-ruta #p-ruta{ display:block !important; }
   body.print-devcli #p-dev{ display:block !important; }
   body.print-devcli #p-dev > *:not(#devCliCard){ display:none !important; }
@@ -177,6 +177,7 @@ td.name{font-weight:600}
   body.print-metaago-seg #p-metaago > *:not(#mdPrintCard){ display:none !important; }
   body.print-metaago-seg #mdPrintTitle{ display:block !important; }
   body.print-stock #p-stock{ display:block !important; }
+  body.print-covmarca #p-covmarca{ display:block !important; }
   .card{ box-shadow:none !important; border:1px solid #cfd6e0 !important; break-inside:avoid; margin:0 0 8px 0 !important; padding:10px 12px !important; }
   .card+.card,.grid+.grid,.grid+.card,.card+.grid{ margin-top:8px !important; }
   .grid{ gap:8px !important; }
@@ -1935,13 +1936,15 @@ function renderCoberturaMarcas(){
   const DIASFULL={Lu:'Lunes',Ma:'Martes',Mi:'Miércoles',Ju:'Jueves',Vi:'Viernes'};
   const card=el('div','card');
   let head='<div class="ctitle"><h2>Cobertura de marcas por vendedor y cliente</h2><span class="hint">elegí un vendedor · filas = clientes · columnas = marcas · color = intensidad de $ por marca en ese cliente · filtrá por Días Visita para ver a quién reforzarle el mix ese día</span></div>';
-  head+='<div style="display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 12px;align-items:center">';
+  head+='<div class="no-print" style="display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 12px;align-items:center">';
   head+='<select id="cmV" class="fsel">'+vends.map(v=>`<option value="${v.cod}">${v.nombre} (${v.supervisor.split(' ')[0]})</option>`).join('')+'</select>';
   head+='<select id="cmSort" class="fsel"><option value="venta">Ordenar por venta</option><option value="mas">Más marcas primero</option><option value="menos">Menos marcas primero</option><option value="nombre">Alfabético</option></select>';
   head+='<span style="font-size:11px;color:var(--muted);font-weight:700;margin-left:6px">Días Visita</span><div class="seg" id="cmDias"></div>';
-  head+='</div><div id="cmSum"></div><div id="cmWho" style="font-size:11.5px;color:var(--muted);margin-bottom:6px"></div><div id="cmBox"></div>';
+  head+='<button id="cmPrint" class="tab no-print">🖨️ Imprimir / PDF</button>';
+  head+='</div><div id="cmVendTitle" style="font-size:15px;font-weight:800;margin-bottom:6px"></div><div id="cmSum"></div><div id="cmWho" style="font-size:11.5px;color:var(--muted);margin-bottom:6px"></div><div id="cmBox"></div>';
   card.innerHTML=head; p.appendChild(card);
-  const selV=card.querySelector('#cmV'), selSort=card.querySelector('#cmSort'), diasBox=card.querySelector('#cmDias'), sumEl=card.querySelector('#cmSum'), whoEl=card.querySelector('#cmWho'), box=card.querySelector('#cmBox');
+  const selV=card.querySelector('#cmV'), selSort=card.querySelector('#cmSort'), diasBox=card.querySelector('#cmDias'), sumEl=card.querySelector('#cmSum'), whoEl=card.querySelector('#cmWho'), box=card.querySelector('#cmBox'), vendTitleEl=card.querySelector('#cmVendTitle');
+  card.querySelector('#cmPrint').addEventListener('click',()=>{ document.body.classList.add('print-covmarca'); setTimeout(()=>{ try{window.print();}catch(e){} setTimeout(()=>document.body.classList.remove('print-covmarca'),400); },60); });
   let selDia='TODOS';
   ['TODOS','Lu','Ma','Mi','Ju','Vi'].forEach(d=>{
     const b=el('button',null,d==='TODOS'?'Todos':d); b.setAttribute('aria-pressed',d===selDia?'true':'false');
@@ -1951,6 +1954,8 @@ function renderCoberturaMarcas(){
   function draw(){
     const vc=selV.value, sort=selSort.value;
     const V=CM[vc];
+    const vObj=vends.find(v=>String(v.cod)===String(vc));
+    vendTitleEl.textContent=(vObj?vObj.nombre+' · '+vObj.supervisor:'Vendedor '+vc)+' — al '+fdate(DATA.meta.ultimaFecha)+'/'+DATA.meta.ultimaFecha.slice(0,4);
     const cmMap={}; (V&&V.clientes?V.clientes:[]).forEach(c=>{ cmMap[c.cod]=c; });
     let rows, whoTxt;
     if(selDia==='TODOS'){
