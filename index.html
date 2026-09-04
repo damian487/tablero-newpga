@@ -3331,7 +3331,8 @@ function renderMapa(){
 
   const sups=['TODOS',...[...new Set(rows.map(r=>r.supervisor))].filter(s=>s && s.indexOf('N/A')<0)];
   const eqBar=el('div','seg'); eqBar.style.marginBottom='8px';
-  let eqSel='TODOS', vendSel='TODOS', diaSel='TODOS';
+  const DIA_ORDEN=['Lu','Ma','Mi','Ju','Vi'];
+  let eqSel='TODOS', vendSel='TODOS', diasSel=new Set(); // vacio = "Todos los dias" (sin filtro de dia)
 
   const vendSelEl=document.createElement('select'); vendSelEl.className='fsel';
   function fillVendSel(){
@@ -3349,20 +3350,31 @@ function renderMapa(){
   fillVendSel();
   vendSelEl.onchange=()=>{ vendSel=vendSelEl.value; drawMarkers(); };
 
+  // Dias de semana: multi-seleccion (pedido de Damian, ej. ver Lu+Vi a la vez) - "Todos" es un
+  // boton aparte que limpia la seleccion puntual (equivale a "sin filtro de dia").
   const diaBar=el('div','seg'); diaBar.style.marginBottom='8px';
-  const DIAS=[['TODOS','Todos'],['Lu','Lu'],['Ma','Ma'],['Mi','Mi'],['Ju','Ju'],['Vi','Vi']];
-  DIAS.forEach(([k,lbl])=>{
-    const b=document.createElement('button'); b.textContent=lbl;
-    b.setAttribute('aria-pressed', k==='TODOS'?'true':'false');
-    b.onclick=()=>{ diaSel=k; [...diaBar.children].forEach(x=>x.setAttribute('aria-pressed', x===b?'true':'false')); syncFechaEnabled(); drawMarkers(); };
-    diaBar.appendChild(b);
+  const btnTodosDia=document.createElement('button'); btnTodosDia.textContent='Todos'; btnTodosDia.setAttribute('aria-pressed','true');
+  btnTodosDia.onclick=()=>{ diasSel.clear(); syncDiaBotones(); syncFechaEnabled(); drawMarkers(); };
+  diaBar.appendChild(btnTodosDia);
+  const btnsDia={};
+  DIA_ORDEN.forEach(k=>{
+    const b=document.createElement('button'); b.textContent=k; b.setAttribute('aria-pressed','false');
+    b.onclick=()=>{ if(diasSel.has(k)) diasSel.delete(k); else diasSel.add(k); syncDiaBotones(); syncFechaEnabled(); drawMarkers(); };
+    btnsDia[k]=b; diaBar.appendChild(b);
   });
+  function syncDiaBotones(){
+    btnTodosDia.setAttribute('aria-pressed', diasSel.size===0?'true':'false');
+    DIA_ORDEN.forEach(k=>btnsDia[k].setAttribute('aria-pressed', diasSel.has(k)?'true':'false'));
+  }
 
   // Fecha real "a visitar" (pedido de Damian): el dia (Lu-Vi) solo dice el dia de semana fijo de
   // la ruta - un cliente Quincenal/Mensual no se visita TODAS las semanas de ese dia, solo cuando
   // la fecha cae exacto en su ciclo (esVisitaEnFecha, mismo criterio que ya usa el Worker para
   // efectividad). Se cruza por codigo de cliente contra DATA.ruta.ciclos (cliente -> [frecuencia,
   // primeraVisita]), que ya viaja en el JSON para el panel de Ruta - no hizo falta tocar el backend.
+  // Con multi-seleccion de dias, la fecha elegida se toma como "semana de referencia" (Lu-Vi de esa
+  // semana) y cada cliente se chequea contra el dia que le corresponde DENTRO de esa semana, no
+  // literalmente la fecha tipeada (que solo puede ser un dia de la semana a la vez).
   const CIC_MAPA=(DATA.ruta&&DATA.ruta.ciclos)||{};
   function esVisitaEnFechaJS(frecuencia,primeraVisita,fecha){
     if(frecuencia!=='Quincenal'&&frecuencia!=='Mensual') return true;
@@ -3373,12 +3385,19 @@ function renderMapa(){
     const diffDias=Math.round((d-anchor)/86400000);
     return ((diffDias%periodo)+periodo)%periodo===0;
   }
-  const DIA_POR_NUM={1:'Lu',2:'Ma',3:'Mi',4:'Ju',5:'Vi'};
+  const DIA_NUM={Lu:1,Ma:2,Mi:3,Ju:4,Vi:5};
   function hoyLocalStr(){ const n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); }
-  const fechaLbl=el('span',null,'Fecha real:'); fechaLbl.style.cssText='font-size:11px;color:var(--muted);font-weight:700';
+  function fechaDeDiaEnSemana(fechaRef,diaCodigo){
+    const d=new Date(fechaRef+'T00:00:00Z');
+    const isoDow=d.getUTCDay()===0?7:d.getUTCDay(); // 1=Lu...7=Do
+    const monday=new Date(d); monday.setUTCDate(d.getUTCDate()-(isoDow-1));
+    const target=new Date(monday); target.setUTCDate(monday.getUTCDate()+(DIA_NUM[diaCodigo]-1));
+    return target.toISOString().slice(0,10);
+  }
+  const fechaLbl=el('span',null,'Semana de:'); fechaLbl.style.cssText='font-size:11px;color:var(--muted);font-weight:700';
   const fechaInput=document.createElement('input'); fechaInput.type='date'; fechaInput.className='fsel'; fechaInput.value=hoyLocalStr(); fechaInput.style.padding='6px 8px';
   fechaInput.onchange=()=>{ drawMarkers(); };
-  function syncFechaEnabled(){ const on=diaSel!=='TODOS'; fechaInput.disabled=!on; fechaLbl.style.opacity=on?'1':'.45'; fechaInput.style.opacity=on?'1':'.45'; }
+  function syncFechaEnabled(){ const on=diasSel.size>0; fechaInput.disabled=!on; fechaLbl.style.opacity=on?'1':'.45'; fechaInput.style.opacity=on?'1':'.45'; }
   syncFechaEnabled();
 
   const filtBar=el('div',null,''); filtBar.style.cssText='display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:6px 0 12px';
@@ -3397,16 +3416,17 @@ function renderMapa(){
   function drawMarkers(){
     if(!mapaMarkersLayer) return;
     mapaMarkersLayer.clearLayers();
-    const fechaSel=fechaInput.value||hoyLocalStr();
+    const fechaRef=fechaInput.value||hoyLocalStr();
     const filtered=rows.filter(r=>{
       if(eqSel!=='TODOS'&&r.supervisor!==eqSel) return false;
       if(vendSel!=='TODOS'&&r.vendCod!==vendSel) return false;
-      if(diaSel==='TODOS') return true;
-      if(r.dia!==diaSel) return false;
+      if(diasSel.size===0) return true;
+      if(!diasSel.has(r.dia)) return false;
       const cic=CIC_MAPA[r.cod];
       const frec=(cic&&cic[0])||r.frecuencia||'Semanal';
       const anchor=cic?cic[1]:null;
-      return esVisitaEnFechaJS(frec,anchor,fechaSel);
+      const fechaDia=fechaDeDiaEnSemana(fechaRef,r.dia);
+      return esVisitaEnFechaJS(frec,anchor,fechaDia);
     });
     const usados=new Map();
     filtered.forEach(r=>{
@@ -3433,7 +3453,9 @@ function renderMapa(){
     const leyendaFrec='<span style="display:inline-flex;align-items:center;gap:4px"><i style="width:9px;height:9px;border-radius:50%;background:#999;display:inline-block"></i>Semanal ('+AR.format(frecCounts.Semanal)+')</span>'+
       '<span style="display:inline-flex;align-items:center;gap:4px"><i style="width:9px;height:9px;border-radius:50%;background:#999;border:2px solid #fff;box-shadow:0 0 0 1px #999;display:inline-block"></i>Quincenal ('+AR.format(frecCounts.Quincenal)+')</span>'+
       '<span style="display:inline-flex;align-items:center;gap:4px"><i style="width:9px;height:9px;border-radius:50%;background:#999;border:2px dashed #1a1a1a;display:inline-block"></i>Mensual ('+AR.format(frecCounts.Mensual)+')</span>';
-    const tituloCant=diaSel==='TODOS' ? (AR.format(filtered.length)+' clientes en el mapa') : (AR.format(filtered.length)+' clientes a visitar el '+fechaSel.split('-').reverse().slice(0,2).join('/')+' ('+diaSel+')');
+    const diasTxt=[...diasSel].sort((a,b)=>DIA_ORDEN.indexOf(a)-DIA_ORDEN.indexOf(b)).join('+');
+    const mondayTxt=fechaDeDiaEnSemana(fechaRef,'Lu').split('-').reverse().slice(0,2).join('/');
+    const tituloCant=diasSel.size===0 ? (AR.format(filtered.length)+' clientes en el mapa') : (AR.format(filtered.length)+' clientes a visitar · semana del '+mondayTxt+' · '+diasTxt);
     legend.innerHTML='<b style="width:100%;color:var(--muted)">'+tituloCant+'</b>'+[...usados.entries()].sort((a,b)=>a[1].nombre.localeCompare(b[1].nombre)).map(([cod,inf])=>`<span style="display:inline-flex;align-items:center;gap:4px"><i style="width:9px;height:9px;border-radius:50%;background:${inf.color};display:inline-block"></i>${inf.nombre.replace('KAF ','').replace('Kaf ','')}</span>`).join('')+
       '<span style="width:100%;height:0"></span><b style="width:100%;color:var(--muted);margin-top:4px">Frecuencia (borde):</b>'+leyendaFrec;
     // encuadra el mapa a los clientes filtrados (arranca centrado en la zona real, y se
