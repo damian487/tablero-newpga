@@ -3354,12 +3354,35 @@ function renderMapa(){
   DIAS.forEach(([k,lbl])=>{
     const b=document.createElement('button'); b.textContent=lbl;
     b.setAttribute('aria-pressed', k==='TODOS'?'true':'false');
-    b.onclick=()=>{ diaSel=k; [...diaBar.children].forEach(x=>x.setAttribute('aria-pressed', x===b?'true':'false')); drawMarkers(); };
+    b.onclick=()=>{ diaSel=k; [...diaBar.children].forEach(x=>x.setAttribute('aria-pressed', x===b?'true':'false')); syncFechaEnabled(); drawMarkers(); };
     diaBar.appendChild(b);
   });
 
+  // Fecha real "a visitar" (pedido de Damian): el dia (Lu-Vi) solo dice el dia de semana fijo de
+  // la ruta - un cliente Quincenal/Mensual no se visita TODAS las semanas de ese dia, solo cuando
+  // la fecha cae exacto en su ciclo (esVisitaEnFecha, mismo criterio que ya usa el Worker para
+  // efectividad). Se cruza por codigo de cliente contra DATA.ruta.ciclos (cliente -> [frecuencia,
+  // primeraVisita]), que ya viaja en el JSON para el panel de Ruta - no hizo falta tocar el backend.
+  const CIC_MAPA=(DATA.ruta&&DATA.ruta.ciclos)||{};
+  function esVisitaEnFechaJS(frecuencia,primeraVisita,fecha){
+    if(frecuencia!=='Quincenal'&&frecuencia!=='Mensual') return true;
+    if(!primeraVisita) return true;
+    const periodo=frecuencia==='Quincenal'?14:28;
+    const anchor=new Date(primeraVisita+'T00:00:00Z').getTime();
+    const d=new Date(fecha+'T00:00:00Z').getTime();
+    const diffDias=Math.round((d-anchor)/86400000);
+    return ((diffDias%periodo)+periodo)%periodo===0;
+  }
+  const DIA_POR_NUM={1:'Lu',2:'Ma',3:'Mi',4:'Ju',5:'Vi'};
+  function hoyLocalStr(){ const n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); }
+  const fechaLbl=el('span',null,'Fecha real:'); fechaLbl.style.cssText='font-size:11px;color:var(--muted);font-weight:700';
+  const fechaInput=document.createElement('input'); fechaInput.type='date'; fechaInput.className='fsel'; fechaInput.value=hoyLocalStr(); fechaInput.style.padding='6px 8px';
+  fechaInput.onchange=()=>{ drawMarkers(); };
+  function syncFechaEnabled(){ const on=diaSel!=='TODOS'; fechaInput.disabled=!on; fechaLbl.style.opacity=on?'1':'.45'; fechaInput.style.opacity=on?'1':'.45'; }
+  syncFechaEnabled();
+
   const filtBar=el('div',null,''); filtBar.style.cssText='display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:6px 0 12px';
-  filtBar.appendChild(eqBar); filtBar.appendChild(vendSelEl); filtBar.appendChild(diaBar);
+  filtBar.appendChild(eqBar); filtBar.appendChild(vendSelEl); filtBar.appendChild(diaBar); filtBar.appendChild(fechaLbl); filtBar.appendChild(fechaInput);
   card.appendChild(filtBar);
 
   const mapWrap=document.createElement('div'); mapWrap.id='mapaLeafletBox';
@@ -3374,7 +3397,17 @@ function renderMapa(){
   function drawMarkers(){
     if(!mapaMarkersLayer) return;
     mapaMarkersLayer.clearLayers();
-    const filtered=rows.filter(r=>(eqSel==='TODOS'||r.supervisor===eqSel)&&(vendSel==='TODOS'||r.vendCod===vendSel)&&(diaSel==='TODOS'||r.dia===diaSel));
+    const fechaSel=fechaInput.value||hoyLocalStr();
+    const filtered=rows.filter(r=>{
+      if(eqSel!=='TODOS'&&r.supervisor!==eqSel) return false;
+      if(vendSel!=='TODOS'&&r.vendCod!==vendSel) return false;
+      if(diaSel==='TODOS') return true;
+      if(r.dia!==diaSel) return false;
+      const cic=CIC_MAPA[r.cod];
+      const frec=(cic&&cic[0])||r.frecuencia||'Semanal';
+      const anchor=cic?cic[1]:null;
+      return esVisitaEnFechaJS(frec,anchor,fechaSel);
+    });
     const usados=new Map();
     filtered.forEach(r=>{
       const color=MAPA_COLORS[r.vendCod]||'#888';
@@ -3400,7 +3433,8 @@ function renderMapa(){
     const leyendaFrec='<span style="display:inline-flex;align-items:center;gap:4px"><i style="width:9px;height:9px;border-radius:50%;background:#999;display:inline-block"></i>Semanal ('+AR.format(frecCounts.Semanal)+')</span>'+
       '<span style="display:inline-flex;align-items:center;gap:4px"><i style="width:9px;height:9px;border-radius:50%;background:#999;border:2px solid #fff;box-shadow:0 0 0 1px #999;display:inline-block"></i>Quincenal ('+AR.format(frecCounts.Quincenal)+')</span>'+
       '<span style="display:inline-flex;align-items:center;gap:4px"><i style="width:9px;height:9px;border-radius:50%;background:#999;border:2px dashed #1a1a1a;display:inline-block"></i>Mensual ('+AR.format(frecCounts.Mensual)+')</span>';
-    legend.innerHTML='<b style="width:100%;color:var(--muted)">'+AR.format(filtered.length)+' clientes en el mapa</b>'+[...usados.entries()].sort((a,b)=>a[1].nombre.localeCompare(b[1].nombre)).map(([cod,inf])=>`<span style="display:inline-flex;align-items:center;gap:4px"><i style="width:9px;height:9px;border-radius:50%;background:${inf.color};display:inline-block"></i>${inf.nombre.replace('KAF ','').replace('Kaf ','')}</span>`).join('')+
+    const tituloCant=diaSel==='TODOS' ? (AR.format(filtered.length)+' clientes en el mapa') : (AR.format(filtered.length)+' clientes a visitar el '+fechaSel.split('-').reverse().slice(0,2).join('/')+' ('+diaSel+')');
+    legend.innerHTML='<b style="width:100%;color:var(--muted)">'+tituloCant+'</b>'+[...usados.entries()].sort((a,b)=>a[1].nombre.localeCompare(b[1].nombre)).map(([cod,inf])=>`<span style="display:inline-flex;align-items:center;gap:4px"><i style="width:9px;height:9px;border-radius:50%;background:${inf.color};display:inline-block"></i>${inf.nombre.replace('KAF ','').replace('Kaf ','')}</span>`).join('')+
       '<span style="width:100%;height:0"></span><b style="width:100%;color:var(--muted);margin-top:4px">Frecuencia (borde):</b>'+leyendaFrec;
     // encuadra el mapa a los clientes filtrados (arranca centrado en la zona real, y se
     // reencuadra solo al elegir un vendedor/equipo puntual) en vez de depender de un centro fijo
