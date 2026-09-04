@@ -1825,11 +1825,18 @@ function renderCombos(){
   const supsUso=[...new Set(usoTodos.map(v=>v.supervisor))].sort((a,b)=>a.localeCompare(b));
   const usoCard=el('div','card');
   usoCard.appendChild(el('div','ctitle','<h2>Uso de la herramienta de combos</h2><span class="hint">qué vendedores vendieron al menos un combo este mes y cuáles todavía no · ordenado de mayor a menor uso</span>'));
-  let uHead='<div style="margin-bottom:10px"><select id="usoSup" class="fsel"><option value="TODOS">Total equipo</option>'+supsUso.map(s=>`<option value="${s}">Supervisor ${s.split(' ')[0]}</option>`).join('')+'</select></div><div id="usoBox"></div>';
+  let uHead='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px"><select id="usoSup" class="fsel"><option value="TODOS">Total equipo</option>'+supsUso.map(s=>`<option value="${s}">Supervisor ${s.split(' ')[0]}</option>`).join('')+'</select><select id="usoVend" class="fsel"><option value="TODOS">Todos los vendedores</option></select></div><div id="usoBox"></div>';
   usoCard.innerHTML+=uHead; p.appendChild(usoCard);
-  const usoBox=usoCard.querySelector('#usoBox'), selUso=usoCard.querySelector('#usoSup');
+  const usoBox=usoCard.querySelector('#usoBox'), selUso=usoCard.querySelector('#usoSup'), selUsoVend=usoCard.querySelector('#usoVend');
+  function fillUsoVend(){
+    const base=selUso.value==='TODOS'?usoTodos:usoTodos.filter(v=>v.supervisor===selUso.value);
+    const prev=selUsoVend.value;
+    selUsoVend.innerHTML='<option value="TODOS">Todos los vendedores</option>'+base.map(v=>`<option value="${v.cod}">${v.nombre}</option>`).join('');
+    selUsoVend.value=base.some(v=>String(v.cod)===prev)?prev:'TODOS';
+  }
   function drawUso(){
-    const usoRows=selUso.value==='TODOS'?usoTodos:usoTodos.filter(v=>v.supervisor===selUso.value);
+    let usoRows=selUso.value==='TODOS'?usoTodos:usoTodos.filter(v=>v.supervisor===selUso.value);
+    if(selUsoVend.value!=='TODOS') usoRows=usoRows.filter(v=>String(v.cod)===selUsoVend.value);
     const usanCount=usoRows.filter(v=>v.combos.length>0).length;
     const noUsan=usoRows.filter(v=>v.combos.length===0);
     let uh=`<div class="kpitiles" style="grid-template-columns:repeat(2,1fr)">
@@ -1849,7 +1856,8 @@ function renderCombos(){
     uh+='</tbody></table></div>';
     usoBox.innerHTML=uh;
   }
-  selUso.onchange=drawUso; drawUso();
+  selUso.onchange=()=>{ fillUsoVend(); drawUso(); }; selUsoVend.onchange=drawUso;
+  fillUsoVend(); drawUso();
 }
 
 /* ---------- PANEL: Ruta / No compradores ---------- */
