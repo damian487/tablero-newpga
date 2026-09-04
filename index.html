@@ -1744,12 +1744,17 @@ function renderCombos(){
     });
     return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">${paths}</svg>`;
   }
-  function donaCard(titulo,slices,selId){
+  function donaCard(titulo,slices,selId,forceTotal){
     const total=slices.reduce((s,x)=>s+x.value,0);
     const sel=slices.find(s=>s.id===selId);
     const size=112,thick=17;
     const svg=donutSVG(slices.map(s=>({value:s.value,color:s.color,dim:selId!=null && s.id!==selId})),size,thick);
-    const centerBig=AR.format(sel? sel.value : total), centerSmall=sel? cbNombreCorto(sel.nombre).slice(0,14) : 'total';
+    // forceTotal (pedido de Damian): la tarjeta "Total de combos" siempre debe mostrar la SUMA real
+    // de todos los combos en el centro - antes mostraba el valor del combo elegido (igual que las
+    // otras 2 tarjetas de canal), asi que nunca se veia un total de verdad. El anillo sigue
+    // resaltando la porcion del combo seleccionado (dim de los demas), solo cambia el numero central.
+    const centerBig=AR.format(forceTotal? total : (sel? sel.value : total));
+    const centerSmall=forceTotal? 'total' : (sel? cbNombreCorto(sel.nombre).slice(0,14) : 'total');
     const legend=slices.map(s=>{
       const activo=s.id===selId;
       const pct=total? Math.round(1000*s.value/total)/10 : 0;
@@ -1768,7 +1773,7 @@ function renderCombos(){
     const almList=conId.filter(cb=>cb.canal!=='Autoservicios');
     const slicesFn=arr=>arr.map((cb,k)=>({id:cb.id, nombre:cb.nombre, value:cbMetricVal(cb,m,sup), color:CB_PALETTE[k%CB_PALETTE.length]}));
     donasEl.innerHTML =
-      donaCard('Total de combos', slicesFn(conId), selIdx) +
+      donaCard('Total de combos', slicesFn(conId), selIdx, true) +
       donaCard('Combos en Autoservicios', slicesFn(autoList), autoList.some(c=>c.id===selIdx)?selIdx:null) +
       donaCard('Combos en Almacenes', slicesFn(almList), almList.some(c=>c.id===selIdx)?selIdx:null);
   }
