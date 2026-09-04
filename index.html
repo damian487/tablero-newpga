@@ -178,6 +178,7 @@ td.name{font-weight:600}
   body.print-metaago-seg #mdPrintTitle{ display:block !important; }
   body.print-stock #p-stock{ display:block !important; }
   body.print-covmarca #p-covmarca{ display:block !important; }
+  body.print-covmarca #p-covmarca > *:not(#cmMainCard){ display:none !important; }
   .card{ box-shadow:none !important; border:1px solid #cfd6e0 !important; break-inside:avoid; margin:0 0 8px 0 !important; padding:10px 12px !important; }
   .card+.card,.grid+.grid,.grid+.card,.card+.grid{ margin-top:8px !important; }
   .grid{ gap:8px !important; }
@@ -1934,7 +1935,7 @@ function renderCoberturaMarcas(){
   const vends=DATA.porVendedor.filter(v=>!v.mayorista).slice().sort((a,b)=>b.venta-a.venta);
   const RT=DATA.ruta;
   const DIASFULL={Lu:'Lunes',Ma:'Martes',Mi:'Miércoles',Ju:'Jueves',Vi:'Viernes'};
-  const card=el('div','card');
+  const card=el('div','card'); card.id='cmMainCard'; // usado para acotar el area de impresion (excluye "Apertura por marca", que se agrega despues como card aparte)
   let head='<div class="ctitle"><h2>Cobertura de marcas por vendedor y cliente</h2><span class="hint">elegí un vendedor · filas = clientes · columnas = marcas · color = intensidad de $ por marca en ese cliente · filtrá por Días Visita para ver a quién reforzarle el mix ese día</span></div>';
   head+='<div class="no-print" style="display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 12px;align-items:center">';
   head+='<select id="cmV" class="fsel">'+vends.map(v=>`<option value="${v.cod}">${v.nombre} (${v.supervisor.split(' ')[0]})</option>`).join('')+'</select>';
