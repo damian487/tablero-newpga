@@ -2512,6 +2512,15 @@ const NV_FECHA_INICIO='2026-09-01';
 function computeNoVisitadosAcumulado(){
   const R=DATA.ruta; if(!R) return null;
   const CIC=R.ciclos||{};
+  // "Visitado" ahora se cruza contra la fecha EXACTA de compra (R.comprasPorFecha, cliente x
+  // fecha real) en vez del flag mensual "compro algo este mes" - pedido de Damian (8/9), ya que la
+  // venta cruda SI tiene fecha exacta por cliente, solo faltaba exponerla desde el Worker.
+  const comprasPorFecha=R.comprasPorFecha||{};
+  const setPorFecha={}; // cache de Set para lookup O(1), se arma una vez por fecha
+  function compradoresDe(fecha){
+    if(!setPorFecha[fecha]) setPorFecha[fecha]=new Set(comprasPorFecha[fecha]||[]);
+    return setPorFecha[fecha];
+  }
   const fechaFin=(DATA.meta&&DATA.meta.ultimaFecha)?DATA.meta.ultimaFecha:hoyLocalStr();
   const DIA_POR_ISODOW={1:'Lu',2:'Ma',3:'Mi',4:'Ju',5:'Vi'};
   const fechas=[]; // [{fecha,dia}] - solo dias habiles, nunca mas alla de fechaFin
@@ -2527,14 +2536,15 @@ function computeNoVisitadosAcumulado(){
   const porFechaTotal=fechas.map(f=>({fecha:f.fecha,dia:f.dia,ruta:0,visit:0}));
   fechas.forEach((f,i)=>{
     const vd=R.data[f.dia]||{};
+    const compradores=compradoresDe(f.fecha);
     Object.keys(vd).forEach(vc=>{
       if(!porVendedor[vc]) return;
       let ruta=0, visit=0;
       (vd[vc].cl||[]).forEach(c=>{
-        const cod=c[0], ok=c[1];
+        const cod=c[0];
         const cic=CIC[cod]; const frec=cic?cic[0]:'Semanal'; const anchor=cic?cic[1]:'';
         if(!esVisitaEnFechaJS(frec,anchor,f.fecha)) return;
-        ruta++; if(ok===1) visit++;
+        ruta++; if(compradores.has(cod)) visit++;
       });
       porVendedor[vc].porFecha.push({fecha:f.fecha,dia:f.dia,ruta,visit});
       porVendedor[vc].totalRuta+=ruta; porVendedor[vc].totalVisit+=visit;
@@ -2549,7 +2559,7 @@ function renderNoVisitadosSemana(p){
   const vendsAll=Object.values(NV.porVendedor).filter(v=>v.totalRuta>0);
 
   const card=el('div','card');
-  card.appendChild(el('div','ctitle',`<h2>📍 Clientes no visitados — desde la reestructuración</h2><span class="hint">acumulado ${fdate(NV.fechaInicio)} a ${fdate(NV.fechaFin)} (nunca incluye días que todavía no corrieron) · ruta real ya filtrada por ciclo Semanal/Quincenal/Mensual · "visitado" = compró en el mes (proxy, no hay check-in de visita) · pensado para medir si la reestructuración de rutas es efectiva</span>`));
+  card.appendChild(el('div','ctitle',`<h2>📍 Clientes no visitados — desde la reestructuración</h2><span class="hint">acumulado ${fdate(NV.fechaInicio)} a ${fdate(NV.fechaFin)} (nunca incluye días que todavía no corrieron) · ruta real ya filtrada por ciclo Semanal/Quincenal/Mensual · "visitado" = compró ESE día exacto (proxy, no hay check-in de visita real en el sistema) · pensado para medir si la reestructuración de rutas es efectiva</span>`));
   const filtBar=el('div',null,''); filtBar.style.cssText='display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0 4px';
   const eqBar=el('div','seg');
   const btnTodos=document.createElement('button'); btnTodos.textContent='Todos'; btnTodos.setAttribute('aria-pressed','true'); eqBar.appendChild(btnTodos);
