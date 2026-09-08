@@ -2498,90 +2498,143 @@ function renderEfec(){
   renderNoVisitadosSemana(p);
 }
 
-// ---- Clientes no visitados de la semana (pedido de Damian 8/9, para medir si la reestructuracion
-// de rutas es efectiva) - a diferencia de "Efectividad de ruta" de arriba (que es del MES elegido),
-// esto es siempre la SEMANA EN CURSO (Lu-Vi de hoy), cruzando cada cliente contra su ciclo real
-// (Semanal/Quincenal/Mensual) para no contar de mas a los quincenales/mensuales que esa semana no
-// correspondia visitar - mismo criterio ya usado en el Mapa y validado contra el reporte real del
-// 7/9. "Visitado" es un proxy: compro algo ese dia (no hay check-in de visita real en el sistema).
-function computeNoVisitadosSemana(){
+// ---- Clientes no visitados DESDE el inicio de la reestructuracion (pedido de Damian 8/9, para
+// medir si la reestructuracion de rutas del 1/9 es efectiva) - a diferencia de "Efectividad de
+// ruta" de arriba (que es del MES elegido), esto acumula dia habil por dia habil desde el 01/09
+// hasta la ULTIMA FECHA CON DATOS REALES (nunca fechas futuras que todavia no corrieron - eso era
+// un bug: mostraba "visitados" de un viernes que aun no habia pasado). Cruza cada cliente contra
+// su ciclo real (Semanal/Quincenal/Mensual) para no contar de mas a quincenales/mensuales que esa
+// fecha puntual no correspondia visitar - mismo criterio ya usado en el Mapa. "Visitado" es un
+// proxy: compro algo en el mes (no hay check-in de visita real en el sistema, ni venta por fecha
+// exacta por cliente) - con ocurrencias repetidas del mismo dia de semana (ej. 2 martes) un cliente
+// que compro una sola vez puede contar como "visitado" en ambas, es una limitacion conocida.
+const NV_FECHA_INICIO='2026-09-01';
+function computeNoVisitadosAcumulado(){
   const R=DATA.ruta; if(!R) return null;
   const CIC=R.ciclos||{};
-  const fechaRef=DATA.meta&&DATA.meta.ultimaFecha?DATA.meta.ultimaFecha:hoyLocalStr();
-  const fechaPorDia={}; R.dias.forEach(d=>{ fechaPorDia[d]=fechaDeDiaEnSemana(fechaRef,d); });
+  const fechaFin=(DATA.meta&&DATA.meta.ultimaFecha)?DATA.meta.ultimaFecha:hoyLocalStr();
+  const DIA_POR_ISODOW={1:'Lu',2:'Ma',3:'Mi',4:'Ju',5:'Vi'};
+  const fechas=[]; // [{fecha,dia}] - solo dias habiles, nunca mas alla de fechaFin
+  let d=new Date(NV_FECHA_INICIO+'T00:00:00Z');
+  const fin=new Date(fechaFin+'T00:00:00Z');
+  while(d<=fin){
+    const dia=DIA_POR_ISODOW[d.getUTCDay()];
+    if(dia) fechas.push({fecha:d.toISOString().slice(0,10), dia});
+    d.setUTCDate(d.getUTCDate()+1);
+  }
   const porVendedor={};
-  R.vendedores.forEach(v=>{ porVendedor[v.cod]={cod:v.cod,nombre:v.nombre,supervisor:v.supervisor,porDia:{},totalRuta:0,totalVisit:0}; });
-  const porDiaTotal={}; R.dias.forEach(d=>{ porDiaTotal[d]={ruta:0,visit:0}; });
-  R.dias.forEach(dia=>{
-    const fecha=fechaPorDia[dia];
-    const vd=R.data[dia]||{};
+  R.vendedores.forEach(v=>{ porVendedor[v.cod]={cod:v.cod,nombre:v.nombre,supervisor:v.supervisor,totalRuta:0,totalVisit:0,porFecha:[]}; });
+  const porFechaTotal=fechas.map(f=>({fecha:f.fecha,dia:f.dia,ruta:0,visit:0}));
+  fechas.forEach((f,i)=>{
+    const vd=R.data[f.dia]||{};
     Object.keys(vd).forEach(vc=>{
       if(!porVendedor[vc]) return;
       let ruta=0, visit=0;
       (vd[vc].cl||[]).forEach(c=>{
         const cod=c[0], ok=c[1];
         const cic=CIC[cod]; const frec=cic?cic[0]:'Semanal'; const anchor=cic?cic[1]:'';
-        if(!esVisitaEnFechaJS(frec,anchor,fecha)) return;
+        if(!esVisitaEnFechaJS(frec,anchor,f.fecha)) return;
         ruta++; if(ok===1) visit++;
       });
-      porVendedor[vc].porDia[dia]={ruta,visit,fecha};
+      porVendedor[vc].porFecha.push({fecha:f.fecha,dia:f.dia,ruta,visit});
       porVendedor[vc].totalRuta+=ruta; porVendedor[vc].totalVisit+=visit;
-      porDiaTotal[dia].ruta+=ruta; porDiaTotal[dia].visit+=visit;
+      porFechaTotal[i].ruta+=ruta; porFechaTotal[i].visit+=visit;
     });
   });
-  return {dias:R.dias, fechaPorDia, porVendedor, porDiaTotal};
+  return {fechaInicio:NV_FECHA_INICIO, fechaFin, porVendedor, porFechaTotal};
 }
 function renderNoVisitadosSemana(p){
-  const NV=computeNoVisitadosSemana(); if(!NV) return;
+  const NV=computeNoVisitadosAcumulado(); if(!NV) return;
   const round1=n=>Math.round(n*10)/10;
-  const DIAS_LBL_NV={Lu:'Lunes',Ma:'Martes',Mi:'Miércoles',Ju:'Jueves',Vi:'Viernes'};
-  const vends=Object.values(NV.porVendedor).filter(v=>v.totalRuta>0);
-  const totalRuta=vends.reduce((a,v)=>a+v.totalRuta,0), totalVisit=vends.reduce((a,v)=>a+v.totalVisit,0);
-  const totalNo=totalRuta-totalVisit;
-  const covPct=totalRuta?round1(100*totalVisit/totalRuta):0;
-  const rango=`${fdate(NV.fechaPorDia.Lu)} al ${fdate(NV.fechaPorDia[NV.dias[NV.dias.length-1]])}`;
+  const vendsAll=Object.values(NV.porVendedor).filter(v=>v.totalRuta>0);
 
   const card=el('div','card');
-  card.appendChild(el('div','ctitle',`<h2>📍 Clientes no visitados — semana en curso</h2><span class="hint">semana del ${rango} · ruta real ya filtrada por ciclo Semanal/Quincenal/Mensual · "visitado" = compró ese día (proxy, no hay check-in de visita) · pensado para medir si la reestructuración de rutas es efectiva</span>`));
+  card.appendChild(el('div','ctitle',`<h2>📍 Clientes no visitados — desde la reestructuración</h2><span class="hint">acumulado ${fdate(NV.fechaInicio)} a ${fdate(NV.fechaFin)} (nunca incluye días que todavía no corrieron) · ruta real ya filtrada por ciclo Semanal/Quincenal/Mensual · "visitado" = compró en el mes (proxy, no hay check-in de visita) · pensado para medir si la reestructuración de rutas es efectiva</span>`));
+  const filtBar=el('div',null,''); filtBar.style.cssText='display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0 4px';
+  const eqBar=el('div','seg');
+  const btnTodos=document.createElement('button'); btnTodos.textContent='Todos'; btnTodos.setAttribute('aria-pressed','true'); eqBar.appendChild(btnTodos);
+  const sups=[...new Set(vendsAll.map(v=>v.supervisor))].sort((a,b)=>a.localeCompare(b));
+  const btnsEq={};
+  sups.forEach(sup=>{ const b=document.createElement('button'); b.textContent=sup.split(' ')[0]+' '+(sup.split(' ')[1]||''); b.setAttribute('aria-pressed','false'); btnsEq[sup]=b; eqBar.appendChild(b); });
+  const vendSel=document.createElement('select'); vendSel.className='fsel';
+  filtBar.appendChild(eqBar); filtBar.appendChild(vendSel);
+  card.appendChild(filtBar);
+  const bodyWrap=el('div',null,''); card.appendChild(bodyWrap);
+  p.appendChild(card);
 
-  const sg=el('div','supgrid');
-  const totCard=el('div','supcard'); totCard.innerHTML=`<h3>Total general</h3><div class="who">ruta real de la semana</div>
-    <div class="big num">${pct(covPct)}</div>
-    <div class="row"><span class="l">Ruta de la semana</span><span class="v">${AR.format(totalRuta)}</span></div>
-    <div class="row"><span class="l">Visitados</span><span class="v">${AR.format(totalVisit)}</span></div>
-    <div class="row"><span class="l" style="color:var(--bad);font-weight:700">No visitados</span><span class="v" style="color:var(--bad);font-weight:700">${AR.format(totalNo)}</span></div>`;
-  sg.appendChild(totCard);
-  const porEquipo={};
-  vends.forEach(v=>{ if(!porEquipo[v.supervisor]) porEquipo[v.supervisor]={ruta:0,visit:0}; porEquipo[v.supervisor].ruta+=v.totalRuta; porEquipo[v.supervisor].visit+=v.totalVisit; });
-  Object.keys(porEquipo).sort((a,b)=>a.localeCompare(b)).forEach(sup=>{
-    const eq=porEquipo[sup]; const covEq=eq.ruta?round1(100*eq.visit/eq.ruta):0;
-    const c=el('div','supcard'); c.innerHTML=`<h3>${sup}</h3><div class="who">ruta real de la semana</div>
-      <div class="big num">${pct(covEq)}</div>
-      <div class="row"><span class="l">Ruta de la semana</span><span class="v">${AR.format(eq.ruta)}</span></div>
-      <div class="row"><span class="l">Visitados</span><span class="v">${AR.format(eq.visit)}</span></div>
-      <div class="row"><span class="l" style="color:var(--bad);font-weight:700">No visitados</span><span class="v" style="color:var(--bad);font-weight:700">${AR.format(eq.ruta-eq.visit)}</span></div>`;
-    sg.appendChild(c);
-  });
-  card.appendChild(sg); p.appendChild(card);
+  let eqSel='TODOS', vendSelVal='TODOS';
+  function fillVendSel(){
+    vendSel.innerHTML='<option value="TODOS">Vendedor: todos</option>'+
+      vendsAll.filter(v=>eqSel==='TODOS'||v.supervisor===eqSel).sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(v=>`<option value="${v.cod}">${v.nombre}</option>`).join('');
+    vendSel.value=vendsAll.some(v=>v.cod===vendSelVal&&(eqSel==='TODOS'||v.supervisor===eqSel))?vendSelVal:'TODOS';
+    vendSelVal=vendSel.value;
+  }
+  btnTodos.onclick=()=>{ eqSel='TODOS'; vendSelVal='TODOS'; btnTodos.setAttribute('aria-pressed','true'); sups.forEach(s=>btnsEq[s].setAttribute('aria-pressed','false')); fillVendSel(); draw(); };
+  sups.forEach(sup=>{ btnsEq[sup].onclick=()=>{ eqSel=sup; vendSelVal='TODOS'; btnTodos.setAttribute('aria-pressed','false'); sups.forEach(s=>btnsEq[s].setAttribute('aria-pressed', s===sup?'true':'false')); fillVendSel(); draw(); }; });
+  vendSel.onchange=()=>{ vendSelVal=vendSel.value; draw(); };
+  fillVendSel();
 
-  // ---- por dia (agregado de toda la red) ----
-  const diaCard=el('div','card'); diaCard.appendChild(el('div','ctitle','<h2>Por día</h2><span class="hint">toda la red · ruta real de ese día (ya excluye quincenales/mensuales que esa fecha no correspondía)</span>'));
-  let hd='<div class="twrap"><table><thead><tr><th>Día</th><th>Fecha</th><th class="num">Ruta ese día</th><th class="num">Visitados</th><th class="num">No visitados</th><th class="num">% Cobertura</th></tr></thead><tbody>';
-  NV.dias.forEach(dia=>{
-    const t=NV.porDiaTotal[dia]; const cov=t.ruta?round1(100*t.visit/t.ruta):0; const cls=cov>=40?'ok':cov>=20?'warn':'bad';
-    hd+=`<tr><td class="name">${DIAS_LBL_NV[dia]||dia}</td><td>${fdate(NV.fechaPorDia[dia])}</td><td class="num">${AR.format(t.ruta)}</td><td class="num">${AR.format(t.visit)}</td><td class="num" style="color:var(--bad);font-weight:700">${AR.format(t.ruta-t.visit)}</td><td><span class="pill ${cls}">${pct(cov)}</span></td></tr>`;
-  });
-  hd+='</tbody></table></div>'; diaCard.innerHTML+=hd; p.appendChild(diaCard);
+  function draw(){
+    bodyWrap.innerHTML='';
+    const vends = vendsAll.filter(v=>(eqSel==='TODOS'||v.supervisor===eqSel)&&(vendSelVal==='TODOS'||v.cod===vendSelVal));
+    const totalRuta=vends.reduce((a,v)=>a+v.totalRuta,0), totalVisit=vends.reduce((a,v)=>a+v.totalVisit,0);
+    const totalNo=totalRuta-totalVisit;
+    const covPct=totalRuta?round1(100*totalVisit/totalRuta):0;
 
-  // ---- por vendedor (ordenado por no visitados, de mayor a menor) ----
-  const vendCard=el('div','card'); vendCard.appendChild(el('div','ctitle','<h2>Por vendedor</h2><span class="hint">ordenado de mayor a menor cantidad de clientes no visitados esta semana</span>'));
-  let hv='<div class="twrap"><table><thead><tr><th>Vendedor</th><th>Equipo</th><th class="num">Ruta semana</th><th class="num">Visitados</th><th class="num">No visitados</th><th class="num">% Cobertura</th></tr></thead><tbody>';
-  [...vends].sort((a,b)=>(b.totalRuta-b.totalVisit)-(a.totalRuta-a.totalVisit)).forEach(v=>{
-    const cov=v.totalRuta?round1(100*v.totalVisit/v.totalRuta):0; const cls=cov>=40?'ok':cov>=20?'warn':'bad';
-    hv+=`<tr><td class="name">${v.nombre}</td><td>${v.supervisor}</td><td class="num">${AR.format(v.totalRuta)}</td><td class="num">${AR.format(v.totalVisit)}</td><td class="num" style="color:var(--bad);font-weight:700">${AR.format(v.totalRuta-v.totalVisit)}</td><td><span class="pill ${cls}">${pct(cov)}</span></td></tr>`;
-  });
-  hv+=`<tr class="grandtotal"><td>TOTAL RED</td><td></td><td class="num">${AR.format(totalRuta)}</td><td class="num">${AR.format(totalVisit)}</td><td class="num">${AR.format(totalNo)}</td><td class="num">${pct(covPct)}</td></tr>`;
-  hv+='</tbody></table></div>'; vendCard.innerHTML+=hv; p.appendChild(vendCard);
+    const sg=el('div','supgrid');
+    const titTot = vendSelVal!=='TODOS' ? (vends[0]?vends[0].nombre:'Vendedor') : (eqSel==='TODOS'?'Total general':eqSel);
+    const totCard=el('div','supcard'); totCard.innerHTML=`<h3>${titTot}</h3><div class="who">ruta real acumulada</div>
+      <div class="big num">${pct(covPct)}</div>
+      <div class="row"><span class="l">Ruta acumulada</span><span class="v">${AR.format(totalRuta)}</span></div>
+      <div class="row"><span class="l">Visitados</span><span class="v">${AR.format(totalVisit)}</span></div>
+      <div class="row"><span class="l" style="color:var(--bad);font-weight:700">No visitados</span><span class="v" style="color:var(--bad);font-weight:700">${AR.format(totalNo)}</span></div>`;
+    sg.appendChild(totCard);
+    if(eqSel==='TODOS'&&vendSelVal==='TODOS'){
+      const porEquipo={};
+      vends.forEach(v=>{ if(!porEquipo[v.supervisor]) porEquipo[v.supervisor]={ruta:0,visit:0}; porEquipo[v.supervisor].ruta+=v.totalRuta; porEquipo[v.supervisor].visit+=v.totalVisit; });
+      Object.keys(porEquipo).sort((a,b)=>a.localeCompare(b)).forEach(sup=>{
+        const eq=porEquipo[sup]; const covEq=eq.ruta?round1(100*eq.visit/eq.ruta):0;
+        const c=el('div','supcard'); c.innerHTML=`<h3>${sup}</h3><div class="who">ruta real acumulada</div>
+          <div class="big num">${pct(covEq)}</div>
+          <div class="row"><span class="l">Ruta acumulada</span><span class="v">${AR.format(eq.ruta)}</span></div>
+          <div class="row"><span class="l">Visitados</span><span class="v">${AR.format(eq.visit)}</span></div>
+          <div class="row"><span class="l" style="color:var(--bad);font-weight:700">No visitados</span><span class="v" style="color:var(--bad);font-weight:700">${AR.format(eq.ruta-eq.visit)}</span></div>`;
+        sg.appendChild(c);
+      });
+    }
+    bodyWrap.appendChild(sg);
+
+    // ---- por dia (fechas individuales desde el inicio, filtrado por equipo/vendedor elegido) ----
+    const diaCard=el('div','card'); diaCard.appendChild(el('div','ctitle','<h2>Por día</h2><span class="hint">una fila por cada día hábil desde el 01/09 · ruta real de ese día (ya excluye quincenales/mensuales que esa fecha no correspondía)</span>'));
+    let porFecha;
+    if(eqSel==='TODOS'&&vendSelVal==='TODOS'){
+      porFecha=NV.porFechaTotal;
+    }else{
+      const mapa={}; NV.porFechaTotal.forEach(f=>{ mapa[f.fecha]={fecha:f.fecha,dia:f.dia,ruta:0,visit:0}; });
+      vends.forEach(v=>{ v.porFecha.forEach(f=>{ mapa[f.fecha].ruta+=f.ruta; mapa[f.fecha].visit+=f.visit; }); });
+      porFecha=Object.values(mapa);
+    }
+    const DIAS_LBL_NV={Lu:'Lunes',Ma:'Martes',Mi:'Miércoles',Ju:'Jueves',Vi:'Viernes'};
+    let hd='<div class="twrap"><table><thead><tr><th>Día</th><th>Fecha</th><th class="num">Ruta ese día</th><th class="num">Visitados</th><th class="num">No visitados</th><th class="num">% Cobertura</th></tr></thead><tbody>';
+    porFecha.forEach(f=>{
+      const cov=f.ruta?round1(100*f.visit/f.ruta):0; const cls=cov>=40?'ok':cov>=20?'warn':'bad';
+      hd+=`<tr><td class="name">${DIAS_LBL_NV[f.dia]||f.dia}</td><td>${fdate(f.fecha)}</td><td class="num">${AR.format(f.ruta)}</td><td class="num">${AR.format(f.visit)}</td><td class="num" style="color:var(--bad);font-weight:700">${AR.format(f.ruta-f.visit)}</td><td>${f.ruta?`<span class="pill ${cls}">${pct(cov)}</span>`:'—'}</td></tr>`;
+    });
+    hd+='</tbody></table></div>'; diaCard.innerHTML+=hd; bodyWrap.appendChild(diaCard);
+
+    // ---- por vendedor (ordenado por no visitados, de mayor a menor) - se oculta si ya se eligio 1 solo vendedor ----
+    if(vendSelVal==='TODOS'){
+      const vendCard=el('div','card'); vendCard.appendChild(el('div','ctitle','<h2>Por vendedor</h2><span class="hint">ordenado de mayor a menor cantidad de clientes no visitados acumulados</span>'));
+      let hv='<div class="twrap"><table><thead><tr><th>Vendedor</th><th>Equipo</th><th class="num">Ruta acumulada</th><th class="num">Visitados</th><th class="num">No visitados</th><th class="num">% Cobertura</th></tr></thead><tbody>';
+      [...vends].sort((a,b)=>(b.totalRuta-b.totalVisit)-(a.totalRuta-a.totalVisit)).forEach(v=>{
+        const cov=v.totalRuta?round1(100*v.totalVisit/v.totalRuta):0; const cls=cov>=40?'ok':cov>=20?'warn':'bad';
+        hv+=`<tr><td class="name">${v.nombre}</td><td>${v.supervisor}</td><td class="num">${AR.format(v.totalRuta)}</td><td class="num">${AR.format(v.totalVisit)}</td><td class="num" style="color:var(--bad);font-weight:700">${AR.format(v.totalRuta-v.totalVisit)}</td><td><span class="pill ${cls}">${pct(cov)}</span></td></tr>`;
+      });
+      hv+=`<tr class="grandtotal"><td>TOTAL</td><td></td><td class="num">${AR.format(totalRuta)}</td><td class="num">${AR.format(totalVisit)}</td><td class="num">${AR.format(totalNo)}</td><td class="num">${pct(covPct)}</td></tr>`;
+      hv+='</tbody></table></div>'; vendCard.innerHTML+=hv; bodyWrap.appendChild(vendCard);
+    }
+  }
+  draw();
 }
 
 /* ---------- PANEL: Concurso Nubi ---------- */
