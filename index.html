@@ -527,6 +527,29 @@ function gapCell(diasTrabajados,diasSinUso){
   return `<span class="pill ${gapPillClass(pct)}">${diasSinUso}/${diasTrabajados} días (${pct}%)</span>`;
 }
 
+// ---- Ciclo real de visita (Semanal/Quincenal/Mensual) - helpers compartidos por Mapa y
+// Efectividad. Un cliente Quincenal/Mensual no tiene ruta TODAS las semanas de su día fijo, solo
+// cuando la fecha cae exacto cada 14/28 días desde su ancla (primeraVisita) - mismo criterio que
+// ya usa el Worker (ruta.ts, esVisitaEnFecha) para no sobrecontar la ruta de un vendedor.
+const DIA_NUM_G = {Lu:1,Ma:2,Mi:3,Ju:4,Vi:5};
+function esVisitaEnFechaJS(frecuencia,primeraVisita,fecha){
+  if(frecuencia!=='Quincenal'&&frecuencia!=='Mensual') return true;
+  if(!primeraVisita) return true;
+  const periodo=frecuencia==='Quincenal'?14:28;
+  const anchor=new Date(primeraVisita+'T00:00:00Z').getTime();
+  const d=new Date(fecha+'T00:00:00Z').getTime();
+  const diffDias=Math.round((d-anchor)/86400000);
+  return ((diffDias%periodo)+periodo)%periodo===0;
+}
+function hoyLocalStr(){ const n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); }
+function fechaDeDiaEnSemana(fechaRef,diaCodigo){
+  const d=new Date(fechaRef+'T00:00:00Z');
+  const isoDow=d.getUTCDay()===0?7:d.getUTCDay(); // 1=Lu...7=Do
+  const monday=new Date(d); monday.setUTCDate(d.getUTCDate()-(isoDow-1));
+  const target=new Date(monday); target.setUTCDate(monday.getUTCDate()+(DIA_NUM_G[diaCodigo]-1));
+  return target.toISOString().slice(0,10);
+}
+
 /* ---------- header + kpis ---------- */
 let K;
 function renderHeaderKpis(){
@@ -2471,6 +2494,94 @@ function renderEfec(){
       <td><span class="pill ${cls}">${pct(v.efectividad)}</span></td></tr>`;});
   h+=`<tr class="grandtotal"><td>TOTAL EQUIPO</td><td></td><td class="num">${AR.format(E.total.planificados)}</td><td class="num">${AR.format(E.total.efectivos)}</td><td class="num">${pct(E.total.efectividad)}</td></tr>`;
   h+='</tbody></table></div>'; t.innerHTML+=h; p.appendChild(t);
+
+  renderNoVisitadosSemana(p);
+}
+
+// ---- Clientes no visitados de la semana (pedido de Damian 8/9, para medir si la reestructuracion
+// de rutas es efectiva) - a diferencia de "Efectividad de ruta" de arriba (que es del MES elegido),
+// esto es siempre la SEMANA EN CURSO (Lu-Vi de hoy), cruzando cada cliente contra su ciclo real
+// (Semanal/Quincenal/Mensual) para no contar de mas a los quincenales/mensuales que esa semana no
+// correspondia visitar - mismo criterio ya usado en el Mapa y validado contra el reporte real del
+// 7/9. "Visitado" es un proxy: compro algo ese dia (no hay check-in de visita real en el sistema).
+function computeNoVisitadosSemana(){
+  const R=DATA.ruta; if(!R) return null;
+  const CIC=R.ciclos||{};
+  const fechaRef=DATA.meta&&DATA.meta.ultimaFecha?DATA.meta.ultimaFecha:hoyLocalStr();
+  const fechaPorDia={}; R.dias.forEach(d=>{ fechaPorDia[d]=fechaDeDiaEnSemana(fechaRef,d); });
+  const porVendedor={};
+  R.vendedores.forEach(v=>{ porVendedor[v.cod]={cod:v.cod,nombre:v.nombre,supervisor:v.supervisor,porDia:{},totalRuta:0,totalVisit:0}; });
+  const porDiaTotal={}; R.dias.forEach(d=>{ porDiaTotal[d]={ruta:0,visit:0}; });
+  R.dias.forEach(dia=>{
+    const fecha=fechaPorDia[dia];
+    const vd=R.data[dia]||{};
+    Object.keys(vd).forEach(vc=>{
+      if(!porVendedor[vc]) return;
+      let ruta=0, visit=0;
+      (vd[vc].cl||[]).forEach(c=>{
+        const cod=c[0], ok=c[1];
+        const cic=CIC[cod]; const frec=cic?cic[0]:'Semanal'; const anchor=cic?cic[1]:'';
+        if(!esVisitaEnFechaJS(frec,anchor,fecha)) return;
+        ruta++; if(ok===1) visit++;
+      });
+      porVendedor[vc].porDia[dia]={ruta,visit,fecha};
+      porVendedor[vc].totalRuta+=ruta; porVendedor[vc].totalVisit+=visit;
+      porDiaTotal[dia].ruta+=ruta; porDiaTotal[dia].visit+=visit;
+    });
+  });
+  return {dias:R.dias, fechaPorDia, porVendedor, porDiaTotal};
+}
+function renderNoVisitadosSemana(p){
+  const NV=computeNoVisitadosSemana(); if(!NV) return;
+  const round1=n=>Math.round(n*10)/10;
+  const DIAS_LBL_NV={Lu:'Lunes',Ma:'Martes',Mi:'Miércoles',Ju:'Jueves',Vi:'Viernes'};
+  const vends=Object.values(NV.porVendedor).filter(v=>v.totalRuta>0);
+  const totalRuta=vends.reduce((a,v)=>a+v.totalRuta,0), totalVisit=vends.reduce((a,v)=>a+v.totalVisit,0);
+  const totalNo=totalRuta-totalVisit;
+  const covPct=totalRuta?round1(100*totalVisit/totalRuta):0;
+  const rango=`${fdate(NV.fechaPorDia.Lu)} al ${fdate(NV.fechaPorDia[NV.dias[NV.dias.length-1]])}`;
+
+  const card=el('div','card');
+  card.appendChild(el('div','ctitle',`<h2>📍 Clientes no visitados — semana en curso</h2><span class="hint">semana del ${rango} · ruta real ya filtrada por ciclo Semanal/Quincenal/Mensual · "visitado" = compró ese día (proxy, no hay check-in de visita) · pensado para medir si la reestructuración de rutas es efectiva</span>`));
+
+  const sg=el('div','supgrid');
+  const totCard=el('div','supcard'); totCard.innerHTML=`<h3>Total general</h3><div class="who">ruta real de la semana</div>
+    <div class="big num">${pct(covPct)}</div>
+    <div class="row"><span class="l">Ruta de la semana</span><span class="v">${AR.format(totalRuta)}</span></div>
+    <div class="row"><span class="l">Visitados</span><span class="v">${AR.format(totalVisit)}</span></div>
+    <div class="row"><span class="l" style="color:var(--bad);font-weight:700">No visitados</span><span class="v" style="color:var(--bad);font-weight:700">${AR.format(totalNo)}</span></div>`;
+  sg.appendChild(totCard);
+  const porEquipo={};
+  vends.forEach(v=>{ if(!porEquipo[v.supervisor]) porEquipo[v.supervisor]={ruta:0,visit:0}; porEquipo[v.supervisor].ruta+=v.totalRuta; porEquipo[v.supervisor].visit+=v.totalVisit; });
+  Object.keys(porEquipo).sort((a,b)=>a.localeCompare(b)).forEach(sup=>{
+    const eq=porEquipo[sup]; const covEq=eq.ruta?round1(100*eq.visit/eq.ruta):0;
+    const c=el('div','supcard'); c.innerHTML=`<h3>${sup}</h3><div class="who">ruta real de la semana</div>
+      <div class="big num">${pct(covEq)}</div>
+      <div class="row"><span class="l">Ruta de la semana</span><span class="v">${AR.format(eq.ruta)}</span></div>
+      <div class="row"><span class="l">Visitados</span><span class="v">${AR.format(eq.visit)}</span></div>
+      <div class="row"><span class="l" style="color:var(--bad);font-weight:700">No visitados</span><span class="v" style="color:var(--bad);font-weight:700">${AR.format(eq.ruta-eq.visit)}</span></div>`;
+    sg.appendChild(c);
+  });
+  card.appendChild(sg); p.appendChild(card);
+
+  // ---- por dia (agregado de toda la red) ----
+  const diaCard=el('div','card'); diaCard.appendChild(el('div','ctitle','<h2>Por día</h2><span class="hint">toda la red · ruta real de ese día (ya excluye quincenales/mensuales que esa fecha no correspondía)</span>'));
+  let hd='<div class="twrap"><table><thead><tr><th>Día</th><th>Fecha</th><th class="num">Ruta ese día</th><th class="num">Visitados</th><th class="num">No visitados</th><th class="num">% Cobertura</th></tr></thead><tbody>';
+  NV.dias.forEach(dia=>{
+    const t=NV.porDiaTotal[dia]; const cov=t.ruta?round1(100*t.visit/t.ruta):0; const cls=cov>=40?'ok':cov>=20?'warn':'bad';
+    hd+=`<tr><td class="name">${DIAS_LBL_NV[dia]||dia}</td><td>${fdate(NV.fechaPorDia[dia])}</td><td class="num">${AR.format(t.ruta)}</td><td class="num">${AR.format(t.visit)}</td><td class="num" style="color:var(--bad);font-weight:700">${AR.format(t.ruta-t.visit)}</td><td><span class="pill ${cls}">${pct(cov)}</span></td></tr>`;
+  });
+  hd+='</tbody></table></div>'; diaCard.innerHTML+=hd; p.appendChild(diaCard);
+
+  // ---- por vendedor (ordenado por no visitados, de mayor a menor) ----
+  const vendCard=el('div','card'); vendCard.appendChild(el('div','ctitle','<h2>Por vendedor</h2><span class="hint">ordenado de mayor a menor cantidad de clientes no visitados esta semana</span>'));
+  let hv='<div class="twrap"><table><thead><tr><th>Vendedor</th><th>Equipo</th><th class="num">Ruta semana</th><th class="num">Visitados</th><th class="num">No visitados</th><th class="num">% Cobertura</th></tr></thead><tbody>';
+  [...vends].sort((a,b)=>(b.totalRuta-b.totalVisit)-(a.totalRuta-a.totalVisit)).forEach(v=>{
+    const cov=v.totalRuta?round1(100*v.totalVisit/v.totalRuta):0; const cls=cov>=40?'ok':cov>=20?'warn':'bad';
+    hv+=`<tr><td class="name">${v.nombre}</td><td>${v.supervisor}</td><td class="num">${AR.format(v.totalRuta)}</td><td class="num">${AR.format(v.totalVisit)}</td><td class="num" style="color:var(--bad);font-weight:700">${AR.format(v.totalRuta-v.totalVisit)}</td><td><span class="pill ${cls}">${pct(cov)}</span></td></tr>`;
+  });
+  hv+=`<tr class="grandtotal"><td>TOTAL RED</td><td></td><td class="num">${AR.format(totalRuta)}</td><td class="num">${AR.format(totalVisit)}</td><td class="num">${AR.format(totalNo)}</td><td class="num">${pct(covPct)}</td></tr>`;
+  hv+='</tbody></table></div>'; vendCard.innerHTML+=hv; p.appendChild(vendCard);
 }
 
 /* ---------- PANEL: Concurso Nubi ---------- */
@@ -3380,25 +3491,7 @@ function renderMapa(){
   // Con multi-seleccion de dias, la fecha elegida se toma como "semana de referencia" (Lu-Vi de esa
   // semana) y cada cliente se chequea contra el dia que le corresponde DENTRO de esa semana, no
   // literalmente la fecha tipeada (que solo puede ser un dia de la semana a la vez).
-  const CIC_MAPA=(DATA.ruta&&DATA.ruta.ciclos)||{};
-  function esVisitaEnFechaJS(frecuencia,primeraVisita,fecha){
-    if(frecuencia!=='Quincenal'&&frecuencia!=='Mensual') return true;
-    if(!primeraVisita) return true;
-    const periodo=frecuencia==='Quincenal'?14:28;
-    const anchor=new Date(primeraVisita+'T00:00:00Z').getTime();
-    const d=new Date(fecha+'T00:00:00Z').getTime();
-    const diffDias=Math.round((d-anchor)/86400000);
-    return ((diffDias%periodo)+periodo)%periodo===0;
-  }
-  const DIA_NUM={Lu:1,Ma:2,Mi:3,Ju:4,Vi:5};
-  function hoyLocalStr(){ const n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); }
-  function fechaDeDiaEnSemana(fechaRef,diaCodigo){
-    const d=new Date(fechaRef+'T00:00:00Z');
-    const isoDow=d.getUTCDay()===0?7:d.getUTCDay(); // 1=Lu...7=Do
-    const monday=new Date(d); monday.setUTCDate(d.getUTCDate()-(isoDow-1));
-    const target=new Date(monday); target.setUTCDate(monday.getUTCDate()+(DIA_NUM[diaCodigo]-1));
-    return target.toISOString().slice(0,10);
-  }
+  const CIC_MAPA=(DATA.ruta&&DATA.ruta.ciclos)||{}; // esVisitaEnFechaJS/hoyLocalStr/fechaDeDiaEnSemana son globales (ver mas arriba)
   const fechaLbl=el('span',null,'Semana de:'); fechaLbl.style.cssText='font-size:11px;color:var(--muted);font-weight:700';
   const fechaInput=document.createElement('input'); fechaInput.type='date'; fechaInput.className='fsel'; fechaInput.value=hoyLocalStr(); fechaInput.style.padding='6px 8px';
   fechaInput.onchange=()=>{ drawMarkers(); };
