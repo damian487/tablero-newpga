@@ -2559,7 +2559,7 @@ function renderNoVisitadosSemana(p){
   const vendsAll=Object.values(NV.porVendedor).filter(v=>v.totalRuta>0);
 
   const card=el('div','card');
-  card.appendChild(el('div','ctitle',`<h2>📍 Clientes no visitados — desde la reestructuración</h2><span class="hint">acumulado ${fdate(NV.fechaInicio)} a ${fdate(NV.fechaFin)} (nunca incluye días que todavía no corrieron) · ruta real ya filtrada por ciclo Semanal/Quincenal/Mensual · "visitado" = compró ESE día exacto (proxy, no hay check-in de visita real en el sistema) · pensado para medir si la reestructuración de rutas es efectiva</span>`));
+  card.appendChild(el('div','ctitle',`<h2>📍 Clientes de la ruta sin compra — desde la reestructuración</h2><span class="hint">acumulado ${fdate(NV.fechaInicio)} a ${fdate(NV.fechaFin)} (nunca incluye días que todavía no corrieron) · ruta real ya filtrada por ciclo Semanal/Quincenal/Mensual · <b>esto es efectividad de venta, NO cobertura física de ruta</b> — no hay check-in de visita en el sistema, así que un cliente "sin compra" puede haber sido visitado igual y no comprar (rechazo, sin stock, cerrado, etc.) · pensado para medir conversión, no si el vendedor recorrió la ruta</span>`));
   const filtBar=el('div',null,''); filtBar.style.cssText='display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0 4px';
   const eqBar=el('div','seg');
   const btnTodos=document.createElement('button'); btnTodos.textContent='Todos'; btnTodos.setAttribute('aria-pressed','true'); eqBar.appendChild(btnTodos);
@@ -2596,8 +2596,8 @@ function renderNoVisitadosSemana(p){
     const totCard=el('div','supcard'); totCard.innerHTML=`<h3>${titTot}</h3><div class="who">ruta real acumulada</div>
       <div class="big num">${pct(covPct)}</div>
       <div class="row"><span class="l">Ruta acumulada</span><span class="v">${AR.format(totalRuta)}</span></div>
-      <div class="row"><span class="l">Visitados</span><span class="v">${AR.format(totalVisit)}</span></div>
-      <div class="row"><span class="l" style="color:var(--bad);font-weight:700">No visitados</span><span class="v" style="color:var(--bad);font-weight:700">${AR.format(totalNo)}</span></div>`;
+      <div class="row"><span class="l">Con compra</span><span class="v">${AR.format(totalVisit)}</span></div>
+      <div class="row"><span class="l" style="color:var(--bad);font-weight:700">Sin compra</span><span class="v" style="color:var(--bad);font-weight:700">${AR.format(totalNo)}</span></div>`;
     sg.appendChild(totCard);
     if(eqSel==='TODOS'&&vendSelVal==='TODOS'){
       const porEquipo={};
@@ -2607,15 +2607,15 @@ function renderNoVisitadosSemana(p){
         const c=el('div','supcard'); c.innerHTML=`<h3>${sup}</h3><div class="who">ruta real acumulada</div>
           <div class="big num">${pct(covEq)}</div>
           <div class="row"><span class="l">Ruta acumulada</span><span class="v">${AR.format(eq.ruta)}</span></div>
-          <div class="row"><span class="l">Visitados</span><span class="v">${AR.format(eq.visit)}</span></div>
-          <div class="row"><span class="l" style="color:var(--bad);font-weight:700">No visitados</span><span class="v" style="color:var(--bad);font-weight:700">${AR.format(eq.ruta-eq.visit)}</span></div>`;
+          <div class="row"><span class="l">Con compra</span><span class="v">${AR.format(eq.visit)}</span></div>
+          <div class="row"><span class="l" style="color:var(--bad);font-weight:700">Sin compra</span><span class="v" style="color:var(--bad);font-weight:700">${AR.format(eq.ruta-eq.visit)}</span></div>`;
         sg.appendChild(c);
       });
     }
     bodyWrap.appendChild(sg);
 
     // ---- por dia (fechas individuales desde el inicio, filtrado por equipo/vendedor elegido) ----
-    const diaCard=el('div','card'); diaCard.appendChild(el('div','ctitle','<h2>Por día</h2><span class="hint">una fila por cada día hábil desde el 01/09 · ruta real de ese día (ya excluye quincenales/mensuales que esa fecha no correspondía)</span>'));
+    const diaCard=el('div','card'); diaCard.appendChild(el('div','ctitle','<h2>Por día</h2><span class="hint">una fila por cada día hábil desde el 01/09 · ruta real de ese día (ya excluye quincenales/mensuales que esa fecha no correspondía) · % Efectividad = con compra ÷ ruta</span>'));
     let porFecha;
     if(eqSel==='TODOS'&&vendSelVal==='TODOS'){
       porFecha=NV.porFechaTotal;
@@ -2625,17 +2625,17 @@ function renderNoVisitadosSemana(p){
       porFecha=Object.values(mapa);
     }
     const DIAS_LBL_NV={Lu:'Lunes',Ma:'Martes',Mi:'Miércoles',Ju:'Jueves',Vi:'Viernes'};
-    let hd='<div class="twrap"><table><thead><tr><th>Día</th><th>Fecha</th><th class="num">Ruta ese día</th><th class="num">Visitados</th><th class="num">No visitados</th><th class="num">% Cobertura</th></tr></thead><tbody>';
+    let hd='<div class="twrap"><table><thead><tr><th>Día</th><th>Fecha</th><th class="num">Ruta ese día</th><th class="num">Con compra</th><th class="num">Sin compra</th><th class="num">% Efectividad</th></tr></thead><tbody>';
     porFecha.forEach(f=>{
       const cov=f.ruta?round1(100*f.visit/f.ruta):0; const cls=cov>=40?'ok':cov>=20?'warn':'bad';
       hd+=`<tr><td class="name">${DIAS_LBL_NV[f.dia]||f.dia}</td><td>${fdate(f.fecha)}</td><td class="num">${AR.format(f.ruta)}</td><td class="num">${AR.format(f.visit)}</td><td class="num" style="color:var(--bad);font-weight:700">${AR.format(f.ruta-f.visit)}</td><td>${f.ruta?`<span class="pill ${cls}">${pct(cov)}</span>`:'—'}</td></tr>`;
     });
     hd+='</tbody></table></div>'; diaCard.innerHTML+=hd; bodyWrap.appendChild(diaCard);
 
-    // ---- por vendedor (ordenado por no visitados, de mayor a menor) - se oculta si ya se eligio 1 solo vendedor ----
+    // ---- por vendedor (ordenado por clientes sin compra, de mayor a menor) - se oculta si ya se eligio 1 solo vendedor ----
     if(vendSelVal==='TODOS'){
-      const vendCard=el('div','card'); vendCard.appendChild(el('div','ctitle','<h2>Por vendedor</h2><span class="hint">ordenado de mayor a menor cantidad de clientes no visitados acumulados</span>'));
-      let hv='<div class="twrap"><table><thead><tr><th>Vendedor</th><th>Equipo</th><th class="num">Ruta acumulada</th><th class="num">Visitados</th><th class="num">No visitados</th><th class="num">% Cobertura</th></tr></thead><tbody>';
+      const vendCard=el('div','card'); vendCard.appendChild(el('div','ctitle','<h2>Por vendedor</h2><span class="hint">ordenado de mayor a menor cantidad de clientes sin compra acumulados</span>'));
+      let hv='<div class="twrap"><table><thead><tr><th>Vendedor</th><th>Equipo</th><th class="num">Ruta acumulada</th><th class="num">Con compra</th><th class="num">Sin compra</th><th class="num">% Efectividad</th></tr></thead><tbody>';
       [...vends].sort((a,b)=>(b.totalRuta-b.totalVisit)-(a.totalRuta-a.totalVisit)).forEach(v=>{
         const cov=v.totalRuta?round1(100*v.totalVisit/v.totalRuta):0; const cls=cov>=40?'ok':cov>=20?'warn':'bad';
         hv+=`<tr><td class="name">${v.nombre}</td><td>${v.supervisor}</td><td class="num">${AR.format(v.totalRuta)}</td><td class="num">${AR.format(v.totalVisit)}</td><td class="num" style="color:var(--bad);font-weight:700">${AR.format(v.totalRuta-v.totalVisit)}</td><td><span class="pill ${cls}">${pct(cov)}</span></td></tr>`;
