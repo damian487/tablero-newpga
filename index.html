@@ -1247,11 +1247,23 @@ function vistaDiasStock(p){
   const ALERTA_LBL={CRITICO:'🔴 Crítico',BAJO:'🟡 Bajo',OK:'🟢 OK','SIN VENTA':'⚪ Sin venta'};
   const top=el('div','card');
   top.appendChild(el('div','ctitle',`<h2>📦 Días de stock — New PGA</h2><span class="hint">días de stock = stock en depósito principal ÷ venta diaria promedio (trimestre a la fecha, ${S.diasTranscurridos} días) · versión acotada a New PGA de la herramienta de Gerencia</span>`));
-  top.innerHTML+=`<div class="kpitiles" style="grid-template-columns:repeat(3,1fr)">
+  const tieneQuebrados=(S.quebrados||[]).length>0;
+  top.innerHTML+=`<div class="kpitiles" style="grid-template-columns:repeat(${tieneQuebrados?4:3},1fr)">
     <div class="supcard"><h3>🔴 Críticos</h3><div class="who">≤ ${S.alertaRojaDias} días de stock</div><div class="big num" style="color:var(--bad)">${AR.format(S.criticos)}</div></div>
     <div class="supcard"><h3>🟡 Bajos</h3><div class="who">≤ ${S.alertaAmarillaDias} días de stock</div><div class="big num" style="color:var(--warn)">${AR.format(S.bajos)}</div></div>
-    <div class="supcard"><h3>Total SKUs medidos</h3><div class="who">con stock cargado en depósito principal</div><div class="big num">${AR.format(S.lineas.length)}</div></div></div>`;
+    <div class="supcard"><h3>Total SKUs medidos</h3><div class="who">con stock cargado en depósito principal</div><div class="big num">${AR.format(S.lineas.length)}</div></div>
+    ${tieneQuebrados?`<div class="supcard" style="border-color:var(--bad)"><h3>⛔ Quebrados</h3><div class="who">con venta reciente y stock en 0</div><div class="big num" style="color:var(--bad)">${AR.format(S.quebrados.length)}</div></div>`:''}
+    </div>`;
   p.appendChild(top);
+
+  if(tieneQuebrados){
+    const q=el('div','card');
+    q.innerHTML=`<div class="ctitle"><h2>⛔ Productos quebrados</h2><span class="hint">tenían rotación en el trimestre y hoy no tienen stock en depósito principal</span></div>
+      <div class="twrap"><table><thead><tr><th>Código</th><th>Producto</th><th>Marca</th><th>Familia</th><th>Venta diaria prom.</th></tr></thead><tbody>
+      ${S.quebrados.map(x=>`<tr><td class="name">${x.codigo}</td><td class="name" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px" title="${x.descripcion}">${x.descripcion}</td><td style="font-size:11.5px">${x.marca}</td><td style="font-size:11.5px">${x.familia}</td><td class="num" style="font-weight:700;color:var(--bad)">${x.ventaDiariaProm}</td></tr>`).join('')}
+      </tbody></table></div>`;
+    p.appendChild(q);
+  }
 
   const bar=el('div','card'); bar.style.cssText='padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between';
   const filtros=new Set(); // vacio = Todos - se pueden combinar varios a la vez (ej. Bajos + OK)
