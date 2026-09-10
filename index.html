@@ -1498,7 +1498,7 @@ function renderVentaDia(){
         <div class="supcard"><h3>Ventas del día (equipo)</h3><div class="big num">${peso(I.ventaBruta)}</div></div>
         <div class="supcard"><h3>(−) Devoluciones y N/C del día</h3><div class="big num" style="color:var(--bad)">${peso(I.devoluciones)}</div></div>
         <div class="supcard" style="border-color:var(--accent)"><h3>VENTA NETA c/IVA (Gerencia)</h3><div class="big num">${peso(I.venta)}</div></div>
-        ${tieneMay?`<div class="supcard"><h3>Venta mayorista del día</h3><div class="big num">${peso(I.ventaBrutaMayorista)}</div><div class="who">${AR.format(I.cccMayorista||0)} clientes · canal aparte, no suma al equipo</div></div>`:''}
+        ${tieneMay?`<div class="supcard"><h3>Venta mayorista del día</h3><div class="big num">${peso(I.ventaBrutaMayorista)}</div><div class="who">${AR.format(I.cccMayorista||0)} clientes · ya incluida en la Venta Neta de arriba</div></div>`:''}
       </div>`;
     p.appendChild(comp);
   }
@@ -3200,7 +3200,7 @@ function renderDiario(){
       +dkpi('Marcas vendidas',AR.format(k.marcas),'del portafolio P&G')
       +dkpi('Ticket promedio',peso(k.venta/(k.ccc||1)),'venta / cliente')
       +dkpi('Clientes nuevos',AR.format(k.nuevos),'1ª compra P&G')
-      +(k.ventaBrutaMayorista?dkpi('Venta mayorista',peso(k.ventaBrutaMayorista),(k.cccMayorista||0)+' clientes · canal aparte'):'')
+      +(k.ventaBrutaMayorista?dkpi('Venta mayorista',peso(k.ventaBrutaMayorista),(k.cccMayorista||0)+' clientes · ya incluida en la venta neta'):'')
       +'</section>';
     h+='<div class="note">Infaltables colocados hoy: <b>'+k.infaltablesColocados+' / '+infMap+'</b> (sobre catálogo mapeado)</div></div>';
     h+='<div class="grid g2"><div class="card"><div class="ctitle"><h2>Cobertura y venta por canal</h2></div><div class="twrap"><table><thead><tr><th>Canal</th><th>Univ.</th><th>Clientes</th><th>% Cob.</th><th>Venta neta</th></tr></thead><tbody>';
