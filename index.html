@@ -3227,11 +3227,11 @@ function renderDiario(){
     h+='<div class="card"><div class="ctitle"><h2>Detalle por marca</h2><span class="hint">a cuántos clientes y cuánto</span></div><div class="twrap"><table><thead><tr><th>Marca</th><th>Clientes</th><th>% Penetr.</th><th>Venta neta</th></tr></thead><tbody>';
     r.porMarca.forEach(m=>{h+=`<tr><td class="name">${m.marca}</td><td class="num">${AR.format(m.clientes)}</td><td class="num">${pct(m.penetracion)}</td><td class="num">${peso(m.venta)}</td></tr>`;});
     h+='</tbody></table></div></div></div>';
-    h+='<div class="card"><div class="ctitle"><h2>Efectividad y cobertura por supervisor</h2></div><div class="twrap"><table><thead><tr><th>Supervisor</th><th>A visitar</th><th>Efectivos</th><th>% Efect.</th><th>Universo</th><th>Clientes</th><th>% Cob.</th></tr></thead><tbody>';
+    h+='<div class="card"><div class="ctitle"><h2>Efectividad y cobertura por supervisor</h2></div><div class="twrap"><table><thead><tr><th>Supervisor</th><th>A visitar</th><th>Efectivos</th><th>% Efect.</th><th>Universo</th><th>Clientes</th><th>% Cob.</th><th>% Margen</th></tr></thead><tbody>';
     const maxSE=Math.max.apply(null,r.porSupervisor.map(s=>s.efectividad).concat(1));
     const maxSC=Math.max.apply(null,r.porSupervisor.map(s=>s.cobertura).concat(1));
-    r.porSupervisor.forEach(s=>{h+=`<tr><td class="name">${s.supervisor}</td><td class="num">${AR.format(s.planificados)}</td><td class="num">${AR.format(s.efectivos)}</td><td class="num" style="text-align:left">${miniBar(s.efectividad,maxSE)}${pct(s.efectividad)}</td><td class="num">${AR.format(s.universo)}</td><td class="num">${AR.format(s.ccc)}</td><td class="num" style="text-align:left">${miniBar(s.cobertura,maxSC)}${pct(s.cobertura)}</td></tr>`;});
-    h+=`<tr class="grandtotal"><td>TOTAL EQUIPO</td><td class="num">${AR.format(k.planificados)}</td><td class="num">${AR.format(k.efectivos)}</td><td class="num">${pct(k.efectividad)}</td><td class="num">${AR.format(DATA.meta.universoTotal)}</td><td class="num">${AR.format(k.ccc)}</td><td class="num">${pct(k.cobertura)}</td></tr>`;
+    r.porSupervisor.forEach(s=>{h+=`<tr><td class="name">${s.supervisor}</td><td class="num">${AR.format(s.planificados)}</td><td class="num">${AR.format(s.efectivos)}</td><td class="num" style="text-align:left">${miniBar(s.efectividad,maxSE)}${pct(s.efectividad)}</td><td class="num">${AR.format(s.universo)}</td><td class="num">${AR.format(s.ccc)}</td><td class="num" style="text-align:left">${miniBar(s.cobertura,maxSC)}${pct(s.cobertura)}</td><td class="num">${pct(s.margen)}</td></tr>`;});
+    h+=`<tr class="grandtotal"><td>TOTAL EQUIPO</td><td class="num">${AR.format(k.planificados)}</td><td class="num">${AR.format(k.efectivos)}</td><td class="num">${pct(k.efectividad)}</td><td class="num">${AR.format(DATA.meta.universoTotal)}</td><td class="num">${AR.format(k.ccc)}</td><td class="num">${pct(k.cobertura)}</td><td class="num">${pct(k.margen)}</td></tr>`;
     h+='</tbody></table></div></div>';
     const vend=r.porVendedor.filter(v=>v.venta>0);
     const mejor=[...vend].sort((a,b)=>b.venta-a.venta)[0];
@@ -3247,8 +3247,8 @@ function renderDiario(){
       +ftile('Tocaban hoy y NO compraron',AR.format(sinCompra)+' clientes')
       +ftile('Concurso: acelerar',AR.format(Math.round(ritmoTeam))+' cli/día ('+AR.format(faltanTeam)+' faltan)')
       +'</div></div>';
-    h+='<div class="card"><div class="ctitle"><h2>Detalle del día por vendedor</h2><span class="hint">agrupado por equipo · venta real del día (las N/C y devoluciones no afectan al vendedor)</span></div><div class="twrap"><table><thead><tr>'
-      +'<th>Vendedor</th><th>Venta del día</th><th>Clientes</th><th>Marcas</th><th>A visitar</th><th>Efectivos</th><th>% Efect.</th><th>% Cob.</th><th>Acelerar</th><th>Estado</th></tr></thead><tbody>';
+    h+='<div class="card"><div class="ctitle"><h2>Detalle del día por vendedor</h2><span class="hint">agrupado por equipo · venta real del día (las N/C y devoluciones no afectan al vendedor) · margen sobre venta neta sin IVA</span></div><div class="twrap"><table><thead><tr>'
+      +'<th>Vendedor</th><th>Venta del día</th><th>Clientes</th><th>Marcas</th><th>A visitar</th><th>Efectivos</th><th>% Efect.</th><th>% Cob.</th><th>% Margen</th><th>Acelerar</th><th>Estado</th></tr></thead><tbody>';
     const sups=[...new Set(r.porVendedor.map(v=>v.supervisor))];
     const orden=['LUCY CEJAS','JUAN ARMANDOLA'];
     sups.sort((a,b)=>{const ia=orden.indexOf(a),ib=orden.indexOf(b);return (ia<0?9:ia)-(ib<0?9:ib);});
@@ -3257,18 +3257,19 @@ function renderDiario(){
       const g=r.porVendedor.filter(v=>v.supervisor===sn).sort((a,b)=>b.ventaBruta-a.ventaBruta);
       if(!g.length) return;
       const titulo=sn.indexOf('N/A')>=0?grupoLabel(sn):('Equipo '+sn);
-      h+=`<tr class="subhead"><td colspan="10">${titulo}</td></tr>`;
-      h+=`<tr class="colrep"><td>Vendedor</td><td>Venta del día</td><td>Clientes</td><td>Marcas</td><td>A visitar</td><td>Efectivos</td><td>% Efect.</td><td>% Cob.</td><td>Acelerar</td><td>Estado</td></tr>`;
+      const sd=r.porSupervisor.find(s=>s.supervisor===sn);
+      h+=`<tr class="subhead"><td colspan="11">${titulo}</td></tr>`;
+      h+=`<tr class="colrep"><td>Vendedor</td><td>Venta del día</td><td>Clientes</td><td>Marcas</td><td>A visitar</td><td>Efectivos</td><td>% Efect.</td><td>% Cob.</td><td>% Margen</td><td>Acelerar</td><td>Estado</td></tr>`;
       let tb=0,tc=0,tp=0,te=0,tu=0;
       g.forEach(v=>{const noVta=v.ventaBruta<=0; const cls=noVta?'bad':(v.cobertura<5?'warn':'ok'); const est=noVta?'SIN VENTA':(v.cobertura<5?'BAJA':'OK'); const cc=conMap[v.cod];
         tb+=v.ventaBruta;tc+=v.ccc;tp+=v.planificados;te+=v.efectivos;tu+=v.universo;
-        h+=`<tr><td class="name">${v.nombre}</td><td class="num"><b>${peso(v.ventaBruta)}</b></td><td class="num">${AR.format(v.ccc)}</td><td class="num">${AR.format(v.marcas)}</td><td class="num">${AR.format(v.planificados)}</td><td class="num">${AR.format(v.efectivos)}</td><td class="num" style="text-align:left">${miniBar(v.efectividad,maxVE)}${pct(v.efectividad)}</td><td class="num">${pct(v.cobertura)}</td><td class="num">${cc?AR.format(cc.ritmo):'—'}</td><td><span class="pill ${cls}">${est}</span></td></tr>`;});
+        h+=`<tr><td class="name">${v.nombre}</td><td class="num"><b>${peso(v.ventaBruta)}</b></td><td class="num">${AR.format(v.ccc)}</td><td class="num">${AR.format(v.marcas)}</td><td class="num">${AR.format(v.planificados)}</td><td class="num">${AR.format(v.efectivos)}</td><td class="num" style="text-align:left">${miniBar(v.efectividad,maxVE)}${pct(v.efectividad)}</td><td class="num">${pct(v.cobertura)}</td><td class="num">${pct(v.margen)}</td><td class="num">${cc?AR.format(cc.ritmo):'—'}</td><td><span class="pill ${cls}">${est}</span></td></tr>`;});
       const ep=tp>0?Math.round(1000*te/tp)/10:0; const cb=tu>0?Math.round(1000*tc/tu)/10:0;
-      h+=`<tr class="total"><td>Subtotal ${titulo}</td><td class="num">${peso(tb)}</td><td class="num">${AR.format(tc)}</td><td></td><td class="num">${AR.format(tp)}</td><td class="num">${AR.format(te)}</td><td class="num">${pct(ep)}</td><td class="num">${pct(cb)}</td><td></td><td></td></tr>`;
+      h+=`<tr class="total"><td>Subtotal ${titulo}</td><td class="num">${peso(tb)}</td><td class="num">${AR.format(tc)}</td><td></td><td class="num">${AR.format(tp)}</td><td class="num">${AR.format(te)}</td><td class="num">${pct(ep)}</td><td class="num">${pct(cb)}</td><td class="num">${pct(sd?sd.margen:0)}</td><td></td><td></td></tr>`;
     });
-    h+=`<tr class="total"><td>Ventas del día (equipo)</td><td class="num">${peso(k.ventaBruta)}</td><td class="num">${AR.format(k.ccc)}</td><td class="num">${AR.format(k.marcas)}</td><td class="num">${AR.format(k.planificados)}</td><td class="num">${AR.format(k.efectivos)}</td><td class="num">${pct(k.efectividad)}</td><td class="num">${pct(k.cobertura)}</td><td></td><td></td></tr>`;
-    h+=`<tr class="total"><td>(−) Devoluciones y N/C del día</td><td class="num" style="color:var(--bad)">${peso(k.devoluciones)}</td><td colspan="8"></td></tr>`;
-    h+=`<tr class="grandtotal"><td>VENTA NETA c/IVA (Gerencia)</td><td class="num">${peso(k.venta)}</td><td colspan="8"></td></tr>`;
+    h+=`<tr class="total"><td>Ventas del día (equipo)</td><td class="num">${peso(k.ventaBruta)}</td><td class="num">${AR.format(k.ccc)}</td><td class="num">${AR.format(k.marcas)}</td><td class="num">${AR.format(k.planificados)}</td><td class="num">${AR.format(k.efectivos)}</td><td class="num">${pct(k.efectividad)}</td><td class="num">${pct(k.cobertura)}</td><td class="num">${pct(k.margen)}</td><td></td><td></td></tr>`;
+    h+=`<tr class="total"><td>(−) Devoluciones y N/C del día</td><td class="num" style="color:var(--bad)">${peso(k.devoluciones)}</td><td colspan="9"></td></tr>`;
+    h+=`<tr class="grandtotal"><td>VENTA NETA c/IVA (Gerencia)</td><td class="num">${peso(k.venta)}</td><td colspan="9"></td></tr>`;
     h+='</tbody></table></div></div>';
     box.innerHTML=h;
     // ===== BLOQUE 3: Ficha de performance del día =====
