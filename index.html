@@ -1974,7 +1974,11 @@ function renderCombos(){
           });
         });
         const combosDia=[...combosSet];
-        let estado='NO TRABAJÓ', cls='neu';
+        // OJO (aclarado por Damian, 11/9): diasTrabajadosVend() en realidad mide "tuvo venta New
+        // PGA ese día" (real>0 en metaAgosto), NO asistencia/ruta - un vendedor puede haber
+        // trabajado igual y no vender nada de New PGA ese día. Por eso NO se etiqueta como "no
+        // trabajó" (afirmaría algo que no medimos), sino como "sin venta New PGA" (lo que sí sabemos).
+        let estado='SIN VENTA NEW PGA', cls='neu';
         if(diasTrab.length>0){
           if(diasConCombo.size===0){ estado='NO OFRECIÓ NINGÚN DÍA'; cls='bad'; }
           else if(diasConCombo.size>=diasTrab.length){ estado=esUnDia?'USÓ COMBO':'USÓ TODOS LOS DÍAS'; cls='ok'; }
@@ -1985,10 +1989,12 @@ function renderCombos(){
       const rank=r=>r.cls==='bad'?0:r.cls==='warn'?1:r.cls==='ok'?2:3;
       rows.sort((a,b)=>rank(a)-rank(b) || (b.cli-a.cli));
       const noOfrecieron=rows.filter(r=>r.cls==='bad').length;
+      const sinVenta=rows.filter(r=>r.cls==='neu').length;
       const rangoLbl=esUnDia?'ese día':`del ${fd(desde)} al ${fd(hasta)}`;
-      let h=`<div class="kpitiles" style="grid-template-columns:repeat(2,1fr);margin-bottom:12px">
-        <div class="supcard"><h3>Trabajaron y NO ofrecieron combo ningún día</h3><div class="big num" style="color:var(--bad)">${noOfrecieron}</div><div class="who">${rows.filter(r=>r.cls==='bad').map(r=>r.nombre).join(', ')||'—'}</div></div>
-        <div class="supcard"><h3>Usaron combo todos los días trabajados</h3><div class="big num" style="color:var(--good)">${rows.filter(r=>r.cls==='ok').length}</div><div class="who">de ${rows.filter(r=>r.diasTrab>0).length} que trabajaron ${rangoLbl}</div></div>
+      let h=`<div class="kpitiles" style="grid-template-columns:repeat(3,1fr);margin-bottom:12px">
+        <div class="supcard"><h3>Tuvieron venta y NO ofrecieron combo ningún día</h3><div class="big num" style="color:var(--bad)">${noOfrecieron}</div><div class="who">${rows.filter(r=>r.cls==='bad').map(r=>r.nombre).join(', ')||'—'}</div></div>
+        <div class="supcard"><h3>Sin venta de New PGA en el rango</h3><div class="big num" style="color:var(--muted)">${sinVenta}</div><div class="who">${rows.filter(r=>r.cls==='neu').map(r=>r.nombre).join(', ')||'—'}</div></div>
+        <div class="supcard"><h3>Usaron combo todos los días con venta</h3><div class="big num" style="color:var(--good)">${rows.filter(r=>r.cls==='ok').length}</div><div class="who">de ${rows.filter(r=>r.diasTrab>0).length} con venta New PGA ${rangoLbl}</div></div>
       </div>`;
       h+='<div class="twrap"><table class="tbl-compact"><thead><tr><th>Vendedor</th><th>Equipo</th><th>Combos ofrecidos</th><th>Clientes</th><th>Importe</th><th>Estado</th></tr></thead><tbody>';
       rows.forEach(r=>{
