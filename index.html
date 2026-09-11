@@ -1958,50 +1958,61 @@ function renderCombos(){
     const dBox=document.createElement('div'); dBox.style.marginTop='10px';
     diarioCard.appendChild(rangeBar); diarioCard.appendChild(dBox); p.appendChild(diarioCard);
 
+    // KAF (equipo Lucy Cejas especializado) solo atiende Autoservicios y algún mayorista -
+    // confirmado por Damian, 11/9 - no corresponde exigirles combo de Almacenes: no tienen
+    // cartera de ese canal, así que quedan afuera de esa columna (no es que "no la ofrezcan").
+    const esKAF=nombre=>/^kaf\b/i.test(nombre);
+    const combosAuto=lista.filter(cb=>/autoservicio/i.test(cb.canal));
+    const combosAlm=lista.filter(cb=>/almac/i.test(cb.canal));
+    function trackEstado(u,combosCanal,fechasRango,desde,hasta,esUnDia,label){
+      const diasTrab=diasTrabajadosVend(u.cod).filter(f=>f>=desde && f<=hasta);
+      const combosSet=new Set(); const diasConCombo=new Set();
+      fechasRango.forEach(f=>{
+        combosCanal.forEach(cb=>{
+          const pv=(cb.porVendedor||[]).find(x=>String(x.cod)===String(u.cod));
+          const d=pv&&pv.dias&&pv.dias[f];
+          if(d && d.cli>0){ combosSet.add(cbNombreCorto(cb.nombre)); diasConCombo.add(f); }
+        });
+      });
+      let estado=`SIN VENTA`, cls='neu';
+      if(diasTrab.length>0){
+        if(diasConCombo.size===0){ estado='NO OFRECIÓ'; cls='bad'; }
+        else if(diasConCombo.size>=diasTrab.length){ estado=esUnDia?'USÓ COMBO':'TODOS LOS DÍAS'; cls='ok'; }
+        else { estado=`${diasConCombo.size}/${diasTrab.length} DÍAS`; cls='warn'; }
+      }
+      return { diasTrab:diasTrab.length, combos:[...combosSet], estado, cls };
+    }
     function drawDiario(){
       let desde=fDesde.value, hasta=fHasta.value;
       if(desde>hasta){ [desde,hasta]=[hasta,desde]; }
       const fechasRango=fechasCombosTodas.filter(f=>f>=desde && f<=hasta);
       const esUnDia=fechasRango.length<=1;
       const rows=usoTodos.map(u=>{
-        const diasTrab=diasTrabajadosVend(u.cod).filter(f=>f>=desde && f<=hasta);
-        const combosSet=new Set(); let cli=0, imp=0; const diasConCombo=new Set();
-        fechasRango.forEach(f=>{
-          lista.forEach(cb=>{
-            const pv=(cb.porVendedor||[]).find(x=>String(x.cod)===String(u.cod));
-            const d=pv&&pv.dias&&pv.dias[f];
-            if(d && d.cli>0){ combosSet.add(cbNombreCorto(cb.nombre)); cli+=d.cli; imp+=d.imp; diasConCombo.add(f); }
-          });
-        });
-        const combosDia=[...combosSet];
-        // OJO (aclarado por Damian, 11/9): diasTrabajadosVend() en realidad mide "tuvo venta New
-        // PGA ese día" (real>0 en metaAgosto), NO asistencia/ruta - un vendedor puede haber
-        // trabajado igual y no vender nada de New PGA ese día. Por eso NO se etiqueta como "no
-        // trabajó" (afirmaría algo que no medimos), sino como "sin venta New PGA" (lo que sí sabemos).
-        let estado='SIN VENTA NEW PGA', cls='neu';
-        if(diasTrab.length>0){
-          if(diasConCombo.size===0){ estado='NO OFRECIÓ NINGÚN DÍA'; cls='bad'; }
-          else if(diasConCombo.size>=diasTrab.length){ estado=esUnDia?'USÓ COMBO':'USÓ TODOS LOS DÍAS'; cls='ok'; }
-          else { estado=`USÓ ${diasConCombo.size}/${diasTrab.length} DÍAS`; cls='warn'; }
-        }
-        return { nombre:u.nombre, supervisor:u.supervisor, diasTrab:diasTrab.length, diasConCombo:diasConCombo.size, combosDia, cli, imp, estado, cls };
+        const kaf=esKAF(u.nombre);
+        const auto=trackEstado(u,combosAuto,fechasRango,desde,hasta,esUnDia);
+        const alm=kaf?null:trackEstado(u,combosAlm,fechasRango,desde,hasta,esUnDia);
+        const combosDia=[...new Set([...auto.combos,...(alm?alm.combos:[])])];
+        return { nombre:u.nombre, supervisor:u.supervisor, kaf, auto, alm, combosDia };
       });
-      const rank=r=>r.cls==='bad'?0:r.cls==='warn'?1:r.cls==='ok'?2:3;
-      rows.sort((a,b)=>rank(a)-rank(b) || (b.cli-a.cli));
-      const noOfrecieron=rows.filter(r=>r.cls==='bad').length;
-      const sinVenta=rows.filter(r=>r.cls==='neu').length;
+      // ordena primero los "NO OFRECIÓ" (en cualquiera de los 2 canales que le aplique), despues warn, despues ok
+      const rank=r=>{
+        const cls=[r.auto.cls, r.alm?r.alm.cls:null].filter(Boolean);
+        if(cls.includes('bad')) return 0; if(cls.includes('warn')) return 1; if(cls.includes('ok')) return 2; return 3;
+      };
+      rows.sort((a,b)=>rank(a)-rank(b) || a.nombre.localeCompare(b.nombre));
+      const noOfrecAuto=rows.filter(r=>r.auto.cls==='bad');
+      const noOfrecAlm=rows.filter(r=>r.alm && r.alm.cls==='bad');
       const rangoLbl=esUnDia?'ese día':`del ${fd(desde)} al ${fd(hasta)}`;
-      let h=`<div class="kpitiles" style="grid-template-columns:repeat(3,1fr);margin-bottom:12px">
-        <div class="supcard"><h3>Tuvieron venta y NO ofrecieron combo ningún día</h3><div class="big num" style="color:var(--bad)">${noOfrecieron}</div><div class="who">${rows.filter(r=>r.cls==='bad').map(r=>r.nombre).join(', ')||'—'}</div></div>
-        <div class="supcard"><h3>Sin venta de New PGA en el rango</h3><div class="big num" style="color:var(--muted)">${sinVenta}</div><div class="who">${rows.filter(r=>r.cls==='neu').map(r=>r.nombre).join(', ')||'—'}</div></div>
-        <div class="supcard"><h3>Usaron combo todos los días con venta</h3><div class="big num" style="color:var(--good)">${rows.filter(r=>r.cls==='ok').length}</div><div class="who">de ${rows.filter(r=>r.diasTrab>0).length} con venta New PGA ${rangoLbl}</div></div>
-      </div>`;
-      h+='<div class="twrap"><table class="tbl-compact"><thead><tr><th>Vendedor</th><th>Equipo</th><th>Combos ofrecidos</th><th>Clientes</th><th>Importe</th><th>Estado</th></tr></thead><tbody>';
+      let h=`<div class="kpitiles" style="grid-template-columns:repeat(2,1fr);margin-bottom:12px">
+        <div class="supcard"><h3>NO ofrecieron combo de Autoservicios</h3><div class="big num" style="color:var(--bad)">${noOfrecAuto.length}</div><div class="who">${noOfrecAuto.map(r=>r.nombre).join(', ')||'—'}</div></div>
+        <div class="supcard"><h3>NO ofrecieron combo de Almacenes</h3><div class="big num" style="color:var(--bad)">${noOfrecAlm.length}</div><div class="who">${noOfrecAlm.map(r=>r.nombre).join(', ')||'—'} · no incluye KAF (solo Autoservicios/mayorista)</div></div>
+      </div><div class="note" style="margin-bottom:10px">Con venta de New PGA ${rangoLbl} pero sin usar ningún combo de ese canal.</div>`;
+      h+='<div class="twrap"><table class="tbl-compact"><thead><tr><th>Vendedor</th><th>Equipo</th><th>Combos ofrecidos</th><th>Autoservicios</th><th>Almacenes</th></tr></thead><tbody>';
       rows.forEach(r=>{
         h+=`<tr><td class="name">${r.nombre}</td><td style="color:var(--muted)">${r.supervisor}</td>
           <td style="font-size:11px;color:var(--muted);white-space:normal;max-width:260px">${r.combosDia.length?r.combosDia.join(', '):'—'}</td>
-          <td class="num">${AR.format(r.cli)}</td><td class="num">${peso(r.imp)}</td>
-          <td><span class="pill ${r.cls}">${r.estado}</span></td></tr>`;
+          <td><span class="pill ${r.auto.cls}">${r.auto.estado}</span></td>
+          <td>${r.alm?`<span class="pill ${r.alm.cls}">${r.alm.estado}</span>`:'<span class="pill neu">N/A</span>'}</td></tr>`;
       });
       h+='</tbody></table></div>';
       dBox.innerHTML=h;
