@@ -642,7 +642,7 @@ TAB_GROUPS.forEach(group=>{
 });
 
 /* ---------- SVG chart builders ---------- */
-function hbars(items,{val,label,color,fmt=peso,h=28,gap=8,namew=150,w=680}){
+function hbars(items,{val,label,color,fmt=peso,h=28,gap=8,namew=150,w=680,sub}){
   const max=Math.max(...items.map(val),1);
   const H=items.length*(h+gap)+10;
   const bw=w-namew-90;
@@ -652,7 +652,7 @@ function hbars(items,{val,label,color,fmt=peso,h=28,gap=8,namew=150,w=680}){
     const col=typeof color==='function'?color(it):color;
     s+=`<text x="0" y="${y+h/2+4}" class="barname">${label(it)}</text>`;
     s+=`<rect x="${namew}" y="${y}" width="${len}" height="${h}" rx="5" fill="${col}"/>`;
-    s+=`<text x="${namew+len+7}" y="${y+h/2+4}" class="barlabel">${fmt(v)}</text>`;
+    s+=`<text x="${namew+len+7}" y="${y+h/2+4}" class="barlabel">${fmt(v)}${sub?(' · '+sub(it)):''}</text>`;
   });
   return s+'</svg>';
 }
@@ -773,28 +773,30 @@ function renderResumen(){
   cg.innerHTML=`
     <div class="supcard"><h3>Facturación bruta</h3><div class="who">FAC-A + FAC-B + VEN</div><div class="big num">${peso(bruto)}</div></div>
     <div class="supcard" style="border-color:var(--accent)"><h3>= Venta neta</h3><div class="who">lo que muestran los KPIs y las tablas</div><div class="big num">${peso(K.venta)}</div></div>
-    <div class="supcard"><h3>(−) Devoluciones y NC</h3><div class="who">notas de crédito NCR-A/B</div><div class="big num" style="color:var(--bad)">${peso(K.devoluciones)}</div><div class="row"><span class="l">% s/ bruto</span><span class="v">${pct(Math.round(-1000*K.devoluciones/bruto)/10)}</span></div></div>`;
+    <div class="supcard"><h3>(−) Devoluciones y NC</h3><div class="who">notas de crédito NCR-A/B</div><div class="big num" style="color:var(--bad)">${peso(K.devoluciones)}</div><div class="row"><span class="l">% s/ bruto</span><span class="v">${pct(Math.round(-1000*K.devoluciones/bruto)/10)}</span></div></div>
+    <div class="supcard"><h3>% Margen</h3><div class="who">ganancia sobre venta (sin IVA)</div><div class="big num">${pct(K.margen)}</div><div class="row"><span class="l">% Markup</span><span class="v">${pct(K.markup)}</span></div></div>`;
   comp.appendChild(cg); p.appendChild(comp);
   const g=el('div','grid g3');
   // evolución mini + marca
   const evo=el('div','card'); evo.appendChild(el('div','ctitle','<h2>Evolución de la venta diaria</h2><span class="hint">P&amp;G con IVA · por fecha de carga</span>'));
   evo.innerHTML+=areaChart(DATA.evolucion,{});
-  const marca=el('div','card'); marca.appendChild(el('div','ctitle','<h2>Mix por marca</h2>'));
-  marca.innerHTML+=hbars(DATA.porMarca.slice(0,7),{val:m=>m.venta,label:m=>m.marca,color:'var(--accent)',fmt:pesoC,h:24,namew:120,w:420});
+  const marca=el('div','card'); marca.appendChild(el('div','ctitle','<h2>Mix por marca</h2><span class="hint">venta · % margen</span>'));
+  marca.innerHTML+=hbars(DATA.porMarca.slice(0,7),{val:m=>m.venta,label:m=>m.marca,color:'var(--accent)',fmt:pesoC,h:24,namew:120,w:420,sub:m=>pct(m.margen)});
   g.appendChild(evo); g.appendChild(marca); p.appendChild(g);
 
   // canal cobertura + supervisor
   const g2=el('div','grid g2');
   const canal=el('div','card'); canal.appendChild(el('div','ctitle','<h2>Cobertura por canal</h2>'));
-  let ch='<div class="twrap"><table><thead><tr><th>Canal</th><th>Universo</th><th>CCC</th><th>% Cob.</th><th>Venta</th></tr></thead><tbody>';
+  let ch='<div class="twrap"><table><thead><tr><th>Canal</th><th>Universo</th><th>CCC</th><th>% Cob.</th><th>Venta</th><th>% Margen</th></tr></thead><tbody>';
   (DATA.porCanalGrupo||DATA.porCanal.slice(0,6)).forEach(c=>{ch+=`<tr><td class="name">${c.canal}</td><td class="num">${AR.format(c.universo)}</td><td class="num">${AR.format(c.ccc)}</td>
-    <td><span class="pill ${covClass(c.cobertura)}">${pct(c.cobertura)}</span></td><td class="num">${peso(c.venta)}</td></tr>`;});
+    <td><span class="pill ${covClass(c.cobertura)}">${pct(c.cobertura)}</span></td><td class="num">${peso(c.venta)}</td><td class="num">${pct(c.margen)}</td></tr>`;});
   ch+='</tbody></table></div>'; canal.innerHTML+=ch;
   const sup=el('div','card'); sup.appendChild(el('div','ctitle','<h2>Resumen por supervisor</h2>'));
   const sg=el('div','supgrid'); DATA.porSupervisor.forEach(s=>{const isMay=s.supervisor.indexOf('N/A')>=0;const c=el('div','supcard');
     c.innerHTML=`<h3>${grupoLabel(s.supervisor)}</h3><div class="who">${s.vendedores} ${isMay?'canal':'vend.'} · uni ${AR.format(s.universo)}</div>
       <div class="big num">${peso(s.venta)}</div><div class="row"><span class="l">CCC</span><span class="v">${AR.format(s.ccc)}</span></div>
-      <div class="row"><span class="l">% Cob.</span><span class="v">${pct(s.cobertura)}</span></div>`; sg.appendChild(c);});
+      <div class="row"><span class="l">% Cob.</span><span class="v">${pct(s.cobertura)}</span></div>
+      <div class="row"><span class="l">% Margen</span><span class="v">${pct(s.margen)}</span></div>`; sg.appendChild(c);});
   sup.appendChild(sg);
   g2.appendChild(canal); g2.appendChild(sup); p.appendChild(g2);
 }
