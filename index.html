@@ -2679,15 +2679,21 @@ function renderConcurso(){
   head.appendChild(el('div','ctitle',`<h2>Concurso "Acelera 2026" — Nubi</h2><span class="hint">vigencia ${C.vigencia} · quedan ${C.diasRestantes} días</span>`));
   const g=el('div','grid g2');
   const soPct=Math.round(100*C.sellout.real/C.sellout.meta);
+  const tendSO=C.sellout.ritmoReciente!=null?(C.sellout.real+C.sellout.ritmoReciente*C.diasRestantes):null;
+  const tendSOPct=tendSO!=null?Math.round(100*tendSO/C.sellout.meta):null;
   const o1=el('div','supcard'); o1.innerHTML=`<h3>Objetivo 1 · Sell-out (40 pts)</h3><div class="who">suma Jul+Ago+Sep</div>
     <div class="big num">${peso(C.sellout.real)}</div>
     <div class="row"><span class="l">Meta trimestre</span><span class="v">${peso(C.sellout.meta)}</span></div>
-    <div class="cov" style="margin-top:8px;justify-content:flex-start"><span class="track" style="width:100%"><span class="fill" style="width:${Math.min(100,soPct)}%;background:${avanceColor(soPct)}"></span></span><span class="pct num">${soPct}%</span></div>`;
+    <div class="cov" style="margin-top:8px;justify-content:flex-start"><span class="track" style="width:100%"><span class="fill" style="width:${Math.min(100,soPct)}%;background:${avanceColor(soPct)}"></span></span><span class="pct num">${soPct}%</span></div>
+    ${tendSO!=null?`<div class="kpi-tag" style="margin-top:10px" title="Sell-out acumulado + ritmo de los últimos ${C.ritmoRecienteDias} días × ${C.diasRestantes} días restantes"><span class="kpi-tag-lab">Tendencia cierre</span>${peso(tendSO)} <span style="color:${avanceColor(tendSOPct)}">(${tendSOPct}%)</span></div>`:''}`;
   const coPct=Math.round(100*C.cobertura.real/C.cobertura.meta);
+  const tendCO=C.cobertura.ritmoReciente!=null?(C.cobertura.real+C.cobertura.ritmoReciente*C.diasRestantes):null;
+  const tendCOPct=tendCO!=null?Math.round(100*tendCO/C.cobertura.meta):null;
   const o2=el('div','supcard'); o2.innerHTML=`<h3>Objetivo 2 · Cobertura (40+ pts)</h3><div class="who">clientes únicos en el trimestre (10 marcas)</div>
     <div class="big num">${AR.format(C.cobertura.real)}</div>
     <div class="row"><span class="l">Meta trimestre</span><span class="v">${AR.format(C.cobertura.meta)}</span></div>
-    <div class="cov" style="margin-top:8px;justify-content:flex-start"><span class="track" style="width:100%"><span class="fill" style="width:${Math.min(100,coPct)}%;background:${avanceColor(coPct)}"></span></span><span class="pct num">${coPct}%</span></div>`;
+    <div class="cov" style="margin-top:8px;justify-content:flex-start"><span class="track" style="width:100%"><span class="fill" style="width:${Math.min(100,coPct)}%;background:${avanceColor(coPct)}"></span></span><span class="pct num">${coPct}%</span></div>
+    ${tendCO!=null?`<div class="kpi-tag" style="margin-top:10px" title="Clientes del trimestre + ritmo de clientes nuevos de los últimos ${C.ritmoRecienteDias} días × ${C.diasRestantes} días restantes"><span class="kpi-tag-lab">Tendencia cierre</span>${AR.format(Math.round(tendCO))}&nbsp;cli. <span style="color:${avanceColor(tendCOPct)}">(${tendCOPct}%)</span></div>`:''}`;
   g.appendChild(o1);g.appendChild(o2); head.appendChild(g);
   head.appendChild(el('div','note','El sell-out corresponde a la distribuidora Pehuenia (referencia). La cobertura oficial sale de Thalamus; acá es la estimación desde la bajada con las 10 marcas del concurso.'));
   if(C.selloutSinMayorista){
