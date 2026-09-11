@@ -1773,6 +1773,29 @@ function renderCombos(){
   head+='<select id="cbSup" class="fsel"><option value="TODOS">Total equipo</option>'+supsCombo.map(s=>`<option value="${s}">Supervisor ${s.split(' ')[0]}</option>`).join('')+'</select>';
   head+='</div><div id="cbDonas" style="display:flex;gap:14px;flex-wrap:wrap;margin:2px 0 16px"></div><div id="cbMeta"></div><div id="cbSum"></div><div id="cbBox"></div>';
   card.innerHTML=head; p.appendChild(card);
+
+  if(DATA.combos.tope2y1){
+    const T=DATA.combos.tope2y1;
+    const topeCard=el('div','card');
+    const barColor=T.pctUsado>=95?'var(--bad)':(T.pctUsado>=80?'var(--warn)':'var(--good)');
+    topeCard.innerHTML=`<div class="ctitle"><h2>⚠️ Tope de reconocimiento New PGA — Combos 2+1</h2><span class="hint">Almacenes + Autoservicios combinados · 1 unidad bonificada = 1 combo "2+1"</span></div>
+      <div class="supcard" style="max-width:520px">
+        <div class="big num">${AR.format(T.combos)} <span style="font-size:14px;color:var(--muted);font-weight:400">/ ${AR.format(T.tope)} combos</span></div>
+        <div class="cov" style="margin-top:8px;justify-content:flex-start"><span class="track" style="width:100%"><span class="fill" style="width:${Math.min(100,T.pctUsado)}%;background:${barColor}"></span></span><span class="pct num">${T.pctUsado}%</span></div>
+        <div class="row" style="margin-top:8px"><span class="l">Restante antes del tope</span><span class="v">${AR.format(T.restante)} combos</span></div>
+      </div>`;
+    p.appendChild(topeCard);
+  }
+
+  const alertas=DATA.combos.alertasExceso||[];
+  if(alertas.length){
+    const alCard=el('div','card');
+    alCard.innerHTML=`<div class="ctitle"><h2>🚨 Clientes pasados del tope de combos</h2><span class="hint">acumulado de combos colocados a ese cliente durante la vigencia, por encima del máximo permitido (3 Autoservicios / 4 Almacenes)</span></div>
+      <div class="twrap"><table><thead><tr><th>Cliente</th><th>Combo</th><th>Vendedor</th><th>Combos colocados</th><th>Tope</th><th>Exceso</th></tr></thead><tbody>
+      ${alertas.map((a)=>`<tr><td class="name">${a.nombreCliente||a.cliente}</td><td style="font-size:11.5px">${a.comboNombre}</td><td style="font-size:11.5px">${a.vendNombre||a.vendCod}</td><td class="num">${a.combosColocados}</td><td class="num">${a.tope}</td><td class="num" style="font-weight:700;color:var(--bad)">+${a.exceso}</td></tr>`).join('')}
+      </tbody></table></div>`;
+    p.appendChild(alCard);
+  }
   const box=card.querySelector('#cbBox'), sumEl=card.querySelector('#cbSum'), metaEl=card.querySelector('#cbMeta'), selC=card.querySelector('#cbCombo'), selM=card.querySelector('#cbMetric'), selSup=card.querySelector('#cbSup'), donasEl=card.querySelector('#cbDonas');
   const CB_PALETTE=['var(--accent)','var(--accent2)','var(--good)','var(--warn2)','var(--bad)','#8e6fce','#d18a3f','var(--muted)'];
   function cbNombreCorto(n){ return n.replace(/^Combo\s*/,''); }
