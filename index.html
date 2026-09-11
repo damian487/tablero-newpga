@@ -1942,34 +1942,53 @@ function renderCombos(){
   const fechasCombosTodas=[...new Set(lista.flatMap(cb=>cb.fechas||[]))].sort();
   if(fechasCombosTodas.length){
     const diarioCard=el('div','card');
-    diarioCard.appendChild(el('div','ctitle','<h2>Detalle diario de uso de combos</h2><span class="hint">un día puntual, por vendedor · quién ofreció combos y quién no</span>'));
-    const fSel=document.createElement('select'); fSel.className='fsel';
-    fechasCombosTodas.forEach(f=>{ const o=document.createElement('option'); o.value=f; o.textContent=fd(f)+'/'+f.slice(0,4); fSel.appendChild(o); });
-    fSel.value=fechasCombosTodas[fechasCombosTodas.length-1];
+    diarioCard.appendChild(el('div','ctitle','<h2>Detalle diario de uso de combos</h2><span class="hint">un día o un rango de fechas, por vendedor · quién ofreció combos y quién no</span>'));
+    const fDesde=document.createElement('select'); fDesde.className='fsel';
+    const fHasta=document.createElement('select'); fHasta.className='fsel';
+    fechasCombosTodas.forEach(f=>{
+      const lbl=fd(f)+'/'+f.slice(0,4);
+      fDesde.appendChild(new Option(lbl,f)); fHasta.appendChild(new Option(lbl,f));
+    });
+    fDesde.value=fechasCombosTodas[fechasCombosTodas.length-1];
+    fHasta.value=fechasCombosTodas[fechasCombosTodas.length-1];
+    const rangeBar=document.createElement('div'); rangeBar.style.cssText='display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:4px';
+    const lblD=document.createElement('span'); lblD.style.cssText='font-size:12px;color:var(--muted);font-weight:700'; lblD.textContent='Desde';
+    const lblH=document.createElement('span'); lblH.style.cssText='font-size:12px;color:var(--muted);font-weight:700'; lblH.textContent='Hasta';
+    rangeBar.appendChild(lblD); rangeBar.appendChild(fDesde); rangeBar.appendChild(lblH); rangeBar.appendChild(fHasta);
     const dBox=document.createElement('div'); dBox.style.marginTop='10px';
-    diarioCard.appendChild(fSel); diarioCard.appendChild(dBox); p.appendChild(diarioCard);
+    diarioCard.appendChild(rangeBar); diarioCard.appendChild(dBox); p.appendChild(diarioCard);
 
     function drawDiario(){
-      const f=fSel.value;
+      let desde=fDesde.value, hasta=fHasta.value;
+      if(desde>hasta){ [desde,hasta]=[hasta,desde]; }
+      const fechasRango=fechasCombosTodas.filter(f=>f>=desde && f<=hasta);
+      const esUnDia=fechasRango.length<=1;
       const rows=usoTodos.map(u=>{
-        const trabajo=diasTrabajadosVend(u.cod).includes(f);
-        const combosDia=[]; let cli=0, imp=0;
-        lista.forEach(cb=>{
-          const pv=(cb.porVendedor||[]).find(x=>String(x.cod)===String(u.cod));
-          const d=pv&&pv.dias&&pv.dias[f];
-          if(d && d.cli>0){ combosDia.push(cbNombreCorto(cb.nombre)); cli+=d.cli; imp+=d.imp; }
+        const diasTrab=diasTrabajadosVend(u.cod).filter(f=>f>=desde && f<=hasta);
+        const combosSet=new Set(); let cli=0, imp=0; const diasConCombo=new Set();
+        fechasRango.forEach(f=>{
+          lista.forEach(cb=>{
+            const pv=(cb.porVendedor||[]).find(x=>String(x.cod)===String(u.cod));
+            const d=pv&&pv.dias&&pv.dias[f];
+            if(d && d.cli>0){ combosSet.add(cbNombreCorto(cb.nombre)); cli+=d.cli; imp+=d.imp; diasConCombo.add(f); }
+          });
         });
+        const combosDia=[...combosSet];
         let estado='NO TRABAJÓ', cls='neu';
-        if(combosDia.length>0){ estado='USÓ COMBO'; cls='ok'; }
-        else if(trabajo){ estado='NO OFRECIÓ'; cls='bad'; }
-        return { nombre:u.nombre, supervisor:u.supervisor, trabajo, combosDia, cli, imp, estado, cls };
+        if(diasTrab.length>0){
+          if(diasConCombo.size===0){ estado='NO OFRECIÓ NINGÚN DÍA'; cls='bad'; }
+          else if(diasConCombo.size>=diasTrab.length){ estado=esUnDia?'USÓ COMBO':'USÓ TODOS LOS DÍAS'; cls='ok'; }
+          else { estado=`USÓ ${diasConCombo.size}/${diasTrab.length} DÍAS`; cls='warn'; }
+        }
+        return { nombre:u.nombre, supervisor:u.supervisor, diasTrab:diasTrab.length, diasConCombo:diasConCombo.size, combosDia, cli, imp, estado, cls };
       });
-      const rank=r=>r.cls==='bad'?0:r.cls==='ok'?1:2;
+      const rank=r=>r.cls==='bad'?0:r.cls==='warn'?1:r.cls==='ok'?2:3;
       rows.sort((a,b)=>rank(a)-rank(b) || (b.cli-a.cli));
       const noOfrecieron=rows.filter(r=>r.cls==='bad').length;
+      const rangoLbl=esUnDia?'ese día':`del ${fd(desde)} al ${fd(hasta)}`;
       let h=`<div class="kpitiles" style="grid-template-columns:repeat(2,1fr);margin-bottom:12px">
-        <div class="supcard"><h3>Trabajaron y NO ofrecieron combo</h3><div class="big num" style="color:var(--bad)">${noOfrecieron}</div><div class="who">${rows.filter(r=>r.cls==='bad').map(r=>r.nombre).join(', ')||'—'}</div></div>
-        <div class="supcard"><h3>Usaron al menos un combo</h3><div class="big num" style="color:var(--good)">${rows.filter(r=>r.cls==='ok').length}</div><div class="who">de ${rows.filter(r=>r.trabajo).length} que trabajaron ese día</div></div>
+        <div class="supcard"><h3>Trabajaron y NO ofrecieron combo ningún día</h3><div class="big num" style="color:var(--bad)">${noOfrecieron}</div><div class="who">${rows.filter(r=>r.cls==='bad').map(r=>r.nombre).join(', ')||'—'}</div></div>
+        <div class="supcard"><h3>Usaron combo todos los días trabajados</h3><div class="big num" style="color:var(--good)">${rows.filter(r=>r.cls==='ok').length}</div><div class="who">de ${rows.filter(r=>r.diasTrab>0).length} que trabajaron ${rangoLbl}</div></div>
       </div>`;
       h+='<div class="twrap"><table class="tbl-compact"><thead><tr><th>Vendedor</th><th>Equipo</th><th>Combos ofrecidos</th><th>Clientes</th><th>Importe</th><th>Estado</th></tr></thead><tbody>';
       rows.forEach(r=>{
@@ -1981,7 +2000,7 @@ function renderCombos(){
       h+='</tbody></table></div>';
       dBox.innerHTML=h;
     }
-    fSel.onchange=drawDiario; drawDiario();
+    fDesde.onchange=drawDiario; fHasta.onchange=drawDiario; drawDiario();
   }
 }
 
