@@ -1935,6 +1935,54 @@ function renderCombos(){
   }
   selUso.onchange=()=>{ fillUsoVend(); drawUso(); }; selUsoVend.onchange=drawUso;
   fillUsoVend(); drawUso();
+
+  // ---- detalle diario de uso de combos (pedido de Damian, 11/9): "quien no usa combos" pero
+  // dia por dia, para poder corregir en el momento en vez de esperar el cierre del mes. Reusa
+  // usoTodos (vendedor/equipo ya armado arriba) y cb.porVendedor[].dias[fecha] de cada combo.
+  const fechasCombosTodas=[...new Set(lista.flatMap(cb=>cb.fechas||[]))].sort();
+  if(fechasCombosTodas.length){
+    const diarioCard=el('div','card');
+    diarioCard.appendChild(el('div','ctitle','<h2>Detalle diario de uso de combos</h2><span class="hint">un día puntual, por vendedor · quién ofreció combos y quién no</span>'));
+    const fSel=document.createElement('select'); fSel.className='fsel';
+    fechasCombosTodas.forEach(f=>{ const o=document.createElement('option'); o.value=f; o.textContent=fd(f)+'/'+f.slice(0,4); fSel.appendChild(o); });
+    fSel.value=fechasCombosTodas[fechasCombosTodas.length-1];
+    const dBox=document.createElement('div'); dBox.style.marginTop='10px';
+    diarioCard.appendChild(fSel); diarioCard.appendChild(dBox); p.appendChild(diarioCard);
+
+    function drawDiario(){
+      const f=fSel.value;
+      const rows=usoTodos.map(u=>{
+        const trabajo=diasTrabajadosVend(u.cod).includes(f);
+        const combosDia=[]; let cli=0, imp=0;
+        lista.forEach(cb=>{
+          const pv=(cb.porVendedor||[]).find(x=>String(x.cod)===String(u.cod));
+          const d=pv&&pv.dias&&pv.dias[f];
+          if(d && d.cli>0){ combosDia.push(cbNombreCorto(cb.nombre)); cli+=d.cli; imp+=d.imp; }
+        });
+        let estado='NO TRABAJÓ', cls='neu';
+        if(combosDia.length>0){ estado='USÓ COMBO'; cls='ok'; }
+        else if(trabajo){ estado='NO OFRECIÓ'; cls='bad'; }
+        return { nombre:u.nombre, supervisor:u.supervisor, trabajo, combosDia, cli, imp, estado, cls };
+      });
+      const rank=r=>r.cls==='bad'?0:r.cls==='ok'?1:2;
+      rows.sort((a,b)=>rank(a)-rank(b) || (b.cli-a.cli));
+      const noOfrecieron=rows.filter(r=>r.cls==='bad').length;
+      let h=`<div class="kpitiles" style="grid-template-columns:repeat(2,1fr);margin-bottom:12px">
+        <div class="supcard"><h3>Trabajaron y NO ofrecieron combo</h3><div class="big num" style="color:var(--bad)">${noOfrecieron}</div><div class="who">${rows.filter(r=>r.cls==='bad').map(r=>r.nombre).join(', ')||'—'}</div></div>
+        <div class="supcard"><h3>Usaron al menos un combo</h3><div class="big num" style="color:var(--good)">${rows.filter(r=>r.cls==='ok').length}</div><div class="who">de ${rows.filter(r=>r.trabajo).length} que trabajaron ese día</div></div>
+      </div>`;
+      h+='<div class="twrap"><table><thead><tr><th>Vendedor</th><th>Equipo</th><th>Combos ofrecidos</th><th>Clientes</th><th>Importe</th><th>Estado</th></tr></thead><tbody>';
+      rows.forEach(r=>{
+        h+=`<tr><td class="name">${r.nombre}</td><td style="color:var(--muted)">${r.supervisor}</td>
+          <td style="font-size:11.5px;color:var(--muted)">${r.combosDia.length?r.combosDia.join(', '):'—'}</td>
+          <td class="num">${AR.format(r.cli)}</td><td class="num">${peso(r.imp)}</td>
+          <td><span class="pill ${r.cls}">${r.estado}</span></td></tr>`;
+      });
+      h+='</tbody></table></div>';
+      dBox.innerHTML=h;
+    }
+    fSel.onchange=drawDiario; drawDiario();
+  }
 }
 
 /* ---------- PANEL: Ruta / No compradores ---------- */
