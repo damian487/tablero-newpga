@@ -1971,10 +1971,10 @@ function renderCombos(){
         <div class="supcard"><h3>Trabajaron y NO ofrecieron combo</h3><div class="big num" style="color:var(--bad)">${noOfrecieron}</div><div class="who">${rows.filter(r=>r.cls==='bad').map(r=>r.nombre).join(', ')||'—'}</div></div>
         <div class="supcard"><h3>Usaron al menos un combo</h3><div class="big num" style="color:var(--good)">${rows.filter(r=>r.cls==='ok').length}</div><div class="who">de ${rows.filter(r=>r.trabajo).length} que trabajaron ese día</div></div>
       </div>`;
-      h+='<div class="twrap"><table><thead><tr><th>Vendedor</th><th>Equipo</th><th>Combos ofrecidos</th><th>Clientes</th><th>Importe</th><th>Estado</th></tr></thead><tbody>';
+      h+='<div class="twrap"><table class="tbl-compact"><thead><tr><th>Vendedor</th><th>Equipo</th><th>Combos ofrecidos</th><th>Clientes</th><th>Importe</th><th>Estado</th></tr></thead><tbody>';
       rows.forEach(r=>{
         h+=`<tr><td class="name">${r.nombre}</td><td style="color:var(--muted)">${r.supervisor}</td>
-          <td style="font-size:11.5px;color:var(--muted)">${r.combosDia.length?r.combosDia.join(', '):'—'}</td>
+          <td style="font-size:11px;color:var(--muted);white-space:normal;max-width:260px">${r.combosDia.length?r.combosDia.join(', '):'—'}</td>
           <td class="num">${AR.format(r.cli)}</td><td class="num">${peso(r.imp)}</td>
           <td><span class="pill ${r.cls}">${r.estado}</span></td></tr>`;
       });
