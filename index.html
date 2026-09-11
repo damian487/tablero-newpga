@@ -704,7 +704,8 @@ function renderVend(sup='TODOS'){
     c.innerHTML=`<h3>${grupoLabel(s.supervisor)}</h3><div class="who">${s.vendedores} ${isMay?'canal':'vendedores'} · universo ${AR.format(s.universo)}</div>
       <div class="big num">${peso(s.venta)}</div>
       <div class="row"><span class="l">CCC (clientes con compra)</span><span class="v">${AR.format(s.ccc)}</span></div>
-      <div class="row"><span class="l">% Cobertura</span><span class="v">${pct(s.cobertura)}</span></div>`;
+      <div class="row"><span class="l">% Cobertura</span><span class="v">${pct(s.cobertura)}</span></div>
+      <div class="row"><span class="l">% Margen</span><span class="v">${pct(s.margen)}</span></div>`;
     sg.appendChild(c);
   });
   const scard=el('div','card'); scard.appendChild(el('div','ctitle','<h2>Totales por supervisor</h2>')); scard.appendChild(sg);
@@ -717,29 +718,30 @@ function renderVend(sup='TODOS'){
   const tcard=el('div','card');
   tcard.appendChild(el('div','ctitle','<h2>Detalle por vendedor</h2><span class="hint">ordenado por venta · clic en encabezado para reordenar</span>'));
   const tw=el('div','twrap');
-  let html=`<table id="vtab"><thead><tr>
+  let html=`<table class="tbl-compact" id="vtab"><thead><tr>
     <th data-k="nombre">Vendedor</th><th data-k="universo">Universo</th><th data-k="ccc">CCC</th>
     <th data-k="cobertura">% Cobertura</th><th data-k="venta">Venta $ (c/IVA)</th><th data-k="lineas">Líneas</th>
-    <th class="no-sort">Estado</th></tr></thead><tbody>`;
+    <th data-k="margen">% Margen</th><th class="no-sort">Estado</th></tr></thead><tbody>`;
   let gTV=0,gTC=0,gTU=0,gTL=0;
   Object.keys(groups).forEach(g=>{
     const arr=groups[g].slice().sort((a,b)=>b.venta-a.venta);
+    const sd=DATA.porSupervisor.find(s=>s.supervisor===g);
     let tv=0,tc=0,tu=0,tl=0;
-    html+=`<tr class="subhead"><td colspan="7">${grupoLabel(g)}</td></tr>`;
-    html+=`<tr class="colrep"><td>Vendedor</td><td>Universo</td><td>CCC</td><td>% Cobertura</td><td>Venta $ (c/IVA)</td><td>Líneas</td><td>Estado</td></tr>`;
+    html+=`<tr class="subhead"><td colspan="8">${grupoLabel(g)}</td></tr>`;
+    html+=`<tr class="colrep"><td>Vendedor</td><td>Universo</td><td>CCC</td><td>% Cobertura</td><td>Venta $ (c/IVA)</td><td>Líneas</td><td>% Margen</td><td>Estado</td></tr>`;
     arr.forEach(v=>{
       tv+=v.venta;tc+=v.ccc;tu+=v.universo;tl+=v.lineas;
       html+=`<tr><td class="name">${v.nombre}</td><td class="num">${v.universo||'—'}</td><td class="num">${AR.format(v.ccc)}</td>
         <td><div class="cov"><span class="pct num">${pct(v.cobertura)}</span><span class="track"><span class="fill" style="width:${Math.min(100,v.cobertura||0)}%;background:${covColorTeam(v.cobertura,v.supervisor)}"></span></span></div></td>
-        <td class="num">${peso(v.venta)}</td><td class="num">${AR.format(v.lineas)}</td>
+        <td class="num">${peso(v.venta)}</td><td class="num">${AR.format(v.lineas)}</td><td class="num">${pct(v.margen)}</td>
         <td><span class="pill ${alertClass(v.alerta)}">${v.alerta}</span></td></tr>`;
     });
     html+=`<tr class="total"><td>Subtotal ${grupoLabel(g)}</td><td class="num">${tu||'—'}</td><td class="num">${AR.format(tc)}</td>
-      <td class="num">${tu?pct(Math.round(1000*tc/tu)/10):'—'}</td><td class="num">${peso(tv)}</td><td class="num">${AR.format(tl)}</td><td></td></tr>`;
+      <td class="num">${tu?pct(Math.round(1000*tc/tu)/10):'—'}</td><td class="num">${peso(tv)}</td><td class="num">${AR.format(tl)}</td><td class="num">${pct(sd?sd.margen:0)}</td><td></td></tr>`;
     gTV+=tv;gTC+=tc;gTU+=tu;gTL+=tl;
   });
   html+=`<tr class="grandtotal"><td>TOTAL</td><td class="num">${gTU}</td><td class="num">${AR.format(gTC)}</td>
-    <td class="num">${pct(Math.round(1000*gTC/DATA.meta.universoTotal)/10)}</td><td class="num">${peso(gTV)}</td><td class="num">${AR.format(gTL)}</td><td></td></tr>`;
+    <td class="num">${pct(Math.round(1000*gTC/DATA.meta.universoTotal)/10)}</td><td class="num">${peso(gTV)}</td><td class="num">${AR.format(gTL)}</td><td class="num">${pct(DATA.kpis.margen)}</td><td></td></tr>`;
   html+='</tbody></table>';
   tw.innerHTML=html; tcard.appendChild(tw); p.appendChild(tcard);
 
