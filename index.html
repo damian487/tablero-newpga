@@ -585,7 +585,7 @@ function renderHeaderKpis(){
     {lab:'Objetivo MSU',val:M?(msuFmt(M.meta)+' MSU'):'—',foot:'meta trimestral · Stat Factor oficial P&G',tag:M?`≈ ${cajasFmt(M.metaCajas)}&nbsp;cajas`:null},
     {lab:'Alcance en MSU',val:M?(msuFmt(M.real)+' MSU'):'—',foot:M?(pct(M.pctAvance)+' del objetivo'):'',tag:M?`≈ ${cajasFmt(M.cajasReal)}&nbsp;cajas reales`:null},
     {lab:'Tendencia cierre MSU',val:proyMSU!=null?(msuFmt(proyMSU)+' MSU'):'—',foot:'proyección al cierre del trimestre',tag:proyMSUCajas!=null?`≈ ${cajasFmt(proyMSUCajas)}&nbsp;cajas`:null,
-      tagTitle:M?`Alcance actual + ritmo de los últimos ${M.ritmoRecienteDias} días × ${M.diasRestantes} días restantes`:null},
+      tagTitle:M?`Alcance actual + ritmo de los últimos ${M.ritmoRecienteDias} días hábiles × ${M.diasRestantes} días hábiles restantes`:null},
     {lab:'Markup',val:pct(K.markup),foot:'ganancia sobre costo (sin IVA)',tag:'(venta − costo) ÷ costo',gridCol:5},
     {lab:'Margen',val:pct(K.margen),foot:'ganancia sobre venta (sin IVA)',tag:'(venta − costo) ÷ venta',gridCol:6},
   ];
@@ -1656,7 +1656,7 @@ function renderMSU(){
   }
 
   const head=el('div','card');
-  head.appendChild(el('div','ctitle',`<h2>🎯 Meta del trimestre — Objetivo Nubi Sell-Out</h2><span class="hint">vigencia 01/07 al 30/09 · día ${M.diasTranscurridos} de ${M.diasTotales} · quedan ${M.diasRestantes} días</span>`));
+  head.appendChild(el('div','ctitle',`<h2>🎯 Meta del trimestre — Objetivo Nubi Sell-Out</h2><span class="hint">vigencia 01/07 al 30/09 · día hábil ${M.diasTranscurridos} de ${M.diasTotales} · quedan ${M.diasRestantes} días hábiles (Lu-Vi)</span>`));
   if(M.estado){
     head.appendChild(el('div',null,`<div style="margin:4px 0 10px">${estadoPill(M.estado)} <span style="font-size:11.5px;color:var(--muted);margin-left:6px">ritmo necesario ${peso(M.ritmoNecesarioPesos)}/día vs ritmo real de los últimos ${M.ritmoRecienteDias} días ${peso(M.ritmoRecientePesos)}/día</span></div>`));
   }
