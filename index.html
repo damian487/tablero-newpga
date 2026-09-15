@@ -2868,7 +2868,7 @@ function renderConcurso(){
   /* ---- Sell-out cascadeado por equipo ---- */
   if(C.selloutPorEquipo && C.selloutPorEquipo.length){
     const se=el('div','card');
-    se.appendChild(el('div','ctitle','<h2>Objetivo 1 · Sell-out cascadeado por equipo</h2><span class="hint">meta fija por equipo (no proporcional al universo): a Lucía se le pide más porque tiene los mejores autoservicios y mayor concentración de venta — si su meta fuera chica la superaría enseguida y dejaría de traccionar. Entre los dos equipos se pide 110% a propósito, como colchón; la meta real de la empresa sigue siendo 100%.</span>'));
+    se.appendChild(el('div','ctitle','<h2>Objetivo 1 · Sell-out cascadeado por equipo</h2><span class="hint">meta fija por GRUPO de vendedor (no por supervisor ni proporcional al universo): las 4 KAF sobre-cumplidoras van al 80%, Cecilia Gómez tiene una meta individual al 65% de su propia porción de universo (cartera grande pero todavía no tan desarrollada como las otras KAF), y el resto de la empresa (las 3 vendedoras nuevas de Lucy + todo el equipo de Juan) va al 40%. El % que ves por supervisor es el resultado de sumar los targets individuales de cada uno — entre los 3 grupos se pide ~123% a propósito, como colchón; la meta real de la empresa sigue siendo 100%.</span>'));
     const sg2=el('div','supgrid');
     C.selloutPorEquipo.forEach(eq=>{
       const barColor=eq.pctAvance>=100?'var(--good)':(eq.pctAvance>=50?'var(--warn)':'var(--bad)');
