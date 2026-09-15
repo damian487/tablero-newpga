@@ -946,6 +946,13 @@ function renderCanales(){
     rows.forEach(c2=>{h+=`<tr><td class="name">${c2.canal}</td><td class="num">${AR.format(c2.universo)}</td><td class="num">${AR.format(c2.ccc)}</td>
       <td><div class="cov"><span class="pct num">${pct(c2.cobertura)}</span><span class="track"><span class="fill" style="width:${Math.min(100,c2.cobertura||0)}%;background:${covColor(c2.cobertura)}"></span></span></div></td>
       <td class="num">${peso(c2.venta)}</td></tr>`;});
+    const tUniv=rows.reduce((a,c2)=>a+(c2.universo||0),0);
+    const tCcc=rows.reduce((a,c2)=>a+(c2.ccc||0),0);
+    const tVenta=rows.reduce((a,c2)=>a+(c2.venta||0),0);
+    const tCob=tUniv>0?Math.round((100*tCcc/tUniv)*10)/10:null;
+    h+=`<tr class="total"><td>Total</td><td class="num">${AR.format(tUniv)}</td><td class="num">${AR.format(tCcc)}</td>
+      <td><div class="cov"><span class="pct num">${pct(tCob)}</span><span class="track"><span class="fill" style="width:${Math.min(100,tCob||0)}%;background:${covColor(tCob)}"></span></span></div></td>
+      <td class="num">${peso(tVenta)}</td></tr>`;
     h+='</tbody></table></div>';
     document.getElementById('canalesTablaBox').innerHTML=h;
     document.getElementById('canalesBarBox').innerHTML=hbars(rows.filter(x=>x.venta>0),{val:x=>x.venta,label:x=>x.canal,color:'var(--accent)',fmt:pesoC,namew:180,w:720});
