@@ -915,17 +915,43 @@ function renderResultadosMes(){
 }
 
 /* ---------- PANEL: Canales ---------- */
+// Agrupa DATA.porCanalVendedor (canal -> filas por vendedor) por supervisor, para el
+// filtro Totales/Lucy/Juan de "Cobertura y venta por canal" (pedido de Damian 14/9).
+function canalesPorSupervisor(sup){
+  const base=DATA.porCanalGrupo||DATA.porCanal||[];
+  if(sup==='TODOS'||!DATA.porCanalVendedor) return base;
+  return base.map(g=>{
+    const rows=(DATA.porCanalVendedor[g.canal]||[]).filter(r=>r.supervisor===sup);
+    const universo=rows.reduce((a,r)=>a+(r.universo||0),0);
+    const ccc=rows.reduce((a,r)=>a+(r.ccc||0),0);
+    const venta=rows.reduce((a,r)=>a+(r.venta||0),0);
+    const cobertura=universo>0?Math.round((100*ccc/universo)*10)/10:null;
+    return {canal:g.canal,universo,ccc,cobertura,venta};
+  });
+}
 function renderCanales(){
   const p=document.getElementById('p-canales');p.innerHTML='';
-  const c=el('div','card');c.appendChild(el('div','ctitle','<h2>Cobertura y venta por canal</h2><span class="hint">CCC / universo del canal</span>'));
-  let h='<div class="twrap"><table><thead><tr><th>Canal</th><th>Universo</th><th>CCC</th><th>% Cobertura</th><th>Venta $ (c/IVA)</th></tr></thead><tbody>';
-  (DATA.porCanalGrupo||DATA.porCanal).forEach(c2=>{h+=`<tr><td class="name">${c2.canal}</td><td class="num">${AR.format(c2.universo)}</td><td class="num">${AR.format(c2.ccc)}</td>
-    <td><div class="cov"><span class="pct num">${pct(c2.cobertura)}</span><span class="track"><span class="fill" style="width:${Math.min(100,c2.cobertura||0)}%;background:${covColor(c2.cobertura)}"></span></span></div></td>
-    <td class="num">${peso(c2.venta)}</td></tr>`;});
-  h+='</tbody></table></div>';c.innerHTML+=h;p.appendChild(c);
+  const supsDisponibles=DATA.porCanalVendedor?[...new Set(Object.values(DATA.porCanalVendedor).flat().map(r=>r.supervisor))]:[];
+  const c=el('div','card');
+  const selHtml=supsDisponibles.length?`<div style="margin-bottom:10px"><select id="canalesSupSel" class="fsel"><option value="TODOS">Totales</option>${supsDisponibles.map(s=>`<option value="${s}">Supervisor ${s.split(' ')[0]}</option>`).join('')}</select></div>`:'';
+  c.appendChild(el('div','ctitle','<h2>Cobertura y venta por canal</h2><span class="hint">CCC / universo del canal</span>'));
+  c.innerHTML+=selHtml+'<div id="canalesTablaBox"></div>';
+  p.appendChild(c);
   const ch=el('div','card');ch.appendChild(el('div','ctitle','<h2>Venta por canal</h2>'));
-  ch.innerHTML+=hbars((DATA.porCanalGrupo||DATA.porCanal).filter(x=>x.venta>0),{val:x=>x.venta,label:x=>x.canal,color:'var(--accent)',fmt:pesoC,namew:180,w:720});
+  ch.innerHTML+='<div id="canalesBarBox"></div>';
   p.appendChild(ch);
+  function drawCanales(sup){
+    const rows=canalesPorSupervisor(sup);
+    let h='<div class="twrap"><table><thead><tr><th>Canal</th><th>Universo</th><th>CCC</th><th>% Cobertura</th><th>Venta $ (c/IVA)</th></tr></thead><tbody>';
+    rows.forEach(c2=>{h+=`<tr><td class="name">${c2.canal}</td><td class="num">${AR.format(c2.universo)}</td><td class="num">${AR.format(c2.ccc)}</td>
+      <td><div class="cov"><span class="pct num">${pct(c2.cobertura)}</span><span class="track"><span class="fill" style="width:${Math.min(100,c2.cobertura||0)}%;background:${covColor(c2.cobertura)}"></span></span></div></td>
+      <td class="num">${peso(c2.venta)}</td></tr>`;});
+    h+='</tbody></table></div>';
+    document.getElementById('canalesTablaBox').innerHTML=h;
+    document.getElementById('canalesBarBox').innerHTML=hbars(rows.filter(x=>x.venta>0),{val:x=>x.venta,label:x=>x.canal,color:'var(--accent)',fmt:pesoC,namew:180,w:720});
+  }
+  drawCanales('TODOS');
+  if(supsDisponibles.length) document.getElementById('canalesSupSel').addEventListener('change',e=>drawCanales(e.target.value));
   // apertura por subsegmento: que subramos agrupa cada canal
   const grp=s=>s==='Autoservicio Tradicional'?'Autoservicios':s==='Almacen/Despensa'?'Almacenes':s==='Kiosco/Maxikiosco'?'Kioscos':'Otros';
   const orden=['Autoservicios','Almacenes','Kioscos','Otros'];
