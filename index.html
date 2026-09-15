@@ -1721,7 +1721,7 @@ function renderMSU(){
   /* ---- cascade por equipo ---- */
   if(M.porEquipo && M.porEquipo.length){
     const eqCard=el('div','card');
-    eqCard.appendChild(el('div','ctitle','<h2>Meta cascadeada por equipo</h2><span class="hint">meta fija por equipo (Lucía 65% / Juan 45% del objetivo total, no proporcional al universo) — a Lucía se le pide más porque tiene mejores autoservicios y mayor concentración de venta, para que no vea la meta ya superada y deje de traccionar</span>'));
+    eqCard.appendChild(el('div','ctitle','<h2>Meta cascadeada por equipo</h2><span class="hint">meta fija por GRUPO de vendedor (no por supervisor ni proporcional al universo): las 4 KAF que ya venían sobre-cumpliendo (Daniel Sánchez, Romina Merello, Gaby Peralta, María José Minio) van al 80% del objetivo; el resto de la empresa — Cecilia Gómez y las 3 vendedoras nuevas de Lucy (Magali, Pilar, Valentina, todavía desarrollando zona post-reestructuración) más todo el equipo de Juan — va al 40%. El % que ves por supervisor es el resultado de sumar los targets individuales de cada uno, no un número fijo por equipo</span>'));
     const sg=el('div','supgrid');
     M.porEquipo.forEach(eq=>{
       const bc=barColorFor(eq.pctAvance);
@@ -2882,7 +2882,7 @@ function renderConcurso(){
       sg2.appendChild(c);
     });
     se.appendChild(sg2);
-    se.appendChild(el('div','note','Meta fija: Lucía 65% / Juan 45% del objetivo total (pedido de Damián, 25/8) — no se recalcula sola con el avance; se revisa manualmente cada tanto.'));
+    se.appendChild(el('div','note','Meta fija por grupo de vendedor: las 4 KAF sobre-cumplidoras (80%) vs. el resto de la empresa (40%) — ver detalle en la pestaña "Meta del trimestre" (pedido de Damián, 15/9, reemplaza el 65%/45% por supervisor del 25/8). No se recalcula sola con el avance; se revisa manualmente cada tanto.'));
     p.appendChild(se);
   }
 
