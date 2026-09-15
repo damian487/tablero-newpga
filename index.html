@@ -2216,7 +2216,7 @@ function renderMetaAgosto(){
   const p=document.getElementById('p-metaago'); p.innerHTML='';
   const M=DATA.metaAgosto;
   if(!M){ p.innerHTML='<div class="card"><div class="ctitle"><h2>Meta Cobertura del mes</h2></div><p style="color:var(--muted)">Sin datos de meta del mes.</p></div>'; return; }
-  const mesMetaLbl = MESES_ES[parseInt(M.vigenciaDesde.slice(5,7),10)-1]+' '+M.vigenciaHasta.slice(0,4);
+  const mesMetaLbl = MESES_ES[parseInt(M.vigenciaHasta.slice(5,7),10)-1]+' '+M.vigenciaHasta.slice(0,4);
   const head=el('div','card');
   const nota = M.esAgosto
     ? 'En curso · progreso real del mes cargado abajo.'
