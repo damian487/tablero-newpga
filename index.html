@@ -960,8 +960,8 @@ function renderCanales(){
   drawCanales('TODOS');
   if(supsDisponibles.length) document.getElementById('canalesSupSel').addEventListener('change',e=>drawCanales(e.target.value));
   // apertura por subsegmento: que subramos agrupa cada canal
-  const grp=s=>s==='Autoservicio Tradicional'?'Autoservicios':s==='Almacen/Despensa'?'Almacenes':s==='Kiosco/Maxikiosco'?'Kioscos':'Otros';
-  const orden=['Autoservicios','Almacenes','Kioscos','Otros'];
+  const grp=s=>s==='Autoservicio Tradicional'?'Autoservicios':s==='Almacen/Despensa'?'Almacenes':s==='Kiosco/Maxikiosco'?'Kioscos':s==='Mayoristas'?'Mayoristas':'Otros';
+  const orden=['Autoservicios','Almacenes','Kioscos','Mayoristas','Otros'];
   const gmap={}; (DATA.porCanalGrupo||[]).forEach(g=>gmap[g.canal]=g);
   const ap=el('div','card'); ap.appendChild(el('div','ctitle','<h2>Apertura por canal</h2><span class="hint">qué subsegmentos agrupa cada canal</span>'));
   let ah='<div class="twrap"><table><thead><tr><th>Canal / Subsegmento</th><th>Universo</th><th>CCC</th><th>% Cobertura</th><th>Venta $ (c/IVA)</th></tr></thead><tbody>';
