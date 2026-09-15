@@ -401,6 +401,7 @@ td.name{font-weight:600}
   <section class="panel" id="p-covmarca" role="tabpanel"></section>
   <section class="panel" id="p-metaago" role="tabpanel"></section>
   <section class="panel" id="p-matinal" role="tabpanel"></section>
+  <section class="panel" id="p-relevamiento" role="tabpanel"></section>
   <section class="panel" id="p-mapa" role="tabpanel"></section>
   <section class="panel" id="p-plansup" role="tabpanel"></section>
 </main>
@@ -621,7 +622,8 @@ const TAB_GROUPS=[
     {id:'p-msu',label:'🎯 Meta del trimestre'},
     {id:'p-metaago',label:'🎯 Meta Cobertura del mes'},
     {id:'p-matinal',label:'🌅 Matinal'},
-    {id:'p-mapa',label:'🗺️ Mapa'} ],
+    {id:'p-mapa',label:'🗺️ Mapa'},
+    {id:'p-relevamiento',label:'🏷️ Relevamiento Precios'} ],
 ];
 const TABS=TAB_GROUPS.flat();
 const tabsEl=document.getElementById('tabs');
@@ -635,7 +637,8 @@ TAB_GROUPS.forEach(group=>{
       b.setAttribute('aria-selected','true');
       document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
       document.getElementById(t.id).classList.add('on');
-      if(t.id==='p-mapa' && typeof mapaActivar==='function'){ const fn=mapaActivar; mapaActivar=null; fn(); }};
+      if(t.id==='p-mapa' && typeof mapaActivar==='function'){ const fn=mapaActivar; mapaActivar=null; fn(); }
+      if(t.id==='p-relevamiento' && typeof renderRelevamiento==='function'){ renderRelevamiento(false); }};
     g.appendChild(b);
   });
   tabsEl.appendChild(g);
@@ -2265,6 +2268,91 @@ function renderMetaAgosto(){
   h+='</tbody></table></div>'; t.innerHTML+=h; p.appendChild(t);
   p.appendChild(el('div','note','Real acumulado = clientes distintos con compra desde el 01/08 hasta el corte de esa semana (mismo criterio que "CCC actual"). No es la venta de esa semana sola — si superó la meta en una semana, ese excedente sigue contando en las semanas siguientes.'));
   p.appendChild(el('div','note','Ritmo/día = clientes con compra (CCC) a sumar por cada día hábil (Lu-Vi) restante del mes para llegar a la meta. Antes de que arranque el mes, el ritmo mostrado es el ideal (parejo en los días hábiles totales); una vez cargando datos reales del mes, se recalcula sobre los días hábiles que quedan.'));
+}
+
+/* ---------- PANEL: Relevamiento de Precios (New PGA) - carga desde el Worker bajo demanda, no
+   forma parte de DATA (no depende de la corrida del pipeline) - mismo patron que /api/historico-vendedor. ---------- */
+const RELEV_ENDPOINT='https://tablero-newpga-worker.damian-8ad.workers.dev/api/relevamiento-export';
+let _relevCache=null;
+async function fetchRelevamiento(force){
+  if(_relevCache && !force) return _relevCache;
+  let pw=''; try{ pw=sessionStorage.getItem('gpw')||''; }catch(_){ }
+  const res=await fetch(RELEV_ENDPOINT+'?pw='+encodeURIComponent(pw),{headers:{'X-Dashboard-Password':pw}});
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  const j=await res.json();
+  if(!j.ok) throw new Error(j.error||'error del servidor');
+  _relevCache=j.respuestas||[];
+  return _relevCache;
+}
+async function renderRelevamiento(force){
+  const p=document.getElementById('p-relevamiento');
+  if(!p.innerHTML) p.innerHTML='<div class="card"><p style="color:var(--muted)">Cargando relevamiento…</p></div>';
+  let rows;
+  try{ rows=await fetchRelevamiento(force); }
+  catch(e){ p.innerHTML='<div class="card"><div class="ctitle"><h2>🏷️ Relevamiento de Precios — New PGA</h2></div><p style="color:var(--muted)">No se pudo cargar ('+escapeHtml(e.message)+'). Probá de nuevo.</p></div>'; return; }
+  p.innerHTML='';
+
+  const totalUniverso=DATA.porVendedor.filter(v=>!v.mayorista).reduce((s,v)=>s+v.universo,0);
+  const clientesUnicos=new Set(rows.map(r=>r.vendedorCod+'|'+r.clienteCod)).size;
+  const nosCompraSi=rows.filter(r=>r.nosCompro==='SI').length;
+
+  const head=el('div','card');
+  head.appendChild(el('div','ctitle','<h2>🏷️ Relevamiento de Precios — New PGA</h2><span class="hint">precio de góndola relevado por los vendedores en el local del cliente · cargado desde el celular, independiente de la corrida diaria</span><button id="btnRelevRefresh" style="margin-top:8px;font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer">🔄 Actualizar</button>'));
+  const sg=el('div','supgrid');
+  sg.appendChild(el('div','supcard',`<div class="who">Clientes relevados</div><div class="big num">${AR.format(clientesUnicos)}</div>`));
+  sg.appendChild(el('div','supcard',`<div class="who">Cobertura del universo</div><div class="big num">${pct(totalUniverso?Math.round(clientesUnicos/totalUniverso*1000)/10:0)}</div>`));
+  sg.appendChild(el('div','supcard',`<div class="who">Nos compran a nosotros</div><div class="big num">${pct(rows.length?Math.round(nosCompraSi/rows.length*1000)/10:0)}</div>`));
+  sg.appendChild(el('div','supcard',`<div class="who">Total relevamientos</div><div class="big num">${AR.format(rows.length)}</div>`));
+  head.appendChild(sg);
+  p.appendChild(head);
+  document.getElementById('btnRelevRefresh').onclick=()=>renderRelevamiento(true);
+
+  if(!rows.length){ p.appendChild(el('div','card','<p style="color:var(--muted)">Todavía no hay relevamientos cargados.</p>')); return; }
+
+  const artNombres=[...new Set(rows.flatMap(r=>(r.articulos||[]).map(a=>a.nombre)))];
+
+  const artCard=el('div','card');
+  artCard.appendChild(el('div','ctitle','<h2>Resumen por producto</h2><span class="hint">sobre los relevamientos cargados · precio de góndola</span>'));
+  let ah='<div class="twrap"><table><thead><tr><th>Producto</th><th class="num">Con stock</th><th class="num">% de relevados</th><th class="num">Precio prom.</th><th class="num">Precio mín.</th><th class="num">Precio máx.</th></tr></thead><tbody>';
+  artNombres.forEach(nombre=>{
+    const vals=rows.map(r=>(r.articulos||[]).find(a=>a.nombre===nombre)).filter(Boolean);
+    const conStock=vals.filter(a=>a.tiene==='SI');
+    const precios=conStock.map(a=>Number(a.precio)).filter(n=>isFinite(n)&&n>0);
+    const prom=precios.length?Math.round(precios.reduce((s,n)=>s+n,0)/precios.length):null;
+    ah+=`<tr><td class="name">${escapeHtml(nombre)}</td><td class="num">${conStock.length}/${vals.length}</td><td class="num">${pct(vals.length?Math.round(conStock.length/vals.length*1000)/10:0)}</td><td class="num">${prom!=null?peso(prom):'—'}</td><td class="num">${precios.length?peso(Math.min(...precios)):'—'}</td><td class="num">${precios.length?peso(Math.max(...precios)):'—'}</td></tr>`;
+  });
+  ah+='</tbody></table></div>';
+  artCard.innerHTML+=ah;
+  p.appendChild(artCard);
+
+  const detCard=el('div','card');
+  detCard.appendChild(el('div','ctitle','<h2>Detalle de relevamientos</h2><span class="hint">un relevamiento por cliente · el más reciente si se cargó más de una vez</span>'));
+  detCard.innerHTML+='<div style="margin-bottom:10px"><input id="relevBuscador" type="search" placeholder="Buscar por vendedor o cliente…" style="width:100%;max-width:360px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text)"></div>';
+  const boxDet=el('div'); detCard.appendChild(boxDet);
+  p.appendChild(detCard);
+
+  const ordenado=[...rows].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+  function drawDet(q){
+    q=(q||'').toLowerCase();
+    let filas=ordenado;
+    if(q) filas=filas.filter(r=>(r.vendedor||'').toLowerCase().includes(q)||(r.cliente||'').toLowerCase().includes(q));
+    let h='<div class="twrap"><table><thead><tr><th>Fecha</th><th>Vendedor</th><th>Cliente</th><th>Dirección</th><th>Nos compró</th>';
+    artNombres.forEach(n=>{ h+=`<th class="num">${escapeHtml(n)}</th>`; });
+    h+='<th>Obs.</th><th>Foto</th></tr></thead><tbody>';
+    filas.forEach(r=>{
+      const fecha=r.fecha?new Date(r.fecha).toLocaleDateString('es-AR'):'—';
+      h+=`<tr><td>${fecha}</td><td>${escapeHtml(r.vendedor||'')}</td><td class="name">${escapeHtml(r.cliente||'')}</td><td>${escapeHtml(r.direccion||'')}</td><td>${r.nosCompro==='SI'?'<span class="pill ok">Sí</span>':r.nosCompro==='NO'?'<span class="pill bad">No</span>':'—'}</td>`;
+      artNombres.forEach(nombre=>{
+        const a=(r.articulos||[]).find(x=>x.nombre===nombre);
+        h+=`<td class="num">${a&&a.tiene==='SI'?(a.precio!==''&&a.precio!=null?peso(Number(a.precio)):'sin precio'):'—'}</td>`;
+      });
+      h+=`<td>${escapeHtml(r.obs||'')}</td><td>${r.foto?'<a href="'+r.foto+'" target="_blank" rel="noopener">📷 ver</a>':'—'}</td></tr>`;
+    });
+    h+='</tbody></table></div>';
+    boxDet.innerHTML=h;
+  }
+  drawDet('');
+  document.getElementById('relevBuscador').oninput=(e)=>drawDet(e.target.value);
 }
 
 /* ---------- PANEL: Seguimiento diario Agosto (objetivo vs real, por vendedor, con arrastre) ---------- */
