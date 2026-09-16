@@ -2307,6 +2307,38 @@ async function renderRelevamiento(force){
   p.appendChild(head);
   document.getElementById('btnRelevRefresh').onclick=()=>renderRelevamiento(true);
 
+  // ---- uso de la herramienta: quien releva y quien todavia no (pedido de Damian 16/9) ----
+  const vendActivos=DATA.porVendedor.filter(v=>!v.mayorista).map(v=>({cod:String(v.cod),nombre:v.nombre,supervisor:v.supervisor}));
+  const relevPorVend={};
+  rows.forEach(r=>{
+    const k=r.vendedorCod;
+    if(!relevPorVend[k]) relevPorVend[k]={clientes:new Set(),ultima:null};
+    relevPorVend[k].clientes.add(r.clienteCod);
+    if(!relevPorVend[k].ultima || (r.fecha||'')>relevPorVend[k].ultima) relevPorVend[k].ultima=r.fecha;
+  });
+  const usoRelev=vendActivos.map(v=>{
+    const u=relevPorVend[v.cod];
+    return {...v, relevados:u?u.clientes.size:0, ultima:u?u.ultima:null};
+  }).sort((a,b)=>b.relevados-a.relevados || a.nombre.localeCompare(b.nombre));
+  const usanRelev=usoRelev.filter(v=>v.relevados>0);
+  const noUsanRelev=usoRelev.filter(v=>v.relevados===0);
+  const usoCard=el('div','card');
+  usoCard.appendChild(el('div','ctitle','<h2>Uso de la herramienta de Relevamiento</h2><span class="hint">qué vendedores cargaron al menos un relevamiento de precios y cuáles todavía no</span>'));
+  usoCard.innerHTML+=`<div class="kpitiles" style="grid-template-columns:repeat(2,1fr)">
+    <div class="supcard"><h3>Usaron la herramienta</h3><div class="big num" style="color:var(--good)">${usanRelev.length} / ${usoRelev.length}</div><div class="who">vendedores</div></div>
+    <div class="supcard"><h3>Todavía no la usaron</h3><div class="big num" style="color:var(--bad)">${noUsanRelev.length}</div><div class="who">${noUsanRelev.map(v=>v.nombre).join(', ')||'—'}</div></div>
+  </div>`;
+  let uh='<div class="twrap"><table><thead><tr><th>Vendedor</th><th>Equipo</th><th class="num">Clientes relevados</th><th>Último relevamiento</th></tr></thead><tbody>';
+  usoRelev.forEach(v=>{
+    const usa=v.relevados>0;
+    uh+=`<tr><td class="name">${escapeHtml(v.nombre)}</td><td style="color:var(--muted)">${escapeHtml(v.supervisor||'')}</td>
+      <td class="num" style="color:${usa?'var(--good)':'var(--bad)'};font-weight:700">${v.relevados}</td>
+      <td>${v.ultima?new Date(v.ultima).toLocaleDateString('es-AR'):'— nunca —'}</td></tr>`;
+  });
+  uh+='</tbody></table></div>';
+  usoCard.innerHTML+=uh;
+  p.appendChild(usoCard);
+
   if(!rows.length){ p.appendChild(el('div','card','<p style="color:var(--muted)">Todavía no hay relevamientos cargados.</p>')); return; }
 
   const artNombres=[...new Set(rows.flatMap(r=>(r.articulos||[]).map(a=>a.nombre)))];
