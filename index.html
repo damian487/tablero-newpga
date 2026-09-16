@@ -2290,6 +2290,7 @@ async function renderRelevamiento(force){
   let rows;
   try{ rows=await fetchRelevamiento(force); }
   catch(e){ p.innerHTML='<div class="card"><div class="ctitle"><h2>🏷️ Relevamiento de Precios — New PGA</h2></div><p style="color:var(--muted)">No se pudo cargar ('+escapeHtml(e.message)+'). Probá de nuevo.</p></div>'; return; }
+  try{
   p.innerHTML='';
 
   const totalUniverso=DATA.porVendedor.filter(v=>!v.mayorista).reduce((s,v)=>s+v.universo,0);
@@ -2385,6 +2386,9 @@ async function renderRelevamiento(force){
   }
   drawDet('');
   document.getElementById('relevBuscador').oninput=(e)=>drawDet(e.target.value);
+  }catch(e){
+    p.innerHTML='<div class="card"><p style="color:red;white-space:pre-wrap">DEBUG ERROR: '+escapeHtml(e.message)+'\n'+escapeHtml(e.stack||'')+'</p></div>';
+  }
 }
 
 /* ---------- PANEL: Seguimiento diario Agosto (objetivo vs real, por vendedor, con arrastre) ---------- */
