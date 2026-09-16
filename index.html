@@ -2285,18 +2285,11 @@ async function fetchRelevamiento(force){
   return _relevCache;
 }
 async function renderRelevamiento(force){
-  console.log('DBG renderRelevamiento start, force=', force);
   const p=document.getElementById('p-relevamiento');
-  console.log('DBG panel found?', !!p);
   if(!p.innerHTML) p.innerHTML='<div class="card"><p style="color:var(--muted)">Cargando relevamiento…</p></div>';
   let rows;
-  try{
-    console.log('DBG calling fetchRelevamiento');
-    rows=await fetchRelevamiento(force);
-    console.log('DBG fetchRelevamiento returned', rows && rows.length);
-  }
-  catch(e){ console.log('DBG caught error', e); p.innerHTML='<div class="card"><div class="ctitle"><h2>🏷️ Relevamiento de Precios — New PGA</h2></div><p style="color:var(--muted)">No se pudo cargar ('+escapeHtml(e.message)+'). Probá de nuevo.</p></div>'; return; }
-  try{
+  try{ rows=await fetchRelevamiento(force); }
+  catch(e){ p.innerHTML='<div class="card"><div class="ctitle"><h2>🏷️ Relevamiento de Precios — New PGA</h2></div><p style="color:var(--muted)">No se pudo cargar ('+escapeHtml(e.message)+'). Probá de nuevo.</p></div>'; return; }
   p.innerHTML='';
 
   const totalUniverso=DATA.porVendedor.filter(v=>!v.mayorista).reduce((s,v)=>s+v.universo,0);
@@ -2392,9 +2385,6 @@ async function renderRelevamiento(force){
   }
   drawDet('');
   document.getElementById('relevBuscador').oninput=(e)=>drawDet(e.target.value);
-  }catch(e){
-    p.innerHTML='<div class="card"><p style="color:red;white-space:pre-wrap">DEBUG ERROR: '+escapeHtml(e.message)+'\n'+escapeHtml(e.stack||'')+'</p></div>';
-  }
 }
 
 /* ---------- PANEL: Seguimiento diario Agosto (objetivo vs real, por vendedor, con arrastre) ---------- */
