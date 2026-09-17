@@ -1799,7 +1799,28 @@ function renderMSU(){
 function renderPFP(){
   const p=document.getElementById('p-pfp'); p.innerHTML='';
   const F=DATA.pfp;
-  if(!F){ p.innerHTML='<div class="card"><div class="ctitle"><h2>💰 PFP Red GANA</h2></div><p style="color:var(--muted)">Sin datos todavía.</p></div>'; return; }
+  if(!F){
+    p.innerHTML='';
+    const lock=el('div','card');
+    lock.appendChild(el('div','ctitle','<h2>💰 PFP Red GANA</h2><span class="hint">pestaña restringida — acceso solo para elegidos</span>'));
+    lock.appendChild(el('div',null,'<div style="max-width:320px"><p style="color:var(--muted);font-size:13px;margin:0 0 10px">Ingresá la clave de esta pestaña para verla.</p>'
+      +'<input id="pfpPwInp" type="password" autocomplete="off" placeholder="Clave" style="width:100%;box-sizing:border-box;padding:11px 12px;font-size:15px;border-radius:8px;border:1px solid var(--border);margin-bottom:8px">'
+      +'<button id="pfpPwGo" style="width:100%;padding:11px;font-size:15px;font-weight:700;border:0;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer">Ver panel</button>'
+      +'<div id="pfpPwErr" style="margin-top:8px;color:var(--bad);font-size:12.5px;min-height:16px"></div></div>'));
+    p.appendChild(lock);
+    const inp=lock.querySelector('#pfpPwInp'), go=lock.querySelector('#pfpPwGo'), err=lock.querySelector('#pfpPwErr');
+    async function intentar(){
+      err.textContent=''; go.disabled=true; go.textContent='Verificando...';
+      try{
+        if(typeof window.__pfpRefetch!=='function') throw new Error('no disponible en este modo');
+        await window.__pfpRefetch(inp.value);
+        renderPFP();
+      }catch(e){ err.textContent='Clave incorrecta o sin conexión'; go.disabled=false; go.textContent='Ver panel'; inp.select(); }
+    }
+    go.addEventListener('click',intentar);
+    inp.addEventListener('keydown',e=>{ if(e.key==='Enter') intentar(); });
+    return;
+  }
   const barColorFor=pc=>pc>=100?'var(--good)':(pc>=75?'var(--warn)':(pc>=40?'var(--warn2)':'var(--bad)'));
   function tierPillSO(tier){
     if(tier>=1) return '<span class="pill ok">100% del premio</span>';
@@ -4799,7 +4820,10 @@ function botMd(s){ return escapeHtml(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').re
     const p=(typeof silent==='string')?silent:pw.value;
     if(typeof silent!=='string'){ err.textContent=''; go.disabled=true; go.textContent='Cargando...'; }
     try{
-      const res=await fetch(WORKER_URL,{headers:{'X-Dashboard-Password':p}});
+      const headers={'X-Dashboard-Password':p};
+      var __svPfp=null; try{__svPfp=sessionStorage.getItem('gpwpfp');}catch(_){ }
+      if(__svPfp) headers['X-PFP-Password']=__svPfp;
+      const res=await fetch(WORKER_URL,{headers:headers});
       if(!res.ok) throw new Error('HTTP '+res.status);
       DATA=await res.json();
       try{sessionStorage.setItem('gpw',p);}catch(_){ }
@@ -4811,5 +4835,17 @@ function botMd(s){ return escapeHtml(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').re
   pw.addEventListener('keydown',e=>{ if(e.key==='Enter') tryOpen(); });
   var __sv=null; try{__sv=sessionStorage.getItem('gpw');}catch(_){ }
   if(__sv){ ov.style.visibility='hidden'; tryOpen(__sv); } else { pw.focus(); }
+
+  /* ---- clave extra para la pestaÃ±a PFP Red GANA (solo elegidos) ---- */
+  window.__pfpRefetch=async function(pfppw){
+    var mainPw=null; try{mainPw=sessionStorage.getItem('gpw');}catch(_){ }
+    const res=await fetch(WORKER_URL,{headers:{'X-Dashboard-Password':mainPw||'','X-PFP-Password':pfppw}});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const fresh=await res.json();
+    if(!fresh.pfp) throw new Error('clave incorrecta');
+    DATA.pfp=fresh.pfp;
+    try{sessionStorage.setItem('gpwpfp',pfppw);}catch(_){ }
+    return true;
+  };
 })();
 </script>
