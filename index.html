@@ -1249,6 +1249,7 @@ function renderDev(){
     const box=el('div',null,''); tcli.appendChild(box); p.appendChild(tcli);
     const motTxt=d=>(d.motivos||[]).map(m=>m.motivo+(m.cantidad>1?' x'+m.cantidad:'')).join(', ');
     const choTxt=d=>(d.choferes||[]).map(c=>c.chofer+(c.cantidad>1?' x'+c.cantidad:'')).join(', ');
+    const artTxt=d=>(d.articulos||[]).map(a=>a.articulo+(a.cantidad>1?' x'+a.cantidad:'')).join(', ')||'—';
     const fecTxt=d=>(d.fechas&&d.fechas.length)?d.fechas.map(fdate).join(', '):(d.ultimaFecha?fdate(d.ultimaFecha):'—');
     const importeEl=selWrap.querySelector('#devCliImporte');
     function drawCli(vfil,cfil,desde,hasta){
@@ -1264,7 +1265,15 @@ function renderDev(){
           const pf=(d.porFecha||[]).filter(x=>(!desde||x.fecha>=desde)&&(!hasta||x.fecha<=hasta));
           if(!pf.length) return null;
           const importe=pf.reduce((a,x)=>a+x.importe,0), cantidad=pf.reduce((a,x)=>a+x.cantidad,0);
-          return Object.assign({},d,{importe,cantidad,fechas:pf.map(x=>x.fecha)});
+          // Articulos tambien se recortan al mismo rango de fechas (vienen anidados dentro de
+          // cada porFecha), sumando entre los dias que caen en el filtro - no el listado historico.
+          const artMap={};
+          pf.forEach(x=>(x.articulos||[]).forEach(a=>{
+            if(!artMap[a.articulo]) artMap[a.articulo]={articulo:a.articulo,importe:0,cantidad:0};
+            artMap[a.articulo].importe+=a.importe; artMap[a.articulo].cantidad+=a.cantidad;
+          }));
+          const articulos=Object.values(artMap).sort((a,b)=>a.importe-b.importe);
+          return Object.assign({},d,{importe,cantidad,fechas:pf.map(x=>x.fecha),articulos});
         }).filter(Boolean);
       }
       const partes=[]; if(vfil&&vfil!=='TODOS') partes.push('Vendedor: '+vfil); if(cfil&&cfil!=='TODOS') partes.push('Repartidor: '+cfil);
@@ -1272,9 +1281,9 @@ function renderDev(){
       filtroTxt.textContent=(partes.length?partes.join(' · '):'Todos los clientes con devolución')+' · '+rowsCalc.length+' cliente'+(rowsCalc.length===1?'':'s');
       const totalImporte=rowsCalc.reduce((a,d)=>a+d.importe,0);
       importeEl.textContent='Importe rechazado: '+peso(totalImporte);
-      let hh='<div class="twrap"><table><thead><tr><th>Cliente</th><th>Vendedor</th><th>Repartidor</th><th>Motivo</th><th>Ítems</th><th>Importe $</th><th>Fecha del rechazo</th></tr></thead><tbody>';
-      rowsCalc.forEach(d=>{hh+=`<tr><td class="name">${d.cod} - ${d.nombre}</td><td class="name">${d.vendedor}</td><td class="name">${choTxt(d)}</td><td class="name">${motTxt(d)}</td><td class="num">${AR.format(d.cantidad)}</td><td class="num">${peso(d.importe)}</td><td class="num">${fecTxt(d)}</td></tr>`;});
-      if(!rowsCalc.length){ hh+='<tr><td colspan="7" class="note">Sin devoluciones para este filtro.</td></tr>'; }
+      let hh='<div class="twrap"><table><thead><tr><th>Cliente</th><th>Vendedor</th><th>Repartidor</th><th>Motivo</th><th>Artículos</th><th>Ítems</th><th>Importe $</th><th>Fecha del rechazo</th></tr></thead><tbody>';
+      rowsCalc.forEach(d=>{hh+=`<tr><td class="name">${d.cod} - ${d.nombre}</td><td class="name">${d.vendedor}</td><td class="name">${choTxt(d)}</td><td class="name">${motTxt(d)}</td><td class="name">${artTxt(d)}</td><td class="num">${AR.format(d.cantidad)}</td><td class="num">${peso(d.importe)}</td><td class="num">${fecTxt(d)}</td></tr>`;});
+      if(!rowsCalc.length){ hh+='<tr><td colspan="8" class="note">Sin devoluciones para este filtro.</td></tr>'; }
       hh+='</tbody></table></div>';
       box.innerHTML=hh;
     }
