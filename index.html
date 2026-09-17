@@ -1217,8 +1217,8 @@ function renderDev(){
     const selWrap=el('div','no-print','<select id="devCliSel" class="fsel"><option value="TODOS">Vendedor: todos</option>'+vendsConDev.map(v=>`<option value="${v}">${v}</option>`).join('')+'</select> <select id="devCliSelCho" class="fsel"><option value="TODOS">Repartidor: todos</option>'+chofsConDev.map(c=>`<option value="${c}">${c}</option>`).join('')+'</select> '
       +'<label style="font-size:12px;color:var(--muted);margin-left:6px">Desde <input id="devCliDesde" type="date" class="fsel" style="padding:5px 8px"></label> '
       +'<label style="font-size:12px;color:var(--muted)">Hasta <input id="devCliHasta" type="date" class="fsel" style="padding:5px 8px"></label> '
-      +'<button id="devCliPrint" class="tab no-print">🖨️ Imprimir / PDF</button> '
-      +'<span id="devCliImporte" class="pill bad" style="font-size:13px"></span>');
+      +'<button id="devCliPrint" class="tab no-print">🖨️ Imprimir / PDF</button>'
+      +'<div style="margin-top:8px"><span id="devCliImporte" class="pill bad" style="font-size:13px"></span></div>');
     tcli.appendChild(selWrap);
     const filtroTxt=el('div','note','');
     tcli.appendChild(filtroTxt);
