@@ -668,7 +668,7 @@ function hbars(items,{val,label,color,fmt=peso,h=28,gap=8,namew=150,w=680,sub}){
     const y=i*(h+gap)+5; const v=val(it); const len=Math.max(2,bw*v/max);
     const col=typeof color==='function'?color(it):color;
     s+=`<text x="0" y="${y+h/2+4}" class="barname">${label(it)}</text>`;
-    s+=`<rect x="${namew}" y="${y}" width="${len}" height="${h}" rx="5" fill="${col}"/>`;
+    s+=`<rect data-idx="${i}" x="${namew}" y="${y}" width="${len}" height="${h}" rx="5" fill="${col}"/>`;
     s+=`<text x="${namew+len+7}" y="${y+h/2+4}" class="barlabel">${fmt(v)}${sub?(' · '+sub(it)):''}</text>`;
   });
   return s+'</svg>';
@@ -1188,10 +1188,32 @@ function renderDev(){
   // devoluciones puede venir como objeto unico (PS colapsa arrays de 1 elem al serializar) -> coercer a array
   const devs=Array.isArray(DATA.devoluciones)?DATA.devoluciones:(DATA.devoluciones?[DATA.devoluciones]:[]);
   const totCli=DATA.kpis.devClientes||0, totItems=devs.reduce((a,d)=>a+(d.cantidad||0),0), totImp=devs.reduce((a,d)=>a+(d.importe||0),0);
-  const top=el('div','card');
-  top.appendChild(el('div','ctitle','<h2>Rechazos por motivo</h2><span class="hint">total '+peso(DATA.kpis.devoluciones)+' · '+DATA.kpis.devPct+'% de la venta · '+AR.format(totCli)+' clientes · '+AR.format(totItems)+' ítems</span>'));
-  top.innerHTML+=hbars(devs.slice(0,12),{val:d=>Math.abs(d.importe),label:d=>d.motivo,color:'var(--bad)',fmt:n=>peso(-n),namew:230,w:760,h:24});
+  const top=el('div','card'); top.style.position='relative';
+  top.appendChild(el('div','ctitle','<h2>Rechazos por motivo</h2><span class="hint">total '+peso(DATA.kpis.devoluciones)+' · '+DATA.kpis.devPct+'% de la venta · '+AR.format(totCli)+' clientes · '+AR.format(totItems)+' ítems · pasá el mouse sobre una barra para ver clientes y artículos</span>'));
+  const devMotItems=devs.slice(0,12);
+  top.innerHTML+=hbars(devMotItems,{val:d=>Math.abs(d.importe),label:d=>d.motivo,color:'var(--bad)',fmt:n=>peso(-n),namew:230,w:760,h:24});
   p.appendChild(top);
+  // Tooltip al pasar el mouse sobre una barra: detalle de clientes y articulos de ese motivo
+  // (pedido de Damian, 17/9) - usa devMotItems[idx] para que coincida con lo que se dibujo.
+  const devTip=el('div','card'); devTip.style.cssText='position:absolute;z-index:50;display:none;max-width:320px;padding:10px 12px;box-shadow:0 4px 18px rgba(0,0,0,.3);pointer-events:none;font-size:12px';
+  top.appendChild(devTip);
+  top.querySelectorAll('rect[data-idx]').forEach(rect=>{
+    const idx=+rect.getAttribute('data-idx'); const d=devMotItems[idx]; if(!d) return;
+    rect.style.cursor='pointer';
+    rect.addEventListener('mouseenter',()=>{
+      const cliH=(d.detalleClientes||[]).map(c=>`<div class="row"><span class="l">${c.cod} - ${c.nombre}</span><span class="v">${peso(c.importe)}</span></div>`).join('')||'<div class="note">Sin detalle</div>';
+      const artH=(d.detalleArticulos||[]).map(a=>`<div class="row"><span class="l">${a.articulo}</span><span class="v">${peso(a.importe)}</span></div>`).join('')||'<div class="note">Sin detalle</div>';
+      devTip.innerHTML=`<div style="font-weight:700;margin-bottom:6px">${d.motivo}</div><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Clientes</div>${cliH}<div style="font-size:11px;color:var(--muted);margin:8px 0 4px">Artículos</div>${artH}`;
+      devTip.style.display='block';
+    });
+    rect.addEventListener('mousemove',(e)=>{
+      const box=top.getBoundingClientRect();
+      let left=e.clientX-box.left+14, topPos=e.clientY-box.top+14;
+      if(left+320>box.width) left=Math.max(0,e.clientX-box.left-334);
+      devTip.style.left=left+'px'; devTip.style.top=topPos+'px';
+    });
+    rect.addEventListener('mouseleave',()=>{ devTip.style.display='none'; });
+  });
   const t=el('div','card');t.appendChild(el('div','ctitle','<h2>Detalle por motivo</h2><span class="hint">Total = clientes únicos (un cliente puede tener varios motivos)</span>'));
   let h='<div class="twrap"><table><thead><tr><th>Motivo</th><th>Clientes</th><th>Ítems</th><th>Importe $</th></tr></thead><tbody>';
   devs.forEach(d=>{h+=`<tr><td class="name">${d.motivo}</td><td class="num">${AR.format(d.clientes||0)}</td><td class="num">${AR.format(d.cantidad)}</td><td class="num">${peso(d.importe)}</td></tr>`;});
