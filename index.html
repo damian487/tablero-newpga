@@ -630,6 +630,14 @@ const TAB_GROUPS=[
 const TABS=TAB_GROUPS.flat();
 const tabsEl=document.getElementById('tabs');
 let tabIdx=0;
+/* PFP Red GANA: re-bloquea sola a los 5 min de desbloqueada, o apenas se cambia a otra pestaña
+   (pedido de Damian, 17/9) - no se guarda la clave de una vista a la otra, cada vez que se vuelve
+   a entrar hay que tipearla de nuevo. */
+let pfpLockTimer=null;
+function pfpBloquear(){
+  if(pfpLockTimer){ clearTimeout(pfpLockTimer); pfpLockTimer=null; }
+  if(DATA.pfp){ DATA.pfp=null; const panel=document.getElementById('p-pfp'); if(panel && panel.classList.contains('on') && typeof renderPFP==='function') renderPFP(); }
+}
 TAB_GROUPS.forEach(group=>{
   const g=el('div','tabgroup');
   group.forEach(t=>{
@@ -639,6 +647,7 @@ TAB_GROUPS.forEach(group=>{
       b.setAttribute('aria-selected','true');
       document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
       document.getElementById(t.id).classList.add('on');
+      if(t.id!=='p-pfp') pfpBloquear();
       if(t.id==='p-mapa' && typeof mapaActivar==='function'){ const fn=mapaActivar; mapaActivar=null; fn(); }
       if(t.id==='p-relevamiento' && typeof renderRelevamiento==='function'){ renderRelevamiento(false); }};
     g.appendChild(b);
@@ -1814,6 +1823,8 @@ function renderPFP(){
       try{
         if(typeof window.__pfpRefetch!=='function') throw new Error('no disponible en este modo');
         await window.__pfpRefetch(inp.value);
+        if(pfpLockTimer) clearTimeout(pfpLockTimer);
+        pfpLockTimer=setTimeout(pfpBloquear,5*60*1000);
         renderPFP();
       }catch(e){ err.textContent='Clave incorrecta o sin conexión'; go.disabled=false; go.textContent='Ver panel'; inp.select(); }
     }
@@ -4820,10 +4831,7 @@ function botMd(s){ return escapeHtml(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').re
     const p=(typeof silent==='string')?silent:pw.value;
     if(typeof silent!=='string'){ err.textContent=''; go.disabled=true; go.textContent='Cargando...'; }
     try{
-      const headers={'X-Dashboard-Password':p};
-      var __svPfp=null; try{__svPfp=sessionStorage.getItem('gpwpfp');}catch(_){ }
-      if(__svPfp) headers['X-PFP-Password']=__svPfp;
-      const res=await fetch(WORKER_URL,{headers:headers});
+      const res=await fetch(WORKER_URL,{headers:{'X-Dashboard-Password':p}});
       if(!res.ok) throw new Error('HTTP '+res.status);
       DATA=await res.json();
       try{sessionStorage.setItem('gpw',p);}catch(_){ }
@@ -4837,6 +4845,9 @@ function botMd(s){ return escapeHtml(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').re
   if(__sv){ ov.style.visibility='hidden'; tryOpen(__sv); } else { pw.focus(); }
 
   /* ---- clave extra para la pestaÃ±a PFP Red GANA (solo elegidos) ---- */
+  /* No se guarda en sessionStorage a proposito (pedido de Damian, 17/9): se re-bloquea sola a
+     los 5 min o al cambiar de pestaÃ±a (ver pfpBloquear en el body compartido), asi que cada
+     vista nueva de la pestaÃ±a pide la clave de nuevo, sin excepcion ni siquiera post-recarga. */
   window.__pfpRefetch=async function(pfppw){
     var mainPw=null; try{mainPw=sessionStorage.getItem('gpw');}catch(_){ }
     const res=await fetch(WORKER_URL,{headers:{'X-Dashboard-Password':mainPw||'','X-PFP-Password':pfppw}});
@@ -4844,7 +4855,6 @@ function botMd(s){ return escapeHtml(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').re
     const fresh=await res.json();
     if(!fresh.pfp) throw new Error('clave incorrecta');
     DATA.pfp=fresh.pfp;
-    try{sessionStorage.setItem('gpwpfp',pfppw);}catch(_){ }
     return true;
   };
 })();
