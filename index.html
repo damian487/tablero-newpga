@@ -636,7 +636,9 @@ let tabIdx=0;
 let pfpLockTimer=null;
 function pfpBloquear(){
   if(pfpLockTimer){ clearTimeout(pfpLockTimer); pfpLockTimer=null; }
-  if(DATA.pfp){ DATA.pfp=null; const panel=document.getElementById('p-pfp'); if(panel && panel.classList.contains('on') && typeof renderPFP==='function') renderPFP(); }
+  if(DATA.pfp){ DATA.pfp=null; }
+  const panel=document.getElementById('p-pfp');
+  if(panel && panel.classList.contains('on') && typeof renderPFP==='function') renderPFP();
 }
 TAB_GROUPS.forEach(group=>{
   const g=el('div','tabgroup');
@@ -648,6 +650,7 @@ TAB_GROUPS.forEach(group=>{
       document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
       document.getElementById(t.id).classList.add('on');
       if(t.id!=='p-pfp') pfpBloquear();
+      if(t.id==='p-pfp' && typeof renderPFP==='function') renderPFP();
       if(t.id==='p-mapa' && typeof mapaActivar==='function'){ const fn=mapaActivar; mapaActivar=null; fn(); }
       if(t.id==='p-relevamiento' && typeof renderRelevamiento==='function'){ renderRelevamiento(false); }};
     g.appendChild(b);
