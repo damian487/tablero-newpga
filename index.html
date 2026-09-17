@@ -395,6 +395,7 @@ td.name{font-weight:600}
   <section class="panel" id="p-infaltables" role="tabpanel"></section>
   <section class="panel" id="p-stock" role="tabpanel"></section>
   <section class="panel" id="p-msu" role="tabpanel"></section>
+  <section class="panel" id="p-pfp" role="tabpanel"></section>
   <section class="panel" id="p-accion" role="tabpanel"></section>
   <section class="panel" id="p-combos" role="tabpanel"></section>
   <section class="panel" id="p-ruta" role="tabpanel"></section>
@@ -620,6 +621,7 @@ const TAB_GROUPS=[
     {id:'p-combos',label:'🎁 Combos'},
     {id:'p-concurso',label:'🏆 Concurso Nubi'},
     {id:'p-msu',label:'🎯 Meta del trimestre'},
+    {id:'p-pfp',label:'💰 PFP Red GANA'},
     {id:'p-metaago',label:'🎯 Meta Cobertura del mes'},
     {id:'p-matinal',label:'🌅 Matinal'},
     {id:'p-mapa',label:'🗺️ Mapa'},
@@ -1791,6 +1793,81 @@ function renderMSU(){
     fh+='</tbody></table></div>';
   }
   fCard.innerHTML+=fh; p.appendChild(fCard);
+}
+
+/* ---------- PANEL: PFP Red GANA ---------- */
+function renderPFP(){
+  const p=document.getElementById('p-pfp'); p.innerHTML='';
+  const F=DATA.pfp;
+  if(!F){ p.innerHTML='<div class="card"><div class="ctitle"><h2>💰 PFP Red GANA</h2></div><p style="color:var(--muted)">Sin datos todavía.</p></div>'; return; }
+  const barColorFor=pc=>pc>=100?'var(--good)':(pc>=75?'var(--warn)':(pc>=40?'var(--warn2)':'var(--bad)'));
+  function tierPillSO(tier){
+    if(tier>=1) return '<span class="pill ok">100% del premio</span>';
+    if(tier>=0.7) return '<span class="pill" style="background:var(--warn2);color:#fff">70% del premio</span>';
+    return '<span class="pill bad">Sin premio (bajo 90%)</span>';
+  }
+  function canalPill(alcanzado){ return alcanzado?'<span class="pill ok">✓ Ganado</span>':'<span class="pill bad">No ganado</span>'; }
+
+  const head=el('div','card');
+  head.appendChild(el('div','ctitle','<h2>💰 PFP Red GANA — Pay For Performance</h2><span class="hint">programa formal de P&G, distinto de Concurso Nubi · vigencia '+fdate(F.vigenciaDesde)+' al '+fdate(F.vigenciaHasta)+'</span>'));
+  const g=el('div','grid g2');
+  const o1=el('div','supcard'); o1.innerHTML=`<h3>Sell In del trimestre</h3><div class="who">compras a New PGA, neto de notas de crédito</div>
+    <div class="big num">${peso(F.sellIn.total)}</div>
+    <div class="row"><span class="l">Facturas contadas</span><span class="v">${F.sellIn.facturasContadas}</span></div>
+    <div class="row"><span class="l">Notas de crédito</span><span class="v">${F.sellIn.notasCreditoContadas} · ${peso(F.sellIn.totalNotasCredito)}</span></div>`;
+  const o2=el('div','supcard'); o2.innerHTML=`<h3>Premio estimado</h3><div class="who">Sell Out + Canales + Surtido</div>
+    <div class="big num">${peso(F.premioTotal)}</div>
+    <div class="row"><span class="l">Sobre el Sell In</span><span class="v">${F.pctSobreSellIn}% (máx. ${F.premioMaximoPct}%)</span></div>
+    <div class="row"><span class="l">Sell Out (máx 2%)</span><span class="v">${peso(F.sellOutPremio)}</span></div>
+    <div class="row"><span class="l">Canales (máx 1%)</span><span class="v">${peso(F.canalesPremio)}</span></div>
+    <div class="row"><span class="l">Surtido (máx 1%)</span><span class="v">${peso(F.surtidoPremio)}</span></div>`;
+  g.appendChild(o1); g.appendChild(o2); head.appendChild(g);
+  head.appendChild(el('div','note',`<b>Ojo:</b> ${F.gateCobranza.nota}`));
+  head.appendChild(el('div','note','Objetivos "a ojo" que comparte el ejecutivo de P&G vía Talamus (primer trimestre del programa, sin historial) — se van a ir corrigiendo con el tiempo. Sell In por categoría es aproximado: las notas de crédito no traen detalle de artículo, se reparten proporcional al mix de facturas del período.'));
+  p.appendChild(head);
+
+  /* ---- Sell Out: 2% por categoria, independiente ---- */
+  const soCard=el('div','card');
+  soCard.appendChild(el('div','ctitle','<h2>Sell Out — 2% del Sell In por categoría</h2><span class="hint">se cobra cada categoría en forma independiente · 90-99,99% de alcance = 70% del premio · ≥100% = 100% del premio</span>'));
+  let soH='<div class="twrap"><table><thead><tr><th>Categoría</th><th class="num">Objetivo MSU</th><th class="num">Real MSU</th><th>Avance</th><th>Premio</th><th class="num">Sell In</th><th class="num">$ ganado</th></tr></thead><tbody>';
+  F.sellOut.slice().sort((a,b)=>b.pctAlcance-a.pctAlcance).forEach(c=>{
+    const bc=barColorFor(c.pctAlcance);
+    soH+=`<tr><td class="name">${c.categoria}</td><td class="num">${c.objetivoMSU}</td><td class="num">${c.realMSU}</td>
+      <td><div class="cov"><span class="pct num">${c.pctAlcance}%</span><span class="track"><span class="fill" style="width:${Math.min(100,c.pctAlcance)}%;background:${bc}"></span></span></div></td>
+      <td>${tierPillSO(c.tier)}</td><td class="num">${peso(c.sellIn)}</td><td class="num">${peso(c.premio)}</td></tr>`;
+  });
+  soH+='</tbody></table></div>'; soCard.innerHTML+=soH; p.appendChild(soCard);
+
+  /* ---- Canales: 1% ponderado por sub-canal ---- */
+  const caCard=el('div','card');
+  caCard.appendChild(el('div','ctitle','<h2>Canales — 1% del Sell In total</h2><span class="hint">CCC acumulado del trimestre (cliente único, no mensual) · Autoservicios pondera 30%, Almacenes 70%, Kioscos 0% (por ahora) · cada canal cobra su alcance en forma independiente</span>'));
+  const csg=el('div','supgrid');
+  F.canales.forEach(c=>{
+    const bc=barColorFor(c.pctAlcance);
+    const cc=el('div','supcard');
+    cc.innerHTML=`<h3>${c.canal}</h3><div class="who">pondera ${Math.round(c.peso*100)}% del 1%</div>
+      <div class="big num">${AR.format(c.real)}</div>
+      <div class="row"><span class="l">Objetivo trimestral</span><span class="v">${AR.format(c.objetivo)} clientes</span></div>
+      <div class="cov" style="margin-top:8px;justify-content:flex-start"><span class="track" style="width:100%"><span class="fill" style="width:${Math.min(100,c.pctAlcance)}%;background:${bc}"></span></span><span class="pct num">${c.pctAlcance}%</span></div>
+      <div style="margin-top:8px">${canalPill(c.alcanzado)}</div>`;
+    csg.appendChild(cc);
+  });
+  caCard.appendChild(csg);
+  caCard.appendChild(el('div','note',`Ganado: ${Math.round(F.canalesFraccionGanada*100)}% del 1% → ${peso(F.canalesPremio)}`));
+  p.appendChild(caCard);
+
+  /* ---- Surtido: 1% por niveles de categorias alcanzadas ---- */
+  const suCard=el('div','card');
+  suCard.appendChild(el('div','ctitle','<h2>Surtido — 1% del Sell In total</h2><span class="hint">CCC acumulado del trimestre por categoría, en canales foco · 4 de 8 categorías = 50% · 6 de 8 = 75% · 7 u 8 = 100%</span>'));
+  let suH='<div class="twrap"><table><thead><tr><th>Categoría</th><th class="num">Objetivo CCC</th><th class="num">Real CCC</th><th>Avance</th></tr></thead><tbody>';
+  F.surtido.slice().sort((a,b)=>b.pctAlcance-a.pctAlcance).forEach(c=>{
+    const bc=barColorFor(c.pctAlcance);
+    suH+=`<tr><td class="name">${c.categoria}</td><td class="num">${AR.format(c.objetivo)}</td><td class="num">${AR.format(c.real)}</td>
+      <td><div class="cov"><span class="pct num">${c.pctAlcance}%</span><span class="track"><span class="fill" style="width:${Math.min(100,c.pctAlcance)}%;background:${bc}"></span></span></div></td></tr>`;
+  });
+  suH+='</tbody></table></div>'; suCard.innerHTML+=suH;
+  suCard.appendChild(el('div','note',`${F.surtidoCategoriasAlcanzadas} de 8 categorías alcanzadas → ${Math.round(F.surtidoTier*100)}% del premio → ${peso(F.surtidoPremio)}`));
+  p.appendChild(suCard);
 }
 
 /* ---------- PANEL: Combos ---------- */
@@ -4316,7 +4393,7 @@ const DIAS_ES=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sába
 
 /* ---------- init ---------- */
 function renderAll(){
-  renderHeaderKpis(); renderVend(); renderVentaDia(); renderFicha(); renderPerformance(); renderDiario(); renderResumen(); renderResultadosMes(); renderEfec(); renderConcurso(); renderMSU(); renderCanales(); renderMarcas(); renderEvo(); renderDev(); renderInfaltables(); renderStock(); renderAccion(); renderCombos(); renderRuta(); renderCoberturaMarcas(); renderMetaAgosto(); renderSeguimientoDiario(); renderMatinal(); renderMapa(); renderPlanSupervisor();
+  renderHeaderKpis(); renderVend(); renderVentaDia(); renderFicha(); renderPerformance(); renderDiario(); renderResumen(); renderResultadosMes(); renderEfec(); renderConcurso(); renderMSU(); renderPFP(); renderCanales(); renderMarcas(); renderEvo(); renderDev(); renderInfaltables(); renderStock(); renderAccion(); renderCombos(); renderRuta(); renderCoberturaMarcas(); renderMetaAgosto(); renderSeguimientoDiario(); renderMatinal(); renderMapa(); renderPlanSupervisor();
 }
 (function initMesSelector(){
   const sel=document.getElementById('mesSel'); if(!sel) return;
