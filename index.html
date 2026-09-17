@@ -1826,6 +1826,40 @@ function renderPFP(){
   head.appendChild(el('div','note','Objetivos "a ojo" que comparte el ejecutivo de P&G vía Talamus (primer trimestre del programa, sin historial) — se van a ir corrigiendo con el tiempo. Sell In por categoría es aproximado: las notas de crédito no traen detalle de artículo, se reparten proporcional al mix de facturas del período.'));
   p.appendChild(head);
 
+  /* ---- Plan de acción: dónde reaccionar YA (a tiro de ganar un %) ---- */
+  const paCard=el('div','card');
+  paCard.appendChild(el('div','ctitle','<h2>📍 Plan de acción — dónde reaccionar</h2><span class="hint">categorías/canales a menos de 20 puntos del próximo escalón — el resto ya está ganado o todavía lejos</span>'));
+  let paH='';
+  const comprarMas=F.sellOut.filter(c=>c.accion==='comprar_mas');
+  if(comprarMas.length){
+    paH+='<div class="supcard" style="margin-bottom:10px"><h3>🛒 Sell Out — ya ganado, comprar más suma directo</h3><div class="who">el premio de estas categorías ya está al 100% — comprarles más a New PGA sube el premio en $ sin depender de vender más</div>';
+    comprarMas.forEach(c=>{ paH+=`<div class="row"><span class="l">${c.categoria}</span><span class="v">Sell In actual ${peso(c.sellIn)}</span></div>`; });
+    paH+='</div>';
+  }
+  const soATiro=F.sellOut.filter(c=>c.accion==='a_tiro_vender').sort((a,b)=>a.faltaPct-b.faltaPct);
+  if(soATiro.length){
+    paH+='<div class="supcard" style="margin-bottom:10px"><h3>🎯 Sell Out — a tiro, hay que vender</h3><div class="who">faltan pocos puntos para cruzar el 90% o el 100% de alcance de esa categoría</div>';
+    soATiro.forEach(c=>{ paH+=`<div class="row"><span class="l">${c.categoria}</span><span class="v">faltan ${c.faltaMSU} MSU${c.faltaCajas!=null?' (≈'+AR.format(c.faltaCajas)+' cajas)':''} para el ${c.pctAlcance>=90?100:90}%</span></div>`; });
+    paH+='</div>';
+  }
+  const caATiro=F.canales.filter(c=>c.accion==='a_tiro').sort((a,b)=>a.faltaPct-b.faltaPct);
+  if(caATiro.length){
+    paH+='<div class="supcard" style="margin-bottom:10px"><h3>🏬 Canales — a tiro</h3><div class="who">faltan pocos clientes nuevos para ganar ese % de Canales</div>';
+    caATiro.forEach(c=>{ paH+=`<div class="row"><span class="l">${c.canal}</span><span class="v">faltan ${AR.format(c.faltanClientes)} clientes (pondera ${Math.round(c.peso*100)}%)</span></div>`; });
+    paH+='</div>';
+  }
+  if(F.surtidoProximoTierEn){
+    paH+=`<div class="supcard"><h3>🎁 Surtido — próximo escalón</h3><div class="who">${F.surtidoCategoriasAlcanzadas} de 8 categorías alcanzadas → faltan ${F.surtidoCategoriasFaltantesTier} para llegar a ${F.surtidoProximoTierEn} de 8</div>`;
+    F.surtidoCandidatas.forEach(c=>{ paH+=`<div class="row"><span class="l">${c.categoria}</span><span class="v">faltan ${AR.format(c.faltanClientes)} clientes (${c.pctAlcance}%)</span></div>`; });
+    paH+='</div>';
+  } else {
+    paH+='<div class="supcard"><h3>🎁 Surtido</h3><div class="who">ya está en el escalón máximo (7 u 8 de 8 categorías) — nada pendiente acá</div></div>';
+  }
+  if(!comprarMas.length && !soATiro.length && !caATiro.length){
+    paH='<p style="color:var(--muted)">No hay categorías ni canales "a tiro" en Sell Out/Canales ahora mismo — o ya están ganados, o todavía están lejos del umbral.</p>'+paH;
+  }
+  paCard.innerHTML+=paH; p.appendChild(paCard);
+
   /* ---- Sell Out: 2% por categoria, independiente ---- */
   const soCard=el('div','card');
   soCard.appendChild(el('div','ctitle','<h2>Sell Out — 2% del Sell In por categoría</h2><span class="hint">se cobra cada categoría en forma independiente · 90-99,99% de alcance = 70% del premio · ≥100% = 100% del premio</span>'));
