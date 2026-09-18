@@ -673,7 +673,7 @@ function hbars(items,{val,label,color,fmt=peso,h=28,gap=8,namew=150,w=680,sub}){
   });
   return s+'</svg>';
 }
-function areaChart(items,{w=980,h=280}){
+function areaChart(items,{w=980,h=280,critFn=null}){
   const pad={l:54,r:16,t:38,b:34};
   const iw=w-pad.l-pad.r, ih=h-pad.t-pad.b;
   const vals=items.map(d=>d.venta); const max=Math.max(...vals); const min=Math.min(0,...vals);
@@ -687,9 +687,11 @@ function areaChart(items,{w=980,h=280}){
   let area=`M${X(0)} ${Y(min)} `+items.map((d,i)=>'L'+X(i)+' '+Y(d.venta)).join(' ')+` L${X(items.length-1)} ${Y(min)} Z`;
   let pts='',lbl='',vlbl='';
   items.forEach((d,i)=>{const x=X(i),y=Y(d.venta);
-    pts+=`<circle cx="${x}" cy="${y}" r="${i===items.length-1?4:2.5}" fill="var(--accent)"/>`;
+    const crit=critFn&&critFn(d);
+    const col=crit?'var(--bad)':'var(--accent)';
+    pts+=`<circle cx="${x}" cy="${y}" r="${crit?5:(i===items.length-1?4:2.5)}" fill="${col}"/>`;
     const voff=13+(i%2)*13;
-    vlbl+=`<text x="${x}" y="${Math.max(11,y-voff)}" class="barlabel" text-anchor="middle" style="font-weight:700;fill:var(--accent)">${pesoC(d.venta)}</text>`;
+    vlbl+=`<text x="${x}" y="${Math.max(11,y-voff)}" class="barlabel" text-anchor="middle" style="font-weight:700;fill:${col}">${pesoC(d.venta)}</text>`;
     lbl+=`<text x="${x}" y="${h-12}" class="barlabel" text-anchor="middle">${fdate(d.fecha)}</text>`;});
   return `<svg viewBox="0 0 ${w} ${h}" class="chart" role="img">
     <defs><linearGradient id="ag" x1="0" x2="0" y1="0" y2="1">
@@ -3931,7 +3933,7 @@ function renderFicha(){
         let desde=dSel.value, hasta=hSel.value; if(desde>hasta){ [desde,hasta]=[hasta,desde]; }
         const items=serie.filter(d=>d.fecha>=desde&&d.fecha<=hasta);
         let vh='';
-        if(items.length>=2) vh+=areaChart(items,{});
+        if(items.length>=2) vh+=areaChart(items,{critFn:d=>d.venta<20000});
         else vh+='<p style="color:var(--muted)">Elegí un rango de al menos 2 días para ver el gráfico.</p>';
         vh+='<div class="twrap"><table><thead><tr><th>Fecha</th><th>Venta $</th><th>CCC</th><th>% Efectividad</th><th>Marcas</th></tr></thead><tbody>';
         let tv=0; items.forEach(d=>{ tv+=d.venta; const critico=d.venta<20000; vh+=`<tr><td class="name">${fdate(d.fecha)}/${d.fecha.slice(0,4)}</td><td class="num"${critico?' style="color:var(--bad);font-weight:700"':''}>${peso(d.venta)}</td><td class="num">${AR.format(d.ccc)}</td><td class="num">${d.efectividad!=null?pct(d.efectividad):'—'}</td><td class="num">${d.marcas!=null?AR.format(d.marcas):'—'}</td></tr>`; });
