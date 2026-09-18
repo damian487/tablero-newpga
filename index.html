@@ -1962,25 +1962,20 @@ function renderPFP(){
   });
   soH+='</tbody></table></div>'; soCard.innerHTML+=soH; p.appendChild(soCard);
 
-  /* ---- Canales: 1% ponderado por sub-canal ---- */
+  /* ---- Canales: 1% ponderado por sub-canal — un panel, dos ventanas (Mensual / Acumulado) ---- */
+  function canalPremioPill(c){
+    if(c.alcanzado) return `<span class="pill ok">✓ ${Math.round(c.peso*100)}% del premio · ${peso(c.premio)}</span>`;
+    return `<span class="pill bad">Sin premio (no llegó al objetivo)</span>`;
+  }
   const caCard=el('div','card');
-  caCard.appendChild(el('div','ctitle','<h2>Canales — 1% del Sell In total</h2><span class="hint">CCC acumulado del trimestre (cliente único, no mensual) · Autoservicios pondera 30%, Almacenes 70%, Kioscos 0% (por ahora) · cada canal cobra su alcance en forma independiente</span>'));
-  const csg=el('div','supgrid');
-  F.canales.forEach(c=>{
-    const bc=barColorFor(c.pctAlcance);
-    const cc=el('div','supcard');
-    cc.innerHTML=`<h3>${c.canal}</h3><div class="who">pondera ${Math.round(c.peso*100)}% del 1%</div>
-      <div class="big num">${AR.format(c.real)}</div>
-      <div class="row"><span class="l">Objetivo trimestral</span><span class="v">${AR.format(c.objetivo)} clientes</span></div>
-      <div class="cov" style="margin-top:8px;justify-content:flex-start"><span class="track" style="width:100%"><span class="fill" style="width:${Math.min(100,c.pctAlcance)}%;background:${bc}"></span></span><span class="pct num">${c.pctAlcance}%</span></div>
-      <div style="margin-top:8px">${canalPill(c.alcanzado)}</div>`;
-    csg.appendChild(cc);
-  });
-  caCard.appendChild(csg);
+  caCard.appendChild(el('div','ctitle','<h2>Canales — 1% del Sell In total</h2><span class="hint">Autoservicios pondera 30%, Almacenes 70%, Kioscos 0% (por ahora) · cada canal cobra su alcance en forma independiente, igual criterio que Sell Out</span>'));
+  const caWin=el('div','grid g2');
 
-  // ---- detalle tipo Talamus: CCC Mensuales + CCC Acumulado, mismo nivel que muestra P&G ----
   const mesLbl=m=>{ const [y,mm]=m.split('-'); return y+'M'+mm; };
   const meses=F.mesesTrimestre||[];
+  const mensWin=el('div','supcard');
+  mensWin.appendChild(el('h3',null,'CCC Mensuales'));
+  mensWin.appendChild(el('div','who','clientes con compra por mes en cada canal foco — NO acumulado, un cliente cuenta en cada mes que compró'));
   let mensH='<div class="twrap"><table><thead><tr><th>Sub canal</th>'+meses.map(m=>`<th class="num">${mesLbl(m)}</th>`).join('')+'</tr></thead><tbody>';
   const totMes={}; meses.forEach(m=>totMes[m]=0);
   F.canales.forEach(c=>{
@@ -1988,30 +1983,36 @@ function renderPFP(){
   });
   mensH+='<tr class="total"><td>Total</td>'+meses.map(m=>`<td class="num">${AR.format(totMes[m])}</td>`).join('')+'</tr>';
   mensH+='</tbody></table></div>';
-  const mensCard=el('div','card');
-  mensCard.appendChild(el('div','ctitle','<h2>CCC Mensuales</h2><span class="hint">clientes con compra por mes en cada canal foco — NO acumulado, un cliente cuenta en cada mes que compró</span>'));
-  mensCard.innerHTML+=mensH; p.appendChild(mensCard);
+  mensWin.innerHTML+=mensH;
+  caWin.appendChild(mensWin);
 
-  let acumH='<div class="twrap"><table><thead><tr><th>Sub canal</th><th class="num"># PXM</th><th class="num">Objetivo trimestral</th><th class="num">% Alcance acumulado</th><th class="num">Falta CCC</th></tr></thead><tbody>';
-  let tR=0,tO=0;
+  const acumWin=el('div','supcard');
+  acumWin.appendChild(el('h3',null,'CCC Acumulado'));
+  acumWin.appendChild(el('div','who','# PXM = clientes con compra (cliente único) acumulados del trimestre en ese canal · "Falta CCC" negativo = ya superó el objetivo'));
+  let acumH='<div class="twrap"><table><thead><tr><th>Sub canal</th><th class="num"># PXM</th><th class="num">Objetivo</th><th>Avance</th><th class="num">Falta CCC</th><th>Premio</th></tr></thead><tbody>';
+  let tR=0,tO=0,tPremio=0;
   F.canales.forEach(c=>{
-    tR+=c.real; tO+=c.objetivo;
-    acumH+=`<tr><td class="name">${c.canal}</td><td class="num">${AR.format(c.real)}</td><td class="num">${AR.format(c.objetivo)}</td><td class="num">${c.pctAlcance}%</td><td class="num">${AR.format(c.faltanClientes)}</td></tr>`;
+    tR+=c.real; tO+=c.objetivo; tPremio+=c.premio;
+    const bc=barColorFor(c.pctAlcance);
+    acumH+=`<tr><td class="name">${c.canal}</td><td class="num">${AR.format(c.real)}</td><td class="num">${AR.format(c.objetivo)}</td>
+      <td><div class="cov"><span class="pct num">${c.pctAlcance}%</span><span class="track"><span class="fill" style="width:${Math.min(100,c.pctAlcance)}%;background:${bc}"></span></span></div></td>
+      <td class="num">${AR.format(c.faltanClientes)}</td><td>${canalPremioPill(c)}</td></tr>`;
   });
   const tPct=tO>0?Math.round(1000*tR/tO)/10:0;
-  acumH+=`<tr class="total"><td>Total</td><td class="num">${AR.format(tR)}</td><td class="num">${AR.format(tO)}</td><td class="num">${tPct}%</td><td class="num">${AR.format(tO-tR)}</td></tr>`;
+  acumH+=`<tr class="total"><td>Total</td><td class="num">${AR.format(tR)}</td><td class="num">${AR.format(tO)}</td><td class="num">${tPct}%</td><td class="num">${AR.format(tO-tR)}</td><td class="num">${peso(tPremio)}</td></tr>`;
   acumH+='</tbody></table></div>';
-  const acumCard=el('div','card');
-  acumCard.appendChild(el('div','ctitle','<h2>CCC Acumulado</h2><span class="hint"># PXM = clientes con compra (cliente único) acumulados del trimestre en ese canal · "Falta CCC" negativo = ya superó el objetivo</span>'));
-  acumCard.innerHTML+=acumH;
+  acumWin.innerHTML+=acumH;
   const ganados=F.canales.filter(c=>c.alcanzado), noGanados=F.canales.filter(c=>!c.alcanzado);
   const pesoTxt=c=>`${c.canal} (representa el ${Math.round(c.peso*100)}%)`;
   let narr='';
   if(ganados.length) narr+=`Llegaron al objetivo del trimestre en ${ganados.map(pesoTxt).join(' y ')}. `;
   if(noGanados.length) narr+=`Todavía no en ${noGanados.map(pesoTxt).join(' y ')}. `;
   narr+=`Esto significa que se llevan el ${Math.round(F.canalesFraccionGanada*100)}% del 1% del Sell In (${peso(F.canalesPremio)}) por los objetivos cumplidos.`;
-  acumCard.appendChild(el('div','note',narr));
-  p.appendChild(acumCard);
+  acumWin.appendChild(el('div','note',narr));
+  caWin.appendChild(acumWin);
+
+  caCard.appendChild(caWin);
+  p.appendChild(caCard);
 
   /* ---- Surtido: 1% por niveles de categorias alcanzadas ---- */
   const suCard=el('div','card');
