@@ -2014,17 +2014,43 @@ function renderPFP(){
   caCard.appendChild(caWin);
   p.appendChild(caCard);
 
-  /* ---- Surtido: 1% por niveles de categorias alcanzadas ---- */
+  /* ---- Surtido: 1% por niveles de categorias alcanzadas — un panel, dos ventanas ---- */
+  function surtidoPill(c){
+    return c.alcanzado?'<span class="pill ok">✓ Cuenta para el escalón</span>':'<span class="pill bad">Todavía no</span>';
+  }
   const suCard=el('div','card');
   suCard.appendChild(el('div','ctitle','<h2>Surtido — 1% del Sell In total</h2><span class="hint">CCC acumulado del trimestre por categoría, en canales foco · 4 de 8 categorías = 50% · 6 de 8 = 75% · 7 u 8 = 100%</span>'));
-  let suH='<div class="twrap"><table><thead><tr><th>Categoría</th><th class="num">Objetivo CCC</th><th class="num">Real CCC</th><th>Avance</th></tr></thead><tbody>';
+  const suWin=el('div','grid g2');
+
+  const suMesWin=el('div','supcard');
+  suMesWin.appendChild(el('h3',null,'CCC Mensuales'));
+  suMesWin.appendChild(el('div','who','clientes con compra por mes en cada categoría, en canales foco — NO acumulado'));
+  let suMesH='<div class="twrap"><table><thead><tr><th>Categoría</th>'+meses.map(m=>`<th class="num">${mesLbl(m)}</th>`).join('')+'</tr></thead><tbody>';
+  const suTotMes={}; meses.forEach(m=>suTotMes[m]=0);
+  F.surtido.slice().sort((a,b)=>b.pctAlcance-a.pctAlcance).forEach(c=>{
+    suMesH+=`<tr><td class="name">${c.categoria}</td>`+(c.porMes||[]).map(pm=>{ suTotMes[pm.mes]+=pm.ccc; return `<td class="num">${AR.format(pm.ccc)}</td>`; }).join('')+'</tr>';
+  });
+  suMesH+='<tr class="total"><td>Total</td>'+meses.map(m=>`<td class="num">${AR.format(suTotMes[m])}</td>`).join('')+'</tr>';
+  suMesH+='</tbody></table></div>';
+  suMesWin.innerHTML+=suMesH;
+  suWin.appendChild(suMesWin);
+
+  const suAcumWin=el('div','supcard');
+  suAcumWin.appendChild(el('h3',null,'CCC Acumulado'));
+  suAcumWin.appendChild(el('div','who','clientes con compra (cliente único) acumulados del trimestre por categoría'));
+  let suAcumH='<div class="twrap"><table><thead><tr><th>Categoría</th><th class="num">Objetivo CCC</th><th class="num">Real CCC</th><th>Avance</th><th>Escalón</th></tr></thead><tbody>';
   F.surtido.slice().sort((a,b)=>b.pctAlcance-a.pctAlcance).forEach(c=>{
     const bc=barColorFor(c.pctAlcance);
-    suH+=`<tr><td class="name">${c.categoria}</td><td class="num">${AR.format(c.objetivo)}</td><td class="num">${AR.format(c.real)}</td>
-      <td><div class="cov"><span class="pct num">${c.pctAlcance}%</span><span class="track"><span class="fill" style="width:${Math.min(100,c.pctAlcance)}%;background:${bc}"></span></span></div></td></tr>`;
+    suAcumH+=`<tr><td class="name">${c.categoria}</td><td class="num">${AR.format(c.objetivo)}</td><td class="num">${AR.format(c.real)}</td>
+      <td><div class="cov"><span class="pct num">${c.pctAlcance}%</span><span class="track"><span class="fill" style="width:${Math.min(100,c.pctAlcance)}%;background:${bc}"></span></span></div></td>
+      <td>${surtidoPill(c)}</td></tr>`;
   });
-  suH+='</tbody></table></div>'; suCard.innerHTML+=suH;
-  suCard.appendChild(el('div','note',`${F.surtidoCategoriasAlcanzadas} de 8 categorías alcanzadas → ${Math.round(F.surtidoTier*100)}% del premio → ${peso(F.surtidoPremio)}`));
+  suAcumH+='</tbody></table></div>';
+  suAcumWin.innerHTML+=suAcumH;
+  suAcumWin.appendChild(el('div','note',`<span class="pill ok">${F.surtidoCategoriasAlcanzadas} de 8 categorías alcanzadas → ${Math.round(F.surtidoTier*100)}% del premio · ${peso(F.surtidoPremio)}</span>`));
+  suWin.appendChild(suAcumWin);
+
+  suCard.appendChild(suWin);
   p.appendChild(suCard);
 }
 
