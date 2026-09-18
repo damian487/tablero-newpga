@@ -3768,10 +3768,10 @@ function renderFicha(){
       if(sups.length) maAgg={universo:sups.reduce((a,s)=>a+s.universo,0),metaCCC:sups.reduce((a,s)=>a+s.metaCCC,0),cccActual:sups.reduce((a,s)=>a+s.cccActual,0),faltan:sups.reduce((a,s)=>a+s.faltan,0),ritmoDia:null,metaPct:null,prioridad:null};
     }
 
-    h+='<div class="card"><div class="ctitle"><h2>Objetivos</h2><span class="hint">avance en cada meta vigente</span></div><div class="supgrid">';
+    let objetivosHtml='<div class="card"><div class="ctitle"><h2>Objetivos</h2><span class="hint">avance en cada meta vigente</span></div><div class="supgrid">';
     if(msuAgg){
       const pctBar=Math.min(100,msuAgg.pctAvance);
-      h+=`<div class="supcard"><h3>Sell-out (Objetivo 1 · Concurso Nubi)</h3><div class="who">meta trimestral${msuAgg.grupo?' · grupo '+msuAgg.grupo:''}</div>
+      objetivosHtml+=`<div class="supcard"><h3>Sell-out (Objetivo 1 · Concurso Nubi)</h3><div class="who">meta trimestral${msuAgg.grupo?' · grupo '+msuAgg.grupo:''}</div>
         <div class="big num">${peso(msuAgg.importe)}</div>
         <div class="row"><span class="l">Meta</span><span class="v">${peso(msuAgg.meta)}</span></div>
         <div class="cov" style="margin-top:8px;justify-content:flex-start"><span class="track" style="width:100%"><span class="fill" style="width:${pctBar}%;background:${avanceColor(msuAgg.pctAvance)}"></span></span><span class="pct num">${msuAgg.pctAvance}%</span></div>
@@ -3781,7 +3781,7 @@ function renderFicha(){
     }
     if(conAgg){
       const avPct=conAgg.meta>0?Math.round(100*conAgg.ccc/conAgg.meta):0;
-      h+=`<div class="supcard"><h3>Cobertura (Objetivo 2 · Concurso Nubi)</h3><div class="who">clientes únicos del trimestre, 10 marcas</div>
+      objetivosHtml+=`<div class="supcard"><h3>Cobertura (Objetivo 2 · Concurso Nubi)</h3><div class="who">clientes únicos del trimestre, 10 marcas</div>
         <div class="big num">${AR.format(conAgg.ccc)} / ${AR.format(conAgg.meta)}</div>
         <div class="cov" style="margin-top:8px;justify-content:flex-start"><span class="track" style="width:100%"><span class="fill" style="width:${Math.min(100,avPct)}%;background:${avanceColor(avPct)}"></span></span><span class="pct num">${avPct}%</span></div>
         <div class="row" style="margin-top:6px"><span class="l">Faltan</span><span class="v">${AR.format(conAgg.faltan)}</span></div>
@@ -3790,15 +3790,15 @@ function renderFicha(){
     }
     if(maAgg){
       const cobActual=maAgg.universo>0?Math.round(1000*maAgg.cccActual/maAgg.universo)/10:0;
-      h+=`<div class="supcard"><h3>Meta de Cobertura del mes</h3><div class="who">${maAgg.metaPct?'objetivo '+maAgg.metaPct+'% · ':''}independiente del Concurso Nubi</div>
+      objetivosHtml+=`<div class="supcard"><h3>Meta de Cobertura del mes</h3><div class="who">${maAgg.metaPct?'objetivo '+maAgg.metaPct+'% · ':''}independiente del Concurso Nubi</div>
         <div class="big num">${AR.format(maAgg.cccActual)} / ${AR.format(maAgg.metaCCC)}</div>
         <div class="row"><span class="l">Cobertura actual</span><span class="v">${pct(cobActual)}</span></div>
         <div class="row"><span class="l">Faltan</span><span class="v">${AR.format(maAgg.faltan)}</span></div>
         ${maAgg.ritmoDia!=null?`<div class="row"><span class="l">Ritmo/día</span><span class="v">${AR.format(maAgg.ritmoDia)}</span></div>`:''}
         ${maAgg.prioridad?`<div style="margin-top:8px">${prioridadPill(maAgg.prioridad)}</div>`:''}</div>`;
     }
-    if(!msuAgg&&!conAgg&&!maAgg) h+='<p style="color:var(--muted)">Sin objetivos vigentes.</p>';
-    h+='</div></div>';
+    if(!msuAgg&&!conAgg&&!maAgg) objetivosHtml+='<p style="color:var(--muted)">Sin objetivos vigentes.</p>';
+    objetivosHtml+='</div></div>';
 
     /* 4) Uso de herramientas */
     h+='<div class="card"><div class="ctitle"><h2>Uso de herramientas</h2><span class="hint">Acción de precio y Combos — acumulado del mes en curso</span></div>';
@@ -3912,6 +3912,9 @@ function renderFicha(){
       const sinCompra=Math.max(0,universo-ccc);
       h+=`<div class="note">No compraron este mes: <b>${AR.format(sinCompra)}</b> de ${AR.format(universo)} clientes del universo — detalle día a día en la pestaña "Ruta / No compradores".</div></div>`;
     }
+
+    /* Objetivos se muestra al final del todo, como último panel (pedido de Damián) */
+    h+=objetivosHtml;
 
     box.innerHTML=h;
 
