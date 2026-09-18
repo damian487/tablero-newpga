@@ -404,6 +404,7 @@ td.name{font-weight:600}
   <section class="panel" id="p-matinal" role="tabpanel"></section>
   <section class="panel" id="p-relevamiento" role="tabpanel"></section>
   <section class="panel" id="p-mapa" role="tabpanel"></section>
+  <section class="panel" id="p-rutareal" role="tabpanel"></section>
   <section class="panel" id="p-plansup" role="tabpanel"></section>
 </main>
 
@@ -611,6 +612,7 @@ const TAB_GROUPS=[
     {id:'p-performance',label:'📊 Informe Performance'},
     {id:'p-ruta',label:'Ruta / No compradores'},
     {id:'p-efec',label:'Efectividad de ruta'},
+    {id:'p-rutareal',label:'🛰️ Ruta real (GPS)'},
     {id:'p-dev',label:'Rechazos'} ],
   [ {id:'p-canales',label:'Canales'},
     {id:'p-marcas',label:'Marcas & familias'},
@@ -652,7 +654,8 @@ TAB_GROUPS.forEach(group=>{
       if(t.id!=='p-pfp') pfpBloquear();
       if(t.id==='p-pfp' && typeof renderPFP==='function') renderPFP();
       if(t.id==='p-mapa' && typeof mapaActivar==='function'){ const fn=mapaActivar; mapaActivar=null; fn(); }
-      if(t.id==='p-relevamiento' && typeof renderRelevamiento==='function'){ renderRelevamiento(false); }};
+      if(t.id==='p-relevamiento' && typeof renderRelevamiento==='function'){ renderRelevamiento(false); }
+      if(t.id==='p-rutareal' && typeof renderRutaReal==='function'){ renderRutaReal(); }};
     g.appendChild(b);
   });
   tabsEl.appendChild(g);
@@ -4482,6 +4485,84 @@ function renderMapa(){
     ()=>{ mapWrap.innerHTML='<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--bad);font-size:13px;text-align:center;padding:20px">No se pudo cargar el mapa de calles.<br>Verificá la conexión a internet e intentá de nuevo.</div>'; }
   );
   }; // fin mapaActivar
+}
+
+/* ---------- PANEL: Ruta real (GPS) - Axum, carga bajo demanda (18/9, pedido de Damian a partir
+   de un video de referencia con la funcion "Mapa Ordenados" de Axum). Reusa loadLeaflet() de
+   arriba (mismo Leaflet ya cargado para "Mapa de clientes"). Verde = visitó y compró ese día
+   (cruzado contra cliente_index en el Worker), naranja = visitó pero no compró. ---------- */
+const RUTA_REAL_ENDPOINT='https://tablero-newpga-worker.damian-8ad.workers.dev/api/ruta-real';
+let rutaRealMap=null;
+function renderRutaReal(){
+  const p=document.getElementById('p-rutareal');
+  if(p.dataset.built){ return; }
+  p.dataset.built='1';
+  const vends=[...DATA.porVendedor].sort((a,b)=>a.nombre.localeCompare(b.nombre));
+
+  const head=el('div','card');
+  head.appendChild(el('div','ctitle','<h2>🛰️ Ruta real (GPS)</h2><span class="hint">recorrido físico real del vendedor ese día, según Axum GPS · verde = visitó y compró ese día · naranja = visitó pero no compró · requiere conexión a internet</span>'));
+  const bar=el('div',null,''); bar.style.cssText='display:flex;gap:10px;flex-wrap:wrap;align-items:center';
+  const sel=document.createElement('select'); sel.className='fsel';
+  vends.forEach(v=>{ const o=document.createElement('option'); o.value=v.cod; o.textContent=v.nombre+' ('+v.supervisor.split(' ')[0]+')'; sel.appendChild(o); });
+  const fechaInput=document.createElement('input'); fechaInput.type='date'; fechaInput.className='fsel'; fechaInput.value=hoyLocalStr();
+  const btn=document.createElement('button'); btn.className='tab'; btn.textContent='Ver ruta';
+  bar.appendChild(sel); bar.appendChild(fechaInput); bar.appendChild(btn);
+  head.appendChild(bar);
+  const kpiBox=el('div',null,''); kpiBox.style.marginTop='12px';
+  const mapWrap=document.createElement('div'); mapWrap.id='rutaRealMapBox';
+  mapWrap.style.cssText='height:540px;border-radius:10px;overflow:hidden;border:1px solid var(--border);position:relative;background:var(--surface2);margin-top:12px';
+  mapWrap.innerHTML='<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;text-align:center;padding:20px">Elegí un vendedor y una fecha, después tocá "Ver ruta".</div>';
+  const errBox=el('div','note',''); errBox.style.display='none';
+  head.appendChild(kpiBox); head.appendChild(mapWrap); head.appendChild(errBox);
+  p.appendChild(head);
+
+  async function cargar(){
+    mapWrap.innerHTML='<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px">Cargando ruta desde Axum GPS…</div>';
+    errBox.style.display='none'; kpiBox.innerHTML='';
+    let pw=''; try{ pw=sessionStorage.getItem('gpw')||''; }catch(_){ }
+    let json;
+    try{
+      const res=await fetch(RUTA_REAL_ENDPOINT+'?vendedor='+encodeURIComponent(sel.value)+'&fecha='+fechaInput.value,{headers:{'X-Dashboard-Password':pw}});
+      json=await res.json();
+      if(!json.ok) throw new Error(json.error||'error del servidor');
+    }catch(e){
+      mapWrap.innerHTML='';
+      errBox.style.display='';
+      errBox.textContent='No se pudo cargar la ruta ('+e.message+').';
+      return;
+    }
+    if(!json.puntos||!json.puntos.length){
+      mapWrap.innerHTML='<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;text-align:center;padding:20px">Sin visitas registradas en GPS para '+json.vendedorNombre+' ese día.</div>';
+      return;
+    }
+    const k=json.kpis;
+    const horaFmt=s=>s?s.slice(11,16):'—';
+    kpiBox.innerHTML=`<div class="kpitiles" style="grid-template-columns:repeat(6,1fr)">
+      ${ftile('Comercios',AR.format(k.comercios))}
+      ${ftile('Líneas',AR.format(k.lineas))}
+      ${ftile('Desde',horaFmt(k.desde))}
+      ${ftile('Hasta',horaFmt(k.hasta))}
+      ${ftile('En la calle',k.tiempoEnCalleMin!=null?Math.floor(k.tiempoEnCalleMin/60)+'h'+String(k.tiempoEnCalleMin%60).padStart(2,'0'):'—')}
+      ${ftile('Km aprox',k.kmAprox!=null?k.kmAprox+' km':'—')}
+    </div>`;
+    loadLeaflet(()=>{
+      mapWrap.innerHTML='';
+      if(rutaRealMap){ rutaRealMap.remove(); rutaRealMap=null; }
+      rutaRealMap=L.map(mapWrap).setView([json.puntos[0].lat,json.puntos[0].lng],13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(rutaRealMap);
+      const latlngs=json.puntos.map(pt=>[pt.lat,pt.lng]);
+      L.polyline(latlngs,{color:'#607d8b',weight:2,dashArray:'4,4'}).addTo(rutaRealMap);
+      json.puntos.forEach(pt=>{
+        const color=pt.conVenta?'#2e7d32':'#e08a00';
+        const icon=L.divIcon({className:'ruta-real-marker',html:`<div style="background:${color};color:#fff;border:2px solid #fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;box-shadow:0 1px 3px rgba(0,0,0,.4)">${pt.orden}</div>`,iconSize:[26,26],iconAnchor:[13,13]});
+        const m=L.marker([pt.lat,pt.lng],{icon});
+        m.bindPopup(`<b>#${pt.orden} · ${pt.clienteId} - ${pt.razonSocial}</b><br>${pt.start?pt.start.slice(11,16):''}–${pt.end?pt.end.slice(11,16):''} (${pt.duracionMin} min)<br>${pt.conVenta?('✅ Compró: '+peso(pt.ventaNeta)+' · '+pt.lineas+' líneas'):'⚠️ No compró ese día'}`);
+        m.addTo(rutaRealMap);
+      });
+      rutaRealMap.fitBounds(L.latLngBounds(latlngs),{padding:[30,30],maxZoom:16});
+    },()=>{ mapWrap.innerHTML='<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--bad);font-size:13px;text-align:center;padding:20px">No se pudo cargar el mapa de calles.<br>Verificá la conexión a internet e intentá de nuevo.</div>'; });
+  }
+  btn.onclick=cargar;
 }
 
 function miDiaDonut(pctVal,color,size,stroke){
