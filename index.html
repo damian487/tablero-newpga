@@ -4492,6 +4492,7 @@ function renderMapa(){
    arriba (mismo Leaflet ya cargado para "Mapa de clientes"). Verde = visitó y compró ese día
    (cruzado contra cliente_index en el Worker), naranja = visitó pero no compró. ---------- */
 const RUTA_REAL_ENDPOINT='https://tablero-newpga-worker.damian-8ad.workers.dev/api/ruta-real';
+const RUTA_REAL_EQUIPO_ENDPOINT='https://tablero-newpga-worker.damian-8ad.workers.dev/api/ruta-real-equipo';
 let rutaRealMap=null;
 function renderRutaReal(){
   const p=document.getElementById('p-rutareal');
@@ -4499,8 +4500,61 @@ function renderRutaReal(){
   p.dataset.built='1';
   const vends=[...DATA.porVendedor].sort((a,b)=>a.nombre.localeCompare(b.nombre));
 
+  /* ---- Disciplina de ruta: vista de equipo para un día (pedido de Damian 18/9, a partir de un
+     reporte de referencia "Tienda Perfecta" de otro proyecto suyo) ---- */
+  const eqCard=el('div','card');
+  eqCard.appendChild(el('div','ctitle','<h2>Disciplina de ruta</h2><span class="hint">todo el equipo, un día · PASÓ = el GPS detectó una parada cerca del cliente · ENTRÓ = paró 3 minutos o más (DE LARGO = menos de 3) · %CIERRE = de los que ENTRARON, cuántos terminaron en pedido ese día</span>'));
+  const eqBar=el('div',null,''); eqBar.style.cssText='display:flex;gap:10px;flex-wrap:wrap;align-items:center';
+  const eqFecha=document.createElement('input'); eqFecha.type='date'; eqFecha.className='fsel'; eqFecha.value=hoyLocalStr();
+  const eqBtn=document.createElement('button'); eqBtn.className='tab'; eqBtn.textContent='Ver equipo';
+  eqBar.appendChild(eqFecha); eqBar.appendChild(eqBtn);
+  eqCard.appendChild(eqBar);
+  const eqBox=document.createElement('div'); eqBox.style.marginTop='12px';
+  eqBox.innerHTML='<p style="color:var(--muted)">Elegí una fecha y tocá "Ver equipo".</p>';
+  eqCard.appendChild(eqBox);
+  p.appendChild(eqCard);
+
+  async function cargarEquipo(){
+    eqBox.innerHTML='<p style="color:var(--muted)">Cargando…</p>';
+    let pw=''; try{ pw=sessionStorage.getItem('gpw')||''; }catch(_){ }
+    let json;
+    try{
+      const res=await fetch(RUTA_REAL_EQUIPO_ENDPOINT+'?fecha='+eqFecha.value,{headers:{'X-Dashboard-Password':pw}});
+      json=await res.json();
+      if(!json.ok) throw new Error(json.error||'error del servidor');
+    }catch(e){ eqBox.innerHTML='<p style="color:var(--bad)">No se pudo cargar ('+e.message+').</p>'; return; }
+    const k=json.kpis;
+    const horaFmt=s=>s?s.slice(11,16):'—';
+    const pctEntroTot=k.pdvPasados>0?Math.round(1000*k.entro/k.pdvPasados)/10:null;
+    let h=`<div class="kpitiles" style="grid-template-columns:repeat(4,1fr)">
+      ${ftile('PDV pasados',AR.format(k.pdvPasados))}
+      ${ftile('Entró',AR.format(k.entro)+' ('+pct(pctEntroTot)+')')}
+      ${ftile('De largo',AR.format(k.deLargo)+' ('+pct(k.pctDeLargo)+')')}
+      ${ftile('Con pedido / % cierre',AR.format(k.conPedido)+' / '+pct(k.pctCierre))}
+    </div>
+    <div class="kpitiles" style="grid-template-columns:repeat(2,1fr);margin-top:10px">
+      ${ftile('Venta de calle',peso(k.ventaCalle))}
+      ${ftile('Venta total del día (todos los canales)',peso(k.ventaB2B))}
+    </div>`;
+    h+='<div class="twrap" style="margin-top:14px"><table class="tbl-compact"><thead><tr><th>Vendedor</th><th>Equipo</th><th class="num">Cartera</th><th class="num">Pasó</th><th class="num">Entró</th><th class="num">De largo</th><th class="num">%Entró</th><th class="num">C/Pedido</th><th class="num">%Cierre</th><th class="num">Sin visita</th><th class="num">Min/PDV</th><th>Arranque</th><th>Cierre</th><th class="num">Hs</th><th class="num">Venta calle</th></tr></thead><tbody>';
+    json.porVendedor.slice().sort((a,b)=>b.ventaCalle-a.ventaCalle).forEach(v=>{
+      h+=`<tr><td class="name">${v.nombre}</td><td style="color:var(--muted)">${v.supervisor.split(' ')[0]}</td>
+        <td class="num">${AR.format(v.cartera)}</td><td class="num">${AR.format(v.paso)}</td><td class="num">${AR.format(v.entro)}</td><td class="num">${AR.format(v.deLargo)}</td>
+        <td class="num">${pct(v.pctEntro)}</td><td class="num">${AR.format(v.conPedido)}</td><td class="num">${pct(v.pctCierre)}</td>
+        <td class="num">${AR.format(v.sinVisita)}</td><td class="num">${v.minPorPdv!=null?v.minPorPdv:'—'}</td>
+        <td class="num">${horaFmt(v.arranque)}</td><td class="num">${horaFmt(v.cierre)}</td><td class="num">${v.hs!=null?v.hs:'—'}</td><td class="num">${peso(v.ventaCalle)}</td></tr>`;
+    });
+    h+=`<tr class="grandtotal"><td colspan="3">TOTAL</td><td class="num">${AR.format(k.pdvPasados)}</td><td class="num">${AR.format(k.entro)}</td><td class="num">${AR.format(k.deLargo)}</td><td class="num">${pct(pctEntroTot)}</td><td class="num">${AR.format(k.conPedido)}</td><td class="num">${pct(k.pctCierre)}</td><td class="num">—</td><td class="num">—</td><td>—</td><td>—</td><td class="num">—</td><td class="num">${peso(k.ventaCalle)}</td></tr>`;
+    h+='</tbody></table></div>';
+    if(json.noSalieron&&json.noSalieron.length){
+      h+='<div class="note" style="margin-top:10px"><b>No salieron ese día ('+json.noSalieron.length+'):</b> '+json.noSalieron.map(v=>v.nombre+(v.motivo==='sin_cache'?' (sin datos GPS todavía)':'')).join(', ')+'</div>';
+    }
+    eqBox.innerHTML=h;
+  }
+  eqBtn.onclick=cargarEquipo;
+
   const head=el('div','card');
-  head.appendChild(el('div','ctitle','<h2>🛰️ Ruta real (GPS)</h2><span class="hint">recorrido físico real del vendedor ese día, según Axum GPS · verde = visitó y compró ese día · naranja = visitó pero no compró · requiere conexión a internet</span>'));
+  head.appendChild(el('div','ctitle','<h2>Mapa por vendedor</h2><span class="hint">recorrido físico real de un vendedor puntual ese día, según Axum GPS · verde = visitó y compró ese día · naranja = visitó pero no compró · requiere conexión a internet</span>'));
   const bar=el('div',null,''); bar.style.cssText='display:flex;gap:10px;flex-wrap:wrap;align-items:center';
   const sel=document.createElement('select'); sel.className='fsel';
   vends.forEach(v=>{ const o=document.createElement('option'); o.value=v.cod; o.textContent=v.nombre+' ('+v.supervisor.split(' ')[0]+')'; sel.appendChild(o); });
