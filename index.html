@@ -3934,7 +3934,7 @@ function renderFicha(){
         if(items.length>=2) vh+=areaChart(items,{});
         else vh+='<p style="color:var(--muted)">Elegí un rango de al menos 2 días para ver el gráfico.</p>';
         vh+='<div class="twrap"><table><thead><tr><th>Fecha</th><th>Venta $</th><th>CCC</th><th>% Efectividad</th><th>Marcas</th></tr></thead><tbody>';
-        let tv=0; items.forEach(d=>{ tv+=d.venta; vh+=`<tr><td class="name">${fdate(d.fecha)}/${d.fecha.slice(0,4)}</td><td class="num">${peso(d.venta)}</td><td class="num">${AR.format(d.ccc)}</td><td class="num">${d.efectividad!=null?pct(d.efectividad):'—'}</td><td class="num">${d.marcas!=null?AR.format(d.marcas):'—'}</td></tr>`; });
+        let tv=0; items.forEach(d=>{ tv+=d.venta; const critico=d.venta<20000; vh+=`<tr><td class="name">${fdate(d.fecha)}/${d.fecha.slice(0,4)}</td><td class="num"${critico?' style="color:var(--bad);font-weight:700"':''}>${peso(d.venta)}</td><td class="num">${AR.format(d.ccc)}</td><td class="num">${d.efectividad!=null?pct(d.efectividad):'—'}</td><td class="num">${d.marcas!=null?AR.format(d.marcas):'—'}</td></tr>`; });
         vh+=`<tr class="grandtotal"><td>TOTAL del rango</td><td class="num">${peso(tv)}</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>`;
         vh+='</tbody></table></div>';
         vBox.innerHTML=vh;
