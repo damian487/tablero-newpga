@@ -4613,7 +4613,7 @@ function renderRutaReal(){
         return L.divIcon({className:'',html:`<div style="width:22px;height:22px;background:${color};border:2px solid #fff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 1px 3px rgba(0,0,0,.5)"></div>`,iconSize:[22,22],iconAnchor:[11,22],popupAnchor:[0,-22]});
       }
       if(json.trazo&&json.trazo.length>1){
-        L.polyline(json.trazo.map(pt=>[pt.lat,pt.lng]),{color:'#3b82c4',weight:3,opacity:.35}).addTo(rutaRealMap);
+        L.polyline(json.trazo.map(pt=>[pt.lat,pt.lng]),{color:'#0d3d6b',weight:3.5,opacity:.75}).addTo(rutaRealMap);
         L.marker([json.trazo[0].lat,json.trazo[0].lng],{icon:pinIcon('#2e7d32')}).bindPopup('🏁 Inicio del recorrido · '+(json.kpis.desde?json.kpis.desde.slice(11,16):'')).addTo(rutaRealMap);
         const ultimo=json.trazo[json.trazo.length-1];
         L.marker([ultimo.lat,ultimo.lng],{icon:pinIcon('#c62828')}).bindPopup('🏁 Fin del recorrido · '+(json.kpis.hasta?json.kpis.hasta.slice(11,16):'')).addTo(rutaRealMap);
