@@ -4501,7 +4501,7 @@ function renderRutaReal(){
   const vends=[...DATA.porVendedor].sort((a,b)=>a.nombre.localeCompare(b.nombre));
 
   const head=el('div','card');
-  head.appendChild(el('div','ctitle','<h2>Mapa por vendedor</h2><span class="hint">recorrido físico real de un vendedor puntual ese día, según Axum GPS · el número conecta solo las paradas reales (≥3 min): verde = compró, naranja = no compró · los puntitos grises son "de largo" (pasó cerca, no paró) · requiere conexión a internet</span>'));
+  head.appendChild(el('div','ctitle','<h2>Mapa por vendedor</h2><span class="hint">recorrido físico real de un vendedor puntual ese día, según Axum GPS · la línea celeste tenue es el trayecto real por las calles, con bandera verde de inicio y roja de cierre · el número conecta solo las paradas reales (≥3 min): verde = compró, naranja = no compró · los puntitos grises son "de largo" (pasó cerca, no paró) · requiere conexión a internet</span>'));
   const bar=el('div',null,''); bar.style.cssText='display:flex;gap:10px;flex-wrap:wrap;align-items:center';
   const sel=document.createElement('select'); sel.className='fsel';
   vends.forEach(v=>{ const o=document.createElement('option'); o.value=v.cod; o.textContent=v.nombre+' ('+v.supervisor.split(' ')[0]+')'; sel.appendChild(o); });
@@ -4593,7 +4593,7 @@ function renderRutaReal(){
     const k=json.kpis;
     const horaFmt=s=>s?s.slice(11,16):'—';
     kpiBox.innerHTML=`<div class="kpitiles" style="grid-template-columns:repeat(6,1fr)">
-      ${ftile('Comercios',AR.format(k.comercios))}
+      ${ftile('Clientes',AR.format(k.comercios))}
       ${ftile('Líneas',AR.format(k.lineas))}
       ${ftile('Desde',horaFmt(k.desde))}
       ${ftile('Hasta',horaFmt(k.hasta))}
@@ -4605,6 +4605,19 @@ function renderRutaReal(){
       if(rutaRealMap){ rutaRealMap.remove(); rutaRealMap=null; }
       rutaRealMap=L.map(mapWrap).setView([json.puntos[0].lat,json.puntos[0].lng],13);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(rutaRealMap);
+      // Recorrido GPS continuo real (pedido de Damian 18/9, a partir de la funcion "Trayectos" de
+      // Axum) - trazo tenue de fondo que sigue las calles reales, ya reducido por la PC (un punto
+      // cada ~35m de movimiento, ver actualizar_ruta_real.mjs) en vez de los ~15-20mil puntos crudos
+      // del dia. Se dibuja PRIMERO para quedar debajo de las paradas/banderas.
+      function pinIcon(color){
+        return L.divIcon({className:'',html:`<div style="width:22px;height:22px;background:${color};border:2px solid #fff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 1px 3px rgba(0,0,0,.5)"></div>`,iconSize:[22,22],iconAnchor:[11,22],popupAnchor:[0,-22]});
+      }
+      if(json.trazo&&json.trazo.length>1){
+        L.polyline(json.trazo.map(pt=>[pt.lat,pt.lng]),{color:'#3b82c4',weight:3,opacity:.35}).addTo(rutaRealMap);
+        L.marker([json.trazo[0].lat,json.trazo[0].lng],{icon:pinIcon('#2e7d32')}).bindPopup('🏁 Inicio del recorrido · '+(json.kpis.desde?json.kpis.desde.slice(11,16):'')).addTo(rutaRealMap);
+        const ultimo=json.trazo[json.trazo.length-1];
+        L.marker([ultimo.lat,ultimo.lng],{icon:pinIcon('#c62828')}).bindPopup('🏁 Fin del recorrido · '+(json.kpis.hasta?json.kpis.hasta.slice(11,16):'')).addTo(rutaRealMap);
+      }
       // El recorrido se veía enmarañado (muchas líneas cruzadas) porque conectaba TODOS los puntos,
       // incluidos los "de largo" (paradas <3 min, ~60% del total, ruido de proximidad GPS más que
       // visitas reales - pedido de Damian 18/9). Ahora la línea solo une los puntos donde el
@@ -4627,7 +4640,7 @@ function renderRutaReal(){
         m.bindPopup(`<b>#${i+1} · ${pt.clienteId} - ${pt.razonSocial}</b><br>${pt.start?pt.start.slice(11,16):''}–${pt.end?pt.end.slice(11,16):''} (${pt.duracionMin} min)<br>${pt.conVenta?('✅ Compró: '+peso(pt.ventaNeta)+' · '+pt.lineas+' líneas'):'⚠️ No compró ese día'}`);
         m.addTo(rutaRealMap);
       });
-      const latlngs=json.puntos.map(pt=>[pt.lat,pt.lng]);
+      const latlngs=json.puntos.map(pt=>[pt.lat,pt.lng]).concat((json.trazo||[]).map(pt=>[pt.lat,pt.lng]));
       rutaRealMap.fitBounds(L.latLngBounds(latlngs),{padding:[30,30],maxZoom:16});
     },()=>{ mapWrap.innerHTML='<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--bad);font-size:13px;text-align:center;padding:20px">No se pudo cargar el mapa de calles.<br>Verificá la conexión a internet e intentá de nuevo.</div>'; });
   }
