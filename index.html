@@ -4501,7 +4501,7 @@ function renderRutaReal(){
   const vends=[...DATA.porVendedor].sort((a,b)=>a.nombre.localeCompare(b.nombre));
 
   const head=el('div','card');
-  head.appendChild(el('div','ctitle','<h2>Mapa por vendedor</h2><span class="hint">recorrido físico real de un vendedor puntual ese día, según Axum GPS · verde = visitó y compró ese día · naranja = visitó pero no compró · requiere conexión a internet</span>'));
+  head.appendChild(el('div','ctitle','<h2>Mapa por vendedor</h2><span class="hint">recorrido físico real de un vendedor puntual ese día, según Axum GPS · el número conecta solo las paradas reales (≥3 min): verde = compró, naranja = no compró · los puntitos grises son "de largo" (pasó cerca, no paró) · requiere conexión a internet</span>'));
   const bar=el('div',null,''); bar.style.cssText='display:flex;gap:10px;flex-wrap:wrap;align-items:center';
   const sel=document.createElement('select'); sel.className='fsel';
   vends.forEach(v=>{ const o=document.createElement('option'); o.value=v.cod; o.textContent=v.nombre+' ('+v.supervisor.split(' ')[0]+')'; sel.appendChild(o); });
@@ -4605,15 +4605,29 @@ function renderRutaReal(){
       if(rutaRealMap){ rutaRealMap.remove(); rutaRealMap=null; }
       rutaRealMap=L.map(mapWrap).setView([json.puntos[0].lat,json.puntos[0].lng],13);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(rutaRealMap);
-      const latlngs=json.puntos.map(pt=>[pt.lat,pt.lng]);
-      L.polyline(latlngs,{color:'#607d8b',weight:2,dashArray:'4,4'}).addTo(rutaRealMap);
-      json.puntos.forEach(pt=>{
-        const color=pt.conVenta?'#2e7d32':'#e08a00';
-        const icon=L.divIcon({className:'ruta-real-marker',html:`<div style="background:${color};color:#fff;border:2px solid #fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;box-shadow:0 1px 3px rgba(0,0,0,.4)">${pt.orden}</div>`,iconSize:[26,26],iconAnchor:[13,13]});
-        const m=L.marker([pt.lat,pt.lng],{icon});
-        m.bindPopup(`<b>#${pt.orden} · ${pt.clienteId} - ${pt.razonSocial}</b><br>${pt.start?pt.start.slice(11,16):''}–${pt.end?pt.end.slice(11,16):''} (${pt.duracionMin} min)<br>${pt.conVenta?('✅ Compró: '+peso(pt.ventaNeta)+' · '+pt.lineas+' líneas'):'⚠️ No compró ese día'}`);
+      // El recorrido se veía enmarañado (muchas líneas cruzadas) porque conectaba TODOS los puntos,
+      // incluidos los "de largo" (paradas <3 min, ~60% del total, ruido de proximidad GPS más que
+      // visitas reales - pedido de Damian 18/9). Ahora la línea solo une los puntos donde el
+      // vendedor realmente ENTRÓ (≥3 min), en orden - eso es el recorrido real de la visita. Los "de
+      // largo" se muestran como puntitos chicos sueltos, sin numerar ni conectar, para no perder el
+      // dato pero sin ensuciar el trazado principal.
+      const UMBRAL_ENTRO_MIN=3;
+      const entrados=json.puntos.filter(pt=>pt.duracionMin>=UMBRAL_ENTRO_MIN);
+      const deLargo=json.puntos.filter(pt=>pt.duracionMin<UMBRAL_ENTRO_MIN);
+      if(entrados.length>1) L.polyline(entrados.map(pt=>[pt.lat,pt.lng]),{color:'#607d8b',weight:2.5,dashArray:'5,5'}).addTo(rutaRealMap);
+      deLargo.forEach(pt=>{
+        const m=L.circleMarker([pt.lat,pt.lng],{radius:4,color:'#fff',weight:1,fillColor:'#9aa5b1',fillOpacity:.8});
+        m.bindPopup(`<b>De largo · ${pt.clienteId} - ${pt.razonSocial}</b><br>${pt.start?pt.start.slice(11,16):''} (${pt.duracionMin} min) · pasó cerca pero no paró`);
         m.addTo(rutaRealMap);
       });
+      entrados.forEach((pt,i)=>{
+        const color=pt.conVenta?'#2e7d32':'#e08a00';
+        const icon=L.divIcon({className:'ruta-real-marker',html:`<div style="background:${color};color:#fff;border:2px solid #fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;box-shadow:0 1px 3px rgba(0,0,0,.4)">${i+1}</div>`,iconSize:[26,26],iconAnchor:[13,13]});
+        const m=L.marker([pt.lat,pt.lng],{icon});
+        m.bindPopup(`<b>#${i+1} · ${pt.clienteId} - ${pt.razonSocial}</b><br>${pt.start?pt.start.slice(11,16):''}–${pt.end?pt.end.slice(11,16):''} (${pt.duracionMin} min)<br>${pt.conVenta?('✅ Compró: '+peso(pt.ventaNeta)+' · '+pt.lineas+' líneas'):'⚠️ No compró ese día'}`);
+        m.addTo(rutaRealMap);
+      });
+      const latlngs=json.puntos.map(pt=>[pt.lat,pt.lng]);
       rutaRealMap.fitBounds(L.latLngBounds(latlngs),{padding:[30,30],maxZoom:16});
     },()=>{ mapWrap.innerHTML='<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--bad);font-size:13px;text-align:center;padding:20px">No se pudo cargar el mapa de calles.<br>Verificá la conexión a internet e intentá de nuevo.</div>'; });
   }
