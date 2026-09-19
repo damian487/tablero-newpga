@@ -4500,10 +4500,27 @@ function renderRutaReal(){
   p.dataset.built='1';
   const vends=[...DATA.porVendedor].sort((a,b)=>a.nombre.localeCompare(b.nombre));
 
+  const head=el('div','card');
+  head.appendChild(el('div','ctitle','<h2>Mapa por vendedor</h2><span class="hint">recorrido físico real de un vendedor puntual ese día, según Axum GPS · verde = visitó y compró ese día · naranja = visitó pero no compró · requiere conexión a internet</span>'));
+  const bar=el('div',null,''); bar.style.cssText='display:flex;gap:10px;flex-wrap:wrap;align-items:center';
+  const sel=document.createElement('select'); sel.className='fsel';
+  vends.forEach(v=>{ const o=document.createElement('option'); o.value=v.cod; o.textContent=v.nombre+' ('+v.supervisor.split(' ')[0]+')'; sel.appendChild(o); });
+  const fechaInput=document.createElement('input'); fechaInput.type='date'; fechaInput.className='fsel'; fechaInput.value=hoyLocalStr();
+  const btn=document.createElement('button'); btn.className='tab'; btn.textContent='Ver ruta';
+  bar.appendChild(sel); bar.appendChild(fechaInput); bar.appendChild(btn);
+  head.appendChild(bar);
+  const kpiBox=el('div',null,''); kpiBox.style.marginTop='12px';
+  const mapWrap=document.createElement('div'); mapWrap.id='rutaRealMapBox';
+  mapWrap.style.cssText='height:540px;border-radius:10px;overflow:hidden;border:1px solid var(--border);position:relative;background:var(--surface2);margin-top:12px';
+  mapWrap.innerHTML='<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;text-align:center;padding:20px">Elegí un vendedor y una fecha, después tocá "Ver ruta".</div>';
+  const errBox=el('div','note',''); errBox.style.display='none';
+  head.appendChild(kpiBox); head.appendChild(mapWrap); head.appendChild(errBox);
+  p.appendChild(head);
+
   /* ---- Disciplina de ruta: vista de equipo para un día (pedido de Damian 18/9, a partir de un
-     reporte de referencia "Tienda Perfecta" de otro proyecto suyo) ---- */
+     reporte de referencia "Tienda Perfecta" de otro proyecto suyo) - va DEBAJO del mapa individual ---- */
   const eqCard=el('div','card');
-  eqCard.appendChild(el('div','ctitle','<h2>Disciplina de ruta</h2><span class="hint">todo el equipo, un día · PASÓ = el GPS detectó una parada cerca del cliente · ENTRÓ = paró 3 minutos o más (DE LARGO = menos de 3) · %CIERRE = de los que ENTRARON, cuántos terminaron en pedido ese día</span>'));
+  eqCard.appendChild(el('div','ctitle','<h2>Disciplina de ruta</h2><span class="hint">todo el equipo, un día · PASÓ = el GPS detectó una parada cerca del cliente · ENTRÓ = paró 3 minutos o más (DE LARGO = menos de 3) · %CIERRE = de los que ENTRARON, cuántos terminaron en pedido ese día · DROP = ticket promedio de los pedidos conseguidos en la calle (venta de calle ÷ con pedido)</span>'));
   const eqBar=el('div',null,''); eqBar.style.cssText='display:flex;gap:10px;flex-wrap:wrap;align-items:center';
   const eqFecha=document.createElement('input'); eqFecha.type='date'; eqFecha.className='fsel'; eqFecha.value=hoyLocalStr();
   const eqBtn=document.createElement('button'); eqBtn.className='tab'; eqBtn.textContent='Ver equipo';
@@ -4532,19 +4549,20 @@ function renderRutaReal(){
       ${ftile('De largo',AR.format(k.deLargo)+' ('+pct(k.pctDeLargo)+')')}
       ${ftile('Con pedido / % cierre',AR.format(k.conPedido)+' / '+pct(k.pctCierre))}
     </div>
-    <div class="kpitiles" style="grid-template-columns:repeat(2,1fr);margin-top:10px">
+    <div class="kpitiles" style="grid-template-columns:repeat(3,1fr);margin-top:10px">
       ${ftile('Venta de calle',peso(k.ventaCalle))}
       ${ftile('Venta total del día (todos los canales)',peso(k.ventaB2B))}
+      ${ftile('Drop (ticket promedio de calle)',k.drop!=null?peso(k.drop):'—')}
     </div>`;
-    h+='<div class="twrap" style="margin-top:14px"><table class="tbl-compact"><thead><tr><th>Vendedor</th><th>Equipo</th><th class="num">Cartera</th><th class="num">Pasó</th><th class="num">Entró</th><th class="num">De largo</th><th class="num">%Entró</th><th class="num">C/Pedido</th><th class="num">%Cierre</th><th class="num">Sin visita</th><th class="num">Min/PDV</th><th>Arranque</th><th>Cierre</th><th class="num">Hs</th><th class="num">Venta calle</th></tr></thead><tbody>';
+    h+='<div class="twrap" style="margin-top:14px"><table class="tbl-compact"><thead><tr><th>Vendedor</th><th>Equipo</th><th class="num">Cartera</th><th class="num">Pasó</th><th class="num">Entró</th><th class="num">De largo</th><th class="num">%Entró</th><th class="num">C/Pedido</th><th class="num">%Cierre</th><th class="num">Sin visita</th><th class="num">Min/PDV</th><th>Arranque</th><th>Cierre</th><th class="num">Hs</th><th class="num">Venta calle</th><th class="num">Drop</th></tr></thead><tbody>';
     json.porVendedor.slice().sort((a,b)=>b.ventaCalle-a.ventaCalle).forEach(v=>{
       h+=`<tr><td class="name">${v.nombre}</td><td style="color:var(--muted)">${v.supervisor.split(' ')[0]}</td>
         <td class="num">${AR.format(v.cartera)}</td><td class="num">${AR.format(v.paso)}</td><td class="num">${AR.format(v.entro)}</td><td class="num">${AR.format(v.deLargo)}</td>
         <td class="num">${pct(v.pctEntro)}</td><td class="num">${AR.format(v.conPedido)}</td><td class="num">${pct(v.pctCierre)}</td>
         <td class="num">${AR.format(v.sinVisita)}</td><td class="num">${v.minPorPdv!=null?v.minPorPdv:'—'}</td>
-        <td class="num">${horaFmt(v.arranque)}</td><td class="num">${horaFmt(v.cierre)}</td><td class="num">${v.hs!=null?v.hs:'—'}</td><td class="num">${peso(v.ventaCalle)}</td></tr>`;
+        <td class="num">${horaFmt(v.arranque)}</td><td class="num">${horaFmt(v.cierre)}</td><td class="num">${v.hs!=null?v.hs:'—'}</td><td class="num">${peso(v.ventaCalle)}</td><td class="num">${v.drop!=null?peso(v.drop):'—'}</td></tr>`;
     });
-    h+=`<tr class="grandtotal"><td colspan="3">TOTAL</td><td class="num">${AR.format(k.pdvPasados)}</td><td class="num">${AR.format(k.entro)}</td><td class="num">${AR.format(k.deLargo)}</td><td class="num">${pct(pctEntroTot)}</td><td class="num">${AR.format(k.conPedido)}</td><td class="num">${pct(k.pctCierre)}</td><td class="num">—</td><td class="num">—</td><td>—</td><td>—</td><td class="num">—</td><td class="num">${peso(k.ventaCalle)}</td></tr>`;
+    h+=`<tr class="grandtotal"><td colspan="3">TOTAL</td><td class="num">${AR.format(k.pdvPasados)}</td><td class="num">${AR.format(k.entro)}</td><td class="num">${AR.format(k.deLargo)}</td><td class="num">${pct(pctEntroTot)}</td><td class="num">${AR.format(k.conPedido)}</td><td class="num">${pct(k.pctCierre)}</td><td class="num">—</td><td class="num">—</td><td>—</td><td>—</td><td class="num">—</td><td class="num">${peso(k.ventaCalle)}</td><td class="num">${k.drop!=null?peso(k.drop):'—'}</td></tr>`;
     h+='</tbody></table></div>';
     if(json.noSalieron&&json.noSalieron.length){
       h+='<div class="note" style="margin-top:10px"><b>No salieron ese día ('+json.noSalieron.length+'):</b> '+json.noSalieron.map(v=>v.nombre+(v.motivo==='sin_cache'?' (sin datos GPS todavía)':'')).join(', ')+'</div>';
@@ -4552,23 +4570,6 @@ function renderRutaReal(){
     eqBox.innerHTML=h;
   }
   eqBtn.onclick=cargarEquipo;
-
-  const head=el('div','card');
-  head.appendChild(el('div','ctitle','<h2>Mapa por vendedor</h2><span class="hint">recorrido físico real de un vendedor puntual ese día, según Axum GPS · verde = visitó y compró ese día · naranja = visitó pero no compró · requiere conexión a internet</span>'));
-  const bar=el('div',null,''); bar.style.cssText='display:flex;gap:10px;flex-wrap:wrap;align-items:center';
-  const sel=document.createElement('select'); sel.className='fsel';
-  vends.forEach(v=>{ const o=document.createElement('option'); o.value=v.cod; o.textContent=v.nombre+' ('+v.supervisor.split(' ')[0]+')'; sel.appendChild(o); });
-  const fechaInput=document.createElement('input'); fechaInput.type='date'; fechaInput.className='fsel'; fechaInput.value=hoyLocalStr();
-  const btn=document.createElement('button'); btn.className='tab'; btn.textContent='Ver ruta';
-  bar.appendChild(sel); bar.appendChild(fechaInput); bar.appendChild(btn);
-  head.appendChild(bar);
-  const kpiBox=el('div',null,''); kpiBox.style.marginTop='12px';
-  const mapWrap=document.createElement('div'); mapWrap.id='rutaRealMapBox';
-  mapWrap.style.cssText='height:540px;border-radius:10px;overflow:hidden;border:1px solid var(--border);position:relative;background:var(--surface2);margin-top:12px';
-  mapWrap.innerHTML='<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;text-align:center;padding:20px">Elegí un vendedor y una fecha, después tocá "Ver ruta".</div>';
-  const errBox=el('div','note',''); errBox.style.display='none';
-  head.appendChild(kpiBox); head.appendChild(mapWrap); head.appendChild(errBox);
-  p.appendChild(head);
 
   async function cargar(){
     mapWrap.innerHTML='<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px">Cargando ruta desde Axum GPS…</div>';
