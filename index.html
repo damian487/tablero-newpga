@@ -4532,7 +4532,7 @@ function renderRutaReal(){
   const vends=[...DATA.porVendedor].sort((a,b)=>a.nombre.localeCompare(b.nombre));
 
   const head=el('div','card');
-  head.appendChild(el('div','ctitle','<h2>Mapa por vendedor</h2><span class="hint">recorrido físico real de un vendedor puntual ese día, según Axum GPS · la línea celeste tenue es el trayecto real por las calles, con bandera verde de inicio y roja de cierre · el número conecta solo las paradas reales (≥3 min): verde = compró, naranja = no compró · los puntitos grises son "de largo" (pasó cerca, no paró) · requiere conexión a internet</span>'));
+  head.appendChild(el('div','ctitle','<h2>Mapa por vendedor</h2><span class="hint">recorrido físico real de un vendedor puntual ese día, según Axum GPS · la línea celeste tenue es el trayecto real por las calles, con bandera verde de inicio y roja de cierre · el número conecta solo las paradas reales (≥3 min): verde = compró, naranja = no compró · los puntitos grises son "de largo" (pasó cerca, no paró) · círculos rojos punteados = clientes planificados para ese día que NO tuvieron ninguna señal GPS (no atendidos) · requiere conexión a internet</span>'));
   const bar=el('div',null,''); bar.style.cssText='display:flex;gap:10px;flex-wrap:wrap;align-items:center';
   const sel=document.createElement('select'); sel.className='fsel';
   vends.forEach(v=>{ const o=document.createElement('option'); o.value=v.cod; o.textContent=v.nombre+' ('+v.supervisor.split(' ')[0]+')'; sel.appendChild(o); });
@@ -4623,6 +4623,24 @@ function renderRutaReal(){
     }
     const k=json.kpis;
     const horaFmt=s=>s?s.slice(11,16):'—';
+    // Zona de visita del dia + atendidos/no atendidos (pedido de Damian 21/9, "como en el otro
+    // mapa"): reusa DATA.mapaClientes (mismo dataset geocodificado de la pestana "Mapa" general,
+    // ya trae lat/lon + dia de visita + ciclo de frecuencia) filtrado a este vendedor + al dia de
+    // semana de la fecha elegida, cruzado contra lo que el GPS realmente detecto ese dia. Atendido
+    // = parada real (>=3min, mismo "entrados" de mas abajo); no atendido = estaba planificado pero
+    // no hubo ninguna parada real (incluye los "de largo", que ya se ven aparte como punto gris, y
+    // los que ni siquiera pasaron cerca, que se marcan nuevos en el mapa).
+    const DIA_POR_ISODOW_M={1:'Lu',2:'Ma',3:'Mi',4:'Ju',5:'Vi'};
+    const diaLetraSel=DIA_POR_ISODOW_M[new Date(fechaInput.value+'T00:00:00Z').getUTCDay()];
+    const CIC_RUTA_M=(DATA.ruta&&DATA.ruta.ciclos)||{};
+    const planificados=(DATA.mapaClientes||[]).filter(r=>r.vendCod===sel.value && r.dia===diaLetraSel).filter(r=>{
+      const cic=CIC_RUTA_M[r.cod]; const frec=(cic&&cic[0])||r.frecuencia||'Semanal'; const anchor=cic?cic[1]:null;
+      return esVisitaEnFechaJS(frec,anchor,fechaInput.value);
+    });
+    const entradosCodsK=new Set(json.puntos.filter(pt=>pt.duracionMin>=3).map(pt=>pt.clienteId));
+    const pasoCodsK=new Set(json.puntos.map(pt=>pt.clienteId));
+    const noAtendidos=planificados.filter(r=>!entradosCodsK.has(r.cod));
+    const sinSenal=planificados.filter(r=>!pasoCodsK.has(r.cod));
     kpiBox.innerHTML=`<div class="kpitiles" style="grid-template-columns:repeat(6,1fr)">
       ${ftile('Clientes',AR.format(k.comercios))}
       ${ftile('Líneas',AR.format(k.lineas))}
@@ -4630,6 +4648,11 @@ function renderRutaReal(){
       ${ftile('Hasta',horaFmt(k.hasta))}
       ${ftile('En la calle',k.tiempoEnCalleMin!=null?Math.floor(k.tiempoEnCalleMin/60)+'h'+String(k.tiempoEnCalleMin%60).padStart(2,'0'):'—')}
       ${ftile('Km aprox',k.kmAprox!=null?k.kmAprox+' km':'—')}
+    </div>
+    <div class="kpitiles" style="grid-template-columns:repeat(3,1fr);margin-top:8px">
+      ${ftile('Planificados hoy ('+diaLetraSel+')',AR.format(planificados.length))}
+      ${ftile('Atendidos',AR.format(planificados.length-noAtendidos.length))}
+      ${ftile('No atendidos',AR.format(noAtendidos.length))}
     </div>`;
     loadLeaflet(()=>{
       mapWrap.innerHTML='';
@@ -4674,7 +4697,16 @@ function renderRutaReal(){
         m.bindTooltip(`<b>#${i+1} · ${pt.clienteId} - ${pt.razonSocial}</b><br>${pt.start?pt.start.slice(11,16):''}–${pt.end?pt.end.slice(11,16):''} (${pt.duracionMin} min)<br>${pt.conVenta?('✅ Compró: '+peso(pt.ventaNeta)+' · '+pt.lineas+' líneas'):'⚠️ No compró ese día'}`,{direction:'top',offset:[0,-13]});
         m.addTo(rutaRealMap);
       });
-      const latlngs=json.puntos.map(pt=>[pt.lat,pt.lng]).concat((json.trazo||[]).map(pt=>[pt.lat,pt.lng]));
+      // No atendidos SIN ninguna senal GPS ese dia (planificados para hoy, ni entraron ni pasaron
+      // de largo) - usa lat/lon de DATA.mapaClientes (geocodificado, mismo dataset de la pestana
+      // "Mapa" general) para mostrar la zona completa planificada, no solo lo que el GPS capto.
+      sinSenal.forEach(r=>{
+        if(r.lat==null||r.lon==null) return;
+        const m=L.circleMarker([r.lat,r.lon],{radius:7,color:'#c62828',weight:2,dashArray:'3,2',fillColor:'#fff',fillOpacity:.5});
+        m.bindTooltip(`<b>❌ No atendido · ${r.cod} - ${r.nombre}</b><br>${r.dir||''}<br>Sin ninguna señal GPS ese día`,{direction:'top',offset:[0,-7]});
+        m.addTo(rutaRealMap);
+      });
+      const latlngs=json.puntos.map(pt=>[pt.lat,pt.lng]).concat((json.trazo||[]).map(pt=>[pt.lat,pt.lng])).concat(sinSenal.filter(r=>r.lat!=null&&r.lon!=null).map(r=>[r.lat,r.lon]));
       rutaRealMap.fitBounds(L.latLngBounds(latlngs),{padding:[30,30],maxZoom:16});
     },()=>{ mapWrap.innerHTML='<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--bad);font-size:13px;text-align:center;padding:20px">No se pudo cargar el mapa de calles.<br>Verificá la conexión a internet e intentá de nuevo.</div>'; });
   }
