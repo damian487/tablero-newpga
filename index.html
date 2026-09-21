@@ -3950,7 +3950,12 @@ function renderFicha(){
       });
       const dSel=document.getElementById('fichaDesde'), hSel=document.getElementById('fichaHasta'), vBox=document.getElementById('fichaVentaBox');
       fechasDiario.forEach(fch=>{ const lbl=fdate(fch)+'/'+fch.slice(0,4); dSel.appendChild(new Option(lbl,fch)); hSel.appendChild(new Option(lbl,fch)); });
-      dSel.value=fechasDiario[0]; hSel.value=fechasDiario[fechasDiario.length-1];
+      // Por default, rango = mes fiscal en curso (no el trimestre entero disponible - queda muy
+      // denso para ver de un vistazo, pedido de Damian 21/9) - DATA.kpis.mesDesde marca el limite
+      // exacto; si no esta (meses archivados viejos, generados antes de este campo) cae al comportamiento
+      // de siempre (todo el rango disponible).
+      const desdeDefault=(DATA.kpis&&DATA.kpis.mesDesde&&fechasDiario.includes(DATA.kpis.mesDesde))?DATA.kpis.mesDesde:fechasDiario[0];
+      dSel.value=desdeDefault; hSel.value=fechasDiario[fechasDiario.length-1];
       function drawVenta(){
         let desde=dSel.value, hasta=hSel.value; if(desde>hasta){ [desde,hasta]=[hasta,desde]; }
         const items=serie.filter(d=>d.fecha>=desde&&d.fecha<=hasta);
