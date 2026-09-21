@@ -3699,7 +3699,12 @@ function renderFicha(){
   const infDetalle=(DATA.infaltablesEquipo&&DATA.infaltablesEquipo.detalle)||[];
   const accVMap={}; (DATA.accion&&DATA.accion.todos?DATA.accion.todos.porVendedor:[]).forEach(v=>accVMap[v.cod]=v);
   const combosLista=(DATA.combos&&DATA.combos.lista)||[];
-  const fechasDiario=DATA.reporteDiario?Object.keys(DATA.reporteDiario).sort():[];
+  // Excluye dias sin actividad comercial real (CCC=0 a nivel empresa) - pedido de Damian 21/9 al ver
+  // el 18/07 (sabado) en el rango: ese dia dio venta -$258.640/CCC 0/8 lineas, o sea solo se
+  // procesaron devoluciones/notas de credito, ningun cliente compro. No es un filtro de "solo dias
+  // habiles" (el sabado 11/07 SI tuvo venta real, $11M/99 CCC, y se mantiene) - es especificamente
+  // "hubo alguna venta real ese dia", a nivel empresa (no por vendedor/equipo individual).
+  const fechasDiario=DATA.reporteDiario?Object.keys(DATA.reporteDiario).filter(f=>(DATA.reporteDiario[f].kpis?.ccc??0)>0).sort():[];
   const ranked=[...vends].sort((a,b)=>b.venta-a.venta);
   const equipos=[...new Set(ranked.map(v=>v.supervisor))];
   const tituloEquipo=eq=>eq.split(' ').map(w=>w[0]+w.slice(1).toLowerCase()).join(' ');
