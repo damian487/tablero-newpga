@@ -4628,16 +4628,19 @@ function renderRutaReal(){
       const entrados=json.puntos.filter(pt=>pt.duracionMin>=UMBRAL_ENTRO_MIN);
       const deLargo=json.puntos.filter(pt=>pt.duracionMin<UMBRAL_ENTRO_MIN);
       if(entrados.length>1) L.polyline(entrados.map(pt=>[pt.lat,pt.lng]),{color:'#607d8b',weight:2.5,dashArray:'5,5'}).addTo(rutaRealMap);
+      // Puntos mas grandes y detalle al pasar el mouse (tooltip = hover) en vez de tener que
+      // hacer click (popup) - pedido de Damian 21/9, para poder recorrer el mapa mas rapido sin
+      // clickear cada punto uno por uno.
       deLargo.forEach(pt=>{
-        const m=L.circleMarker([pt.lat,pt.lng],{radius:4,color:'#fff',weight:1,fillColor:'#9aa5b1',fillOpacity:.8});
-        m.bindPopup(`<b>De largo · ${pt.clienteId} - ${pt.razonSocial}</b><br>${pt.start?pt.start.slice(11,16):''} (${pt.duracionMin} min) · pasó cerca pero no paró`);
+        const m=L.circleMarker([pt.lat,pt.lng],{radius:7,color:'#fff',weight:1.5,fillColor:'#9aa5b1',fillOpacity:.85});
+        m.bindTooltip(`<b>De largo · ${pt.clienteId} - ${pt.razonSocial}</b><br>${pt.start?pt.start.slice(11,16):''} (${pt.duracionMin} min) · pasó cerca pero no paró`,{direction:'top',offset:[0,-6]});
         m.addTo(rutaRealMap);
       });
       entrados.forEach((pt,i)=>{
         const color=pt.conVenta?'#2e7d32':'#e08a00';
         const icon=L.divIcon({className:'ruta-real-marker',html:`<div style="background:${color};color:#fff;border:2px solid #fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;box-shadow:0 1px 3px rgba(0,0,0,.4)">${i+1}</div>`,iconSize:[26,26],iconAnchor:[13,13]});
         const m=L.marker([pt.lat,pt.lng],{icon});
-        m.bindPopup(`<b>#${i+1} · ${pt.clienteId} - ${pt.razonSocial}</b><br>${pt.start?pt.start.slice(11,16):''}–${pt.end?pt.end.slice(11,16):''} (${pt.duracionMin} min)<br>${pt.conVenta?('✅ Compró: '+peso(pt.ventaNeta)+' · '+pt.lineas+' líneas'):'⚠️ No compró ese día'}`);
+        m.bindTooltip(`<b>#${i+1} · ${pt.clienteId} - ${pt.razonSocial}</b><br>${pt.start?pt.start.slice(11,16):''}–${pt.end?pt.end.slice(11,16):''} (${pt.duracionMin} min)<br>${pt.conVenta?('✅ Compró: '+peso(pt.ventaNeta)+' · '+pt.lineas+' líneas'):'⚠️ No compró ese día'}`,{direction:'top',offset:[0,-13]});
         m.addTo(rutaRealMap);
       });
       const latlngs=json.puntos.map(pt=>[pt.lat,pt.lng]).concat((json.trazo||[]).map(pt=>[pt.lat,pt.lng]));
