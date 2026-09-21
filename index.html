@@ -3881,7 +3881,8 @@ function renderFicha(){
       h+='</tbody></table></div></div>';
     }
 
-    /* 7) Infaltables */
+    /* 7) Infaltables (armado acá, pero se agrega al final del todo - ver más abajo, pedido de Damián 21/9) */
+    let infaltablesHtml='';
     if(infDetalle.length){
       let infRows, infUniverso;
       if(single){
@@ -3891,14 +3892,14 @@ function renderFicha(){
         infRows=infDetalle.map(d=>{ let tot=0; scope.forEach(v=>{ tot+=(d.v&&d.v[v.cod])||0; }); return {categoria:d.categoria,descripcion:d.descripcion,cant:tot}; }).filter(d=>d.cant>0);
         infUniverso=scope.reduce((a,v)=>a+((infMap[v.cod]&&infMap[v.cod].clientes)||0),0);
       }
-      h+=`<div class="card"><div class="ctitle"><h2>Infaltables</h2><span class="hint">artículos del catálogo de infaltables colocados en al menos un cliente</span></div>
+      infaltablesHtml=`<div class="card"><div class="ctitle"><h2>Infaltables</h2><span class="hint">artículos del catálogo de infaltables colocados en al menos un cliente</span></div>
         <div class="supgrid" style="margin-bottom:12px">${ftile('Infaltables colocados',infRows.length+' / '+infDetalle.length)}${infUniverso!=null?ftile('Universo elegible',AR.format(infUniverso)):''}</div>`;
       if(infRows.length){
-        h+='<div class="twrap"><table><thead><tr><th>Categoría</th><th>Infaltable</th><th class="num">Clientes</th></tr></thead><tbody>';
-        infRows.slice().sort((a,b)=>b.cant-a.cant).forEach(d=>{ h+=`<tr><td class="name">${d.categoria}</td><td>${d.descripcion}</td><td class="num">${AR.format(d.cant)}</td></tr>`; });
-        h+='</tbody></table></div>';
+        infaltablesHtml+='<div class="twrap"><table><thead><tr><th>Categoría</th><th>Infaltable</th><th class="num">Clientes</th></tr></thead><tbody>';
+        infRows.slice().sort((a,b)=>b.cant-a.cant).forEach(d=>{ infaltablesHtml+=`<tr><td class="name">${d.categoria}</td><td>${d.descripcion}</td><td class="num">${AR.format(d.cant)}</td></tr>`; });
+        infaltablesHtml+='</tbody></table></div>';
       }
-      h+='</div>';
+      infaltablesHtml+='</div>';
     }
 
     /* 8) Clientes */
@@ -3919,8 +3920,10 @@ function renderFicha(){
       h+=`<div class="note">No compraron este mes: <b>${AR.format(sinCompra)}</b> de ${AR.format(universo)} clientes del universo — detalle día a día en la pestaña "Ruta / No compradores".</div></div>`;
     }
 
-    /* Objetivos se muestra al final del todo, como último panel (pedido de Damián) */
+    /* Objetivos e Infaltables se muestran al final del todo (pedido de Damián) - Infaltables
+       ahora es el último panel de la ficha, después de Objetivos. */
     h+=objetivosHtml;
+    h+=infaltablesHtml;
 
     box.innerHTML=h;
 
