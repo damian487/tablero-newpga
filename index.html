@@ -405,6 +405,7 @@ td.name{font-weight:600}
   <section class="panel" id="p-relevamiento" role="tabpanel"></section>
   <section class="panel" id="p-mapa" role="tabpanel"></section>
   <section class="panel" id="p-rutareal" role="tabpanel"></section>
+  <section class="panel" id="p-config" role="tabpanel"></section>
   <section class="panel" id="p-plansup" role="tabpanel"></section>
 </main>
 
@@ -627,7 +628,8 @@ const TAB_GROUPS=[
     {id:'p-metaago',label:'🎯 Meta Cobertura del mes'},
     {id:'p-matinal',label:'🌅 Matinal'},
     {id:'p-mapa',label:'🗺️ Mapa'},
-    {id:'p-relevamiento',label:'🏷️ Relevamiento Precios'} ],
+    {id:'p-relevamiento',label:'🏷️ Relevamiento Precios'},
+    {id:'p-config',label:'⚙️ Configuración'} ],
 ];
 const TABS=TAB_GROUPS.flat();
 const tabsEl=document.getElementById('tabs');
@@ -655,7 +657,8 @@ TAB_GROUPS.forEach(group=>{
       if(t.id==='p-pfp' && typeof renderPFP==='function') renderPFP();
       if(t.id==='p-mapa' && typeof mapaActivar==='function'){ const fn=mapaActivar; mapaActivar=null; fn(); }
       if(t.id==='p-relevamiento' && typeof renderRelevamiento==='function'){ renderRelevamiento(false); }
-      if(t.id==='p-rutareal' && typeof renderRutaReal==='function'){ renderRutaReal(); }};
+      if(t.id==='p-rutareal' && typeof renderRutaReal==='function'){ renderRutaReal(); }
+      if(t.id==='p-config' && typeof renderConfig==='function'){ renderConfig(); }};
     g.appendChild(b);
   });
   tabsEl.appendChild(g);
@@ -4648,6 +4651,174 @@ function renderRutaReal(){
     },()=>{ mapWrap.innerHTML='<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--bad);font-size:13px;text-align:center;padding:20px">No se pudo cargar el mapa de calles.<br>Verificá la conexión a internet e intentá de nuevo.</div>'; });
   }
   btn.onclick=cargar;
+}
+
+/* ---------- PANEL: Configuración (21/9, pedido de Damian) - Acción de precio/Combos/Objetivos
+   del trimestre (MSU) editables desde el navegador, sin tocar código ni hacer deploy. Pensado para
+   que Miguel Torino cargue lo que mande New PGA mientras Damian está de vacaciones - usa la misma
+   contraseña del tablero (sessionStorage 'gpw'), no hay clave separada. El reparto de meta MSU por
+   vendedor (grupos ALTA/RESTO/Cecilia) NO es editable acá a propósito - eso lo dejó fijo Damian. ---------- */
+const CONFIG_ENDPOINT='https://tablero-newpga-worker.damian-8ad.workers.dev/api/admin/config';
+
+function renderConfig(){
+  const p=document.getElementById('p-config');
+  if(p.dataset.built){ return; }
+  p.dataset.built='1';
+
+  function field(label,inputEl){
+    const w=el('div',null,'<label style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px">'+label+'</label>');
+    inputEl.className=(inputEl.className?inputEl.className+' ':'')+'fsel'; inputEl.style.width='100%';
+    w.appendChild(inputEl);
+    return w;
+  }
+  function statusMsg(box,ok,text){ box.textContent=text; box.style.color=ok?'var(--good)':'var(--bad)'; }
+
+  /* ---- Acción de precio ---- */
+  const accCard=el('div','card');
+  accCard.appendChild(el('div','ctitle','<h2>Acción de precio</h2><span class="hint">carga la acción vigente que mande New PGA · cubre la mecánica actual: 1 SKU con descuento % fijo por canal, como la de hoy (Gillette) · si mandan algo que no entra acá (por tramos, condicionado, etc.) dejalo anotado en "Notas" para programarlo con código cuando Damián vuelva</span>'));
+  const accForm=el('div',null,''); accForm.style.cssText='display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:10px;max-width:640px';
+  const iCodigo=document.createElement('input'); const iNombre=document.createElement('input');
+  const iDesde=document.createElement('input'); iDesde.type='date';
+  const iRef=document.createElement('input'); iRef.type='date';
+  const iAuto=document.createElement('input'); iAuto.type='number';
+  const iAlm=document.createElement('input'); iAlm.type='number';
+  const iKio=document.createElement('input'); iKio.type='number';
+  accForm.appendChild(field('Código de producto',iCodigo));
+  accForm.appendChild(field('Nombre',iNombre));
+  accForm.appendChild(field('Vigente desde',iDesde));
+  accForm.appendChild(field('Fecha de referencia (sin acción)',iRef));
+  accForm.appendChild(field('Descuento % Autoservicios',iAuto));
+  accForm.appendChild(field('Descuento % Almacenes',iAlm));
+  accForm.appendChild(field('Descuento % Kioscos',iKio));
+  accCard.appendChild(accForm);
+  const accNotasWrap=el('div',null,'<label style="display:block;font-size:12px;color:var(--muted);margin:10px 0 4px">Notas (mecánicas especiales que no entran en los campos de arriba)</label>');
+  const iNotas=document.createElement('textarea'); iNotas.className='fsel'; iNotas.style.cssText='width:100%;max-width:640px;min-height:60px';
+  accNotasWrap.appendChild(iNotas); accCard.appendChild(accNotasWrap);
+  const accBtn=document.createElement('button'); accBtn.className='tab'; accBtn.textContent='Guardar acción de precio'; accBtn.style.marginTop='10px';
+  const accMsg=el('div','note',''); accMsg.style.marginTop='8px';
+  accCard.appendChild(accBtn); accCard.appendChild(accMsg);
+  p.appendChild(accCard);
+
+  accBtn.onclick=async()=>{
+    let pw=''; try{ pw=sessionStorage.getItem('gpw')||''; }catch(_){ }
+    accBtn.disabled=true; statusMsg(accMsg,true,'Guardando…');
+    const data={ codigo:iCodigo.value.trim(), nombre:iNombre.value.trim(), desde:iDesde.value, ref:iRef.value,
+      descuentos:{ Autoservicios:Number(iAuto.value)||0, Almacenes:Number(iAlm.value)||0, Kioscos:Number(iKio.value)||0 },
+      notas:iNotas.value.trim() };
+    try{
+      const res=await fetch(CONFIG_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json','X-Dashboard-Password':pw},body:JSON.stringify({tipo:'accion',data})});
+      const json=await res.json();
+      if(!json.ok) throw new Error(json.error||'error del servidor');
+      statusMsg(accMsg,true,'Guardado. Se aplica en la próxima actualización del tablero.');
+    }catch(e){ statusMsg(accMsg,false,'No se pudo guardar ('+e.message+').'); }
+    accBtn.disabled=false;
+  };
+
+  /* ---- Combos ---- */
+  const comboCard=el('div','card');
+  comboCard.appendChild(el('div','ctitle','<h2>Combos</h2><span class="hint">los combos ya cargados no hay que tocarlos - si New PGA corta una promo, deja de sumar sola cuando Gescom deja de tagearla, no hace falta "darla de baja" acá · solo agregá los combos NUEVOS que manden, con el promoId real de Gescom (lo tiene que dar quien carga la promoción ahí)</span>'));
+  const comboTableWrap=el('div',null,'<p style="color:var(--muted)">Cargando combos actuales…</p>'); comboTableWrap.style.marginTop='10px';
+  comboCard.appendChild(comboTableWrap);
+
+  const addTitle=el('div',null,'<h3 style="margin:16px 0 6px;font-size:15px">Agregar combo nuevo</h3>');
+  comboCard.appendChild(addTitle);
+  const comboForm=el('div',null,''); comboForm.style.cssText='display:grid;grid-template-columns:repeat(2,1fr);gap:10px;max-width:640px';
+  const cId=document.createElement('input'); const cNombre=document.createElement('input'); const cCanal=document.createElement('input');
+  cCanal.placeholder='Autoservicios / Almacenes / Kioscos / Almacenes y Kioscos';
+  const cPromoIds=document.createElement('input'); cPromoIds.placeholder='ej. 150 o 150,151';
+  const cDescuento=document.createElement('input'); cDescuento.type='number';
+  const cDesde=document.createElement('input'); cDesde.type='date';
+  comboForm.appendChild(field('ID interno (sin espacios, ej. downy_auto_oct)',cId));
+  comboForm.appendChild(field('Nombre',cNombre));
+  comboForm.appendChild(field('Canal',cCanal));
+  comboForm.appendChild(field('PromoId(s) de Gescom',cPromoIds));
+  comboForm.appendChild(field('Descuento %',cDescuento));
+  comboForm.appendChild(field('Vigente desde',cDesde));
+  comboCard.appendChild(comboForm);
+  const cDetalleWrap=el('div',null,'<label style="display:block;font-size:12px;color:var(--muted);margin:10px 0 4px">Detalle (qué incluye el combo)</label>');
+  const cDetalle=document.createElement('textarea'); cDetalle.className='fsel'; cDetalle.style.cssText='width:100%;max-width:640px;min-height:50px';
+  cDetalleWrap.appendChild(cDetalle); comboCard.appendChild(cDetalleWrap);
+  const comboBtn=document.createElement('button'); comboBtn.className='tab'; comboBtn.textContent='Agregar combo'; comboBtn.style.marginTop='10px';
+  const comboMsg=el('div','note',''); comboMsg.style.marginTop='8px';
+  comboCard.appendChild(comboBtn); comboCard.appendChild(comboMsg);
+  p.appendChild(comboCard);
+
+  function pintarCombos(lista){
+    if(!lista.length){ comboTableWrap.innerHTML='<p style="color:var(--muted)">No hay combos cargados.</p>'; return; }
+    let h='<div class="twrap"><table class="tbl-compact"><thead><tr><th>Nombre</th><th>Canal</th><th>PromoId</th><th class="num">Desc. %</th><th>Desde</th><th>Detalle</th></tr></thead><tbody>';
+    lista.forEach(c=>{ h+=`<tr><td>${c.nombre}</td><td>${c.canal}</td><td>${(c.promoIds||[]).join(', ')}</td><td class="num">${c.descuentoPct}%</td><td>${c.desde}</td><td style="color:var(--muted);font-size:12px">${c.detalle||'—'}</td></tr>`; });
+    h+='</tbody></table></div>';
+    comboTableWrap.innerHTML=h;
+  }
+
+  comboBtn.onclick=async()=>{
+    let pw=''; try{ pw=sessionStorage.getItem('gpw')||''; }catch(_){ }
+    const promoIds=cPromoIds.value.split(',').map(s=>s.trim()).filter(Boolean);
+    if(!cId.value.trim()||!cNombre.value.trim()||!cCanal.value.trim()||!promoIds.length||!cDesde.value){
+      statusMsg(comboMsg,false,'Completá ID, nombre, canal, al menos un promoId y la fecha desde.'); return;
+    }
+    comboBtn.disabled=true; statusMsg(comboMsg,true,'Guardando…');
+    const data={ id:cId.value.trim(), nombre:cNombre.value.trim(), canal:cCanal.value.trim(), promoIds, descuentoPct:Number(cDescuento.value)||0, desde:cDesde.value, detalle:cDetalle.value.trim() };
+    try{
+      const res=await fetch(CONFIG_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json','X-Dashboard-Password':pw},body:JSON.stringify({tipo:'combo',data})});
+      const json=await res.json();
+      if(!json.ok) throw new Error(json.error||'error del servidor');
+      statusMsg(comboMsg,true,'Combo agregado. Se aplica en la próxima actualización del tablero.');
+      cId.value=''; cNombre.value=''; cCanal.value=''; cPromoIds.value=''; cDescuento.value=''; cDesde.value=''; cDetalle.value='';
+      cargarConfig();
+    }catch(e){ statusMsg(comboMsg,false,'No se pudo guardar ('+e.message+').'); }
+    comboBtn.disabled=false;
+  };
+
+  /* ---- Objetivos del trimestre (MSU / Concurso Nubi) ---- */
+  const msuCard=el('div','card');
+  msuCard.appendChild(el('div','ctitle','<h2>Objetivos del trimestre</h2><span class="hint">fechas y metas del trimestre nuevo (Sell-out MSU y $) · el reparto de la meta por vendedor NO se toca acá, queda igual que este trimestre (decisión de Damián)</span>'));
+  const msuForm=el('div',null,''); msuForm.style.cssText='display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:10px;max-width:640px';
+  const mStart=document.createElement('input'); mStart.type='date';
+  const mFin=document.createElement('input'); mFin.type='date';
+  const mMeta=document.createElement('input'); mMeta.type='number'; mMeta.step='0.1';
+  const mPesos=document.createElement('input'); mPesos.type='number';
+  msuForm.appendChild(field('Trimestre desde',mStart));
+  msuForm.appendChild(field('Trimestre hasta',mFin));
+  msuForm.appendChild(field('Meta MSU trimestral',mMeta));
+  msuForm.appendChild(field('Meta $ Sell-out trimestral',mPesos));
+  msuCard.appendChild(msuForm);
+  const msuBtn=document.createElement('button'); msuBtn.className='tab'; msuBtn.textContent='Guardar objetivos'; msuBtn.style.marginTop='10px';
+  const msuMsg=el('div','note',''); msuMsg.style.marginTop='8px';
+  msuCard.appendChild(msuBtn); msuCard.appendChild(msuMsg);
+  p.appendChild(msuCard);
+
+  msuBtn.onclick=async()=>{
+    let pw=''; try{ pw=sessionStorage.getItem('gpw')||''; }catch(_){ }
+    if(!mStart.value||!mFin.value||!mMeta.value||!mPesos.value){ statusMsg(msuMsg,false,'Completá los 4 campos.'); return; }
+    msuBtn.disabled=true; statusMsg(msuMsg,true,'Guardando…');
+    const data={ start:mStart.value, fintrim:mFin.value, metaMsu:Number(mMeta.value), selloutMetaFijo:Number(mPesos.value) };
+    try{
+      const res=await fetch(CONFIG_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json','X-Dashboard-Password':pw},body:JSON.stringify({tipo:'msu',data})});
+      const json=await res.json();
+      if(!json.ok) throw new Error(json.error||'error del servidor');
+      statusMsg(msuMsg,true,'Guardado. Se aplica en la próxima actualización del tablero.');
+    }catch(e){ statusMsg(msuMsg,false,'No se pudo guardar ('+e.message+').'); }
+    msuBtn.disabled=false;
+  };
+
+  /* ---- Carga inicial: precarga los 3 formularios con el efectivo actual ---- */
+  async function cargarConfig(){
+    let pw=''; try{ pw=sessionStorage.getItem('gpw')||''; }catch(_){ }
+    try{
+      const res=await fetch(CONFIG_ENDPOINT,{headers:{'X-Dashboard-Password':pw}});
+      const json=await res.json();
+      if(!json.ok) throw new Error(json.error||'error del servidor');
+      iCodigo.value=json.accion.codigo; iNombre.value=json.accion.nombre; iDesde.value=json.accion.desde; iRef.value=json.accion.ref;
+      iAuto.value=json.accion.descuentos.Autoservicios; iAlm.value=json.accion.descuentos.Almacenes; iKio.value=json.accion.descuentos.Kioscos;
+      iNotas.value=json.accion.notas||'';
+      pintarCombos([...(json.combosDefault||[]),...(json.combosExtra||[])]);
+      mStart.value=json.msu.start; mFin.value=json.msu.fintrim; mMeta.value=json.msu.metaMsu; mPesos.value=json.msu.selloutMetaFijo;
+    }catch(e){
+      comboTableWrap.innerHTML='<p style="color:var(--bad)">No se pudo cargar la configuración actual ('+e.message+').</p>';
+    }
+  }
+  cargarConfig();
 }
 
 function miDiaDonut(pctVal,color,size,stroke){
