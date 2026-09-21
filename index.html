@@ -800,6 +800,11 @@ function enableSort(id){
 /* ---------- PANEL: Resumen gerencial ---------- */
 function renderResumen(){
   const p=document.getElementById('p-resumen'); p.innerHTML='';
+  if(DATA.__trimestre){
+    const aviso=el('div','note'); aviso.style.margin='0 0 12px';
+    aviso.innerHTML='📊 <b>Vista combinada del trimestre</b> (Jul+Ago+Sep) - CCC/Cobertura es una suma simple de cada mes (puede sobreestimar si un cliente compró en más de un mes). El resto de las pestañas sigue mostrando el mes en curso.';
+    p.appendChild(aviso);
+  }
   // Composición de la venta neta
   const bruto=K.venta - K.devoluciones; // devoluciones es negativo
   const comp=el('div','card');
@@ -5179,6 +5184,66 @@ const DIAS_ES=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sába
 function renderAll(){
   renderHeaderKpis(); renderVend(); renderVentaDia(); renderFicha(); renderPerformance(); renderDiario(); renderResumen(); renderResultadosMes(); renderEfec(); renderConcurso(); renderMSU(); renderPFP(); renderCanales(); renderMarcas(); renderEvo(); renderDev(); renderInfaltables(); renderStock(); renderAccion(); renderCombos(); renderRuta(); renderCoberturaMarcas(); renderMetaAgosto(); renderSeguimientoDiario(); renderMatinal(); renderMapa(); renderPlanSupervisor();
 }
+// "Trimestre (Jul-Sep)" en el selector de Mes (21/9, pedido de Damian: "que me permita sumar meses,
+// Septiembre+Agosto+Julio") - combina LIVE_DATA + todos los meses de ARCHIVO en un DATA sintetico.
+// Alcance A PROPOSITO acotado (confirmado con Damian): solo Resumen gerencial + los KPI tiles del
+// header quedan bien combinados - el resto de las pestañas (Vendedores&CCC, Canales, etc.) seguirian
+// mostrando el mes en vivo tal cual, por eso el objeto sintetico arranca de una copia de LIVE_DATA y
+// SOLO pisa los campos que esas 2 vistas usan. CCC (clientes con compra) se suma mes a mes tal cual
+// (confirmado con Damian, mas simple que dedupear clientes repetidos entre meses - puede sobreestimar
+// un poco si el mismo cliente compro en mas de un mes del rango).
+function buildTrimestreData(meses){
+  // meses = [{key, data}], ya ordenados cronologicamente
+  function sum(f){ return meses.reduce((a,m)=>a+(m.data.kpis[f]||0),0); }
+  const venta=sum('venta'), devoluciones=sum('devoluciones'), lineas=sum('lineas'), cccEquipo=sum('cccEquipo'), devClientes=sum('devClientes');
+  // margen/markup: promedio ponderado por venta de cada mes (matematicamente exacto - ver
+  // memoria del proyecto: costo_m = venta_m*(1-margen_m/100), markup usa costo_m=venta_m/(1+markup_m/100)).
+  function pondVenta(campo){ const t=meses.reduce((a,m)=>a+(m.data.kpis.venta||0)*(m.data.kpis[campo]||0),0); return venta>0?round1(t/venta):0; }
+  function round1(n){ return Math.round(n*10)/10; }
+  const margen=pondVenta('margen');
+  let sumCosto=0; meses.forEach(m=>{ const v=m.data.kpis.venta||0, mk=m.data.kpis.markup||0; sumCosto+= v/(1+mk/100); });
+  const markup=sumCosto>0?round1((venta-sumCosto)/sumCosto*100):0;
+  const universoTotal=LIVE_DATA.meta.universoTotal;
+  const kpis={ venta, devoluciones, lineas, cccEquipo, devClientes, ccc:cccEquipo,
+    cobertura: universoTotal>0?round1(100*cccEquipo/universoTotal):0,
+    ticket: cccEquipo>0?Math.round(venta/cccEquipo):0,
+    devPct: (venta-devoluciones)>0?round1(-100*devoluciones/(venta-devoluciones)):0,
+    margen, markup, mix:100,
+    infaltablesPct: round1(meses.reduce((a,m)=>a+(m.data.kpis.infaltablesPct||0),0)/meses.length),
+    proyeccionCierre:null, diasTranscurridos:null, diasHabilesMes:null, mesDesde:meses[0].data.kpis.mesDesde||null };
+
+  function combinarLista(campo, key, sumFields, pctBase){
+    const porKey=new Map();
+    meses.forEach(m=>{ (m.data[campo]||[]).forEach(row=>{
+      const k=row[key];
+      if(!porKey.has(k)) porKey.set(k, {...row});
+      else { const acc=porKey.get(k); sumFields.forEach(f=>{ acc[f]=(acc[f]||0)+(row[f]||0); }); }
+    }); });
+    // margen ponderado por venta de cada fila, usando los valores YA sumados en un segundo paso
+    const out=[...porKey.values()];
+    out.forEach(row=>{
+      let sV=0, sC=0, ultimoOrig=null;
+      meses.forEach(m=>{ const orig=(m.data[campo]||[]).find(r=>r[key]===row[key]); if(orig){ sV+=orig.venta||0; sC+=(orig.venta||0)*(1-(orig.margen||0)/100); ultimoOrig=orig; } });
+      row.margen = sV>0?round1((sV-sC)/sV*100):(row.margen||0);
+      // universo/vendedores no se suman entre meses (es una foto del universo, no un flujo) - se toma
+      // del mes mas reciente que tenga esta fila, para que quede lo mas actualizado posible.
+      if(ultimoOrig){ if(ultimoOrig.universo!=null) row.universo=ultimoOrig.universo; if(ultimoOrig.vendedores!=null) row.vendedores=ultimoOrig.vendedores; }
+      if(row.cobertura!=null && row.universo) row.cobertura=round1(100*row.ccc/row.universo);
+    });
+    if(pctBase){ const tot=out.reduce((a,r)=>a+(r.venta||0),0); out.forEach(r=>{ r.pct=tot>0?round1(100*(r.venta||0)/tot):0; }); }
+    return out;
+  }
+  const porMarca=combinarLista('porMarca','marca',['venta','clientes']).sort((a,b)=>b.venta-a.venta);
+  const porMarcaConPct=(()=>{ const tot=porMarca.reduce((a,r)=>a+r.venta,0); porMarca.forEach(r=>r.pct=tot>0?round1(100*r.venta/tot):0); return porMarca; })();
+  const porCanalGrupo=combinarLista('porCanalGrupo','canal',['venta','ccc']);
+  const porSupervisor=combinarLista('porSupervisor','supervisor',['venta','ccc']);
+
+  const evoMap=new Map(); meses.forEach(m=>{ (m.data.evolucion||[]).forEach(e=>evoMap.set(e.fecha,e)); });
+  const evolucion=[...evoMap.values()].sort((a,b)=>a.fecha<b.fecha?-1:1);
+
+  return { ...LIVE_DATA, __trimestre:true, kpis, porMarca:porMarcaConPct, porCanalGrupo, porCanal:porCanalGrupo, porSupervisor, evolucion, meta:{...LIVE_DATA.meta} };
+}
+
 (function initMesSelector(){
   const sel=document.getElementById('mesSel'); if(!sel) return;
   // El mes "actual" se toma del mes FISCAL de los datos en vivo (ultima entrada de historicoMensual,
@@ -5189,13 +5254,28 @@ function renderAll(){
   const [yLive,mLive]=kLive.split('-');
   const liveOpt=el('option',null,MESES_ES[parseInt(mLive,10)-1]+' '+yLive+' (actual)'); liveOpt.value='__LIVE__';
   sel.appendChild(liveOpt);
-  Object.keys(ARCHIVO).sort().reverse().forEach(kArch=>{
+  const archKeys=Object.keys(ARCHIVO).sort();
+  archKeys.slice().reverse().forEach(kArch=>{
     const [y,m]=kArch.split('-');
     const o=el('option',null,MESES_ES[parseInt(m,10)-1]+' '+y); o.value=kArch;
     sel.appendChild(o);
   });
+  if(archKeys.length){
+    const primerMes=MESES_ES[parseInt(archKeys[0].split('-')[1],10)-1];
+    const ultimoMes=MESES_ES[parseInt(mLive,10)-1];
+    const trimOpt=el('option',null,`Trimestre (${primerMes.slice(0,3)}-${ultimoMes.slice(0,3)})`); trimOpt.value='__TRIM__';
+    sel.appendChild(trimOpt);
+  }
   sel.value='__LIVE__';
-  sel.onchange=()=>{ DATA = (sel.value==='__LIVE__') ? LIVE_DATA : ARCHIVO[sel.value]; renderAll(); };
+  sel.onchange=()=>{
+    if(sel.value==='__TRIM__'){
+      const meses=[...archKeys.map(k=>({key:k,data:ARCHIVO[k]})), {key:kLive,data:LIVE_DATA}];
+      DATA = buildTrimestreData(meses);
+    } else {
+      DATA = (sel.value==='__LIVE__') ? LIVE_DATA : ARCHIVO[sel.value];
+    }
+    renderAll();
+  };
 })();
 
 const miVendParam=new URLSearchParams(location.search).get('vend');
