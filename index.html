@@ -444,7 +444,7 @@ var DATA=null;
 
 function __app(){
 /* ---------- helpers ---------- */
-(function normalizeArrays(){
+function normalizeArrays(DATA){
   const toArr = v => v==null ? v : (Array.isArray(v) ? v : [v]);
   const top=['porVendedor','porSupervisor','porCanal','porCanalGrupo','porMarca','porFamilia','evolucion','devoluciones','devolucionesPorChofer','devolucionesClientes','topProductos','marcasOrden','mapaClientes'];
   top.forEach(f=>{ if(DATA[f]!=null) DATA[f]=toArr(DATA[f]); });
@@ -497,7 +497,17 @@ function __app(){
   if(DATA.coberturaMarcas){
     Object.keys(DATA.coberturaMarcas).forEach(k=>{ const c=DATA.coberturaMarcas[k]; if(c && c.clientes!=null) c.clientes=toArr(c.clientes); });
   }
-})();
+}
+// PowerShell (ConvertTo-Json) colapsa un array de 1 solo elemento a un objeto suelto - normalizeArrays
+// corrige eso. Antes solo se aplicaba a los datos EN VIVO (DATA) una vez al cargar la pagina; los
+// snapshots de meses archivados (ARCHIVO['2026-07'], etc., inyectados directo desde los .json en
+// data\archivo\) nunca pasaban por esta normalizacion - un solo dia con 1 vendedor con venta (ej.
+// 18/07) alcanzaba para que `porVendedor` quedara como objeto en vez de array, y cualquier `.filter()`
+// sobre eso tiraba una excepcion silenciosa que cortaba a mitad de camino el resto del render (asi
+// se detecto: "Ficha por Equipo" -> "Venta diaria" aparecia vacia al mirar el mes de Julio archivado,
+// 21/9). Fix: normalizar tambien cada entrada de ARCHIVO, no solo la data en vivo.
+normalizeArrays(DATA);
+Object.keys(ARCHIVO).forEach(k=>normalizeArrays(ARCHIVO[k]));
 
 const LIVE_DATA = DATA;
 const MESES_ES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
