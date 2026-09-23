@@ -4551,7 +4551,7 @@ function renderRutaReal(){
   /* ---- Disciplina de ruta: vista de equipo para un día (pedido de Damian 18/9, a partir de un
      reporte de referencia "Tienda Perfecta" de otro proyecto suyo) - va DEBAJO del mapa individual ---- */
   const eqCard=el('div','card');
-  eqCard.appendChild(el('div','ctitle','<h2>Disciplina de ruta</h2><span class="hint">todo el equipo, un día · PASÓ = el GPS detectó una parada cerca del cliente · ENTRÓ = paró 3 minutos o más (DE LARGO = menos de 3) · %CIERRE = de los que ENTRARON, cuántos terminaron en pedido ese día · DROP = ticket promedio del día (venta ÷ CCC), mismo criterio que se usa en el resto del tablero</span>'));
+  eqCard.appendChild(el('div','ctitle','<h2>Disciplina de ruta</h2><span class="hint">todo el equipo, un día · CARTERA = clientes programados para ESE día puntual (cruzado por día de visita + frecuencia semanal/quincenal/mensual) · PASÓ = el GPS detectó una parada cerca del cliente (incluye visitas fuera de ruta) · ENTRÓ = paró 3 minutos o más (DE LARGO = menos de 3) · SIN VISITA = de la cartera de hoy, cuántos no tuvieron ninguna señal GPS · %CIERRE = de los que ENTRARON, cuántos terminaron en pedido ese día · DROP = ticket promedio del día (venta ÷ CCC), mismo criterio que se usa en el resto del tablero</span>'));
   const eqBar=el('div',null,''); eqBar.style.cssText='display:flex;gap:10px;flex-wrap:wrap;align-items:center';
   const eqFecha=document.createElement('input'); eqFecha.type='date'; eqFecha.className='fsel'; eqFecha.value=hoyLocalStr();
   const eqBtn=document.createElement('button'); eqBtn.className='tab'; eqBtn.textContent='Ver equipo';
