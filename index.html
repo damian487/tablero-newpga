@@ -4639,6 +4639,11 @@ function renderRutaReal(){
     });
     const entradosCodsK=new Set(json.puntos.filter(pt=>pt.duracionMin>=3).map(pt=>pt.clienteId));
     const pasoCodsK=new Set(json.puntos.map(pt=>pt.clienteId));
+    // "Pedidos" (23/9, pedido de Damian - reemplaza "Líneas", que contaba items de venta y no se
+    // entendía bien): cantidad de paradas reales (≥3min) que terminaron en compra ese día - mismo
+    // criterio que "C/Pedido" en Disciplina de ruta (solo cuenta entre los ENTRADOS, no entre los
+    // "de largo").
+    const pedidosHoyK=json.puntos.filter(pt=>pt.duracionMin>=3 && pt.conVenta).length;
     const noAtendidos=planificados.filter(r=>!entradosCodsK.has(r.cod));
     const sinSenal=planificados.filter(r=>!pasoCodsK.has(r.cod));
     // "Clientes" (23/9, pedido de Damian): antes mostraba k.comercios (clientes distintos que el GPS
@@ -4647,7 +4652,7 @@ function renderRutaReal(){
     // abajo. Ahora usa el mismo "planificados" (cartera real del dia, ya cruzada por dia+frecuencia).
     kpiBox.innerHTML=`<div class="kpitiles" style="grid-template-columns:repeat(6,1fr)">
       ${ftile('Clientes',AR.format(planificados.length))}
-      ${ftile('Líneas',AR.format(k.lineas))}
+      ${ftile('Pedidos',AR.format(pedidosHoyK))}
       ${ftile('Desde',horaFmt(k.desde))}
       ${ftile('Hasta',horaFmt(k.hasta))}
       ${ftile('En la calle',k.tiempoEnCalleMin!=null?Math.floor(k.tiempoEnCalleMin/60)+'h'+String(k.tiempoEnCalleMin%60).padStart(2,'0'):'—')}
