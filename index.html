@@ -4640,10 +4640,13 @@ function renderRutaReal(){
     const entradosCodsK=new Set(json.puntos.filter(pt=>pt.duracionMin>=3).map(pt=>pt.clienteId));
     const pasoCodsK=new Set(json.puntos.map(pt=>pt.clienteId));
     // "Pedidos" (23/9, pedido de Damian - reemplaza "Líneas", que contaba items de venta y no se
-    // entendía bien): cantidad de paradas reales (≥3min) que terminaron en compra ese día - mismo
-    // criterio que "C/Pedido" en Disciplina de ruta (solo cuenta entre los ENTRADOS, no entre los
-    // "de largo").
-    const pedidosHoyK=json.puntos.filter(pt=>pt.duracionMin>=3 && pt.conVenta).length;
+    // entendía bien). Ajustado el mismo día: la primera versión exigía ≥3min de parada (mismo
+    // criterio que "C/Pedido" en Disciplina de ruta) y dejaba afuera ventas reales - ej. Pilar
+    // Fernandez vendió $5787 en 2 clientes un día y acá figuraba 0, porque una parada duró 1min
+    // (menos del umbral) y la otra venta no tuvo NINGUNA señal GPS ese día (pedido sin visita
+    // física). Ahora suma: cualquier punto GPS con compra (sin exigir duración mínima) + las
+    // ventas del día sin señal GPS que resuelve el backend (json.ventasSinGps, ver index.ts).
+    const pedidosHoyK=json.puntos.filter(pt=>pt.conVenta).length + (json.ventasSinGps?json.ventasSinGps.length:0);
     const noAtendidos=planificados.filter(r=>!entradosCodsK.has(r.cod));
     const sinSenal=planificados.filter(r=>!pasoCodsK.has(r.cod));
     // "Clientes" (23/9, pedido de Damian): antes mostraba k.comercios (clientes distintos que el GPS
