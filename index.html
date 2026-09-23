@@ -4641,8 +4641,12 @@ function renderRutaReal(){
     const pasoCodsK=new Set(json.puntos.map(pt=>pt.clienteId));
     const noAtendidos=planificados.filter(r=>!entradosCodsK.has(r.cod));
     const sinSenal=planificados.filter(r=>!pasoCodsK.has(r.cod));
+    // "Clientes" (23/9, pedido de Damian): antes mostraba k.comercios (clientes distintos que el GPS
+    // detecto ese dia, SIN filtrar por frecuencia/dia de ruta - podia incluir paradas fuera de la
+    // ruta oficial de hoy) - confuso al lado de "Planificados hoy" que ya esta bien filtrado mas
+    // abajo. Ahora usa el mismo "planificados" (cartera real del dia, ya cruzada por dia+frecuencia).
     kpiBox.innerHTML=`<div class="kpitiles" style="grid-template-columns:repeat(6,1fr)">
-      ${ftile('Clientes',AR.format(k.comercios))}
+      ${ftile('Clientes',AR.format(planificados.length))}
       ${ftile('Líneas',AR.format(k.lineas))}
       ${ftile('Desde',horaFmt(k.desde))}
       ${ftile('Hasta',horaFmt(k.hasta))}
