@@ -1690,12 +1690,26 @@ function renderAccion(){
   const M=A.meta, fechas=A.fechas;
   const CANALES=['Autoservicios','Almacenes','Kioscos'];
   function fd(f){ return f.slice(8,10)+'/'+f.slice(5,7); }
-  function cell(o,m){ if(!o) return '·'; if(m==='u') return AR.format(o.u); if(m==='imp') return peso(o.imp); return AR.format(o.cli); }
   function acc(o,m){ if(m==='u') return AR.format(o.acumU); if(m==='imp') return peso(o.acumImp); return AR.format(o.acumCli); }
+  // Tabla por mes en vez de por día (23/9, pedido de Damian: la tabla diaria desde el 23/07 ya
+  // tiene mas de 40 columnas y es ilegible) - agrupa las mismas fechas ya calculadas por Worker
+  // (dias[f], por dia) sumando dentro de cada mes. Para "u"/"imp" la suma mensual es exacta (son
+  // aditivos). Para "cli" es la suma de clientes-DIA distintos de cada dia del mes (no clientes
+  // unicos del mes: si el mismo cliente compro en 2 dias del mes cuenta 2 veces) - mismo limite que
+  // ya tenia la tabla diaria si se sumaban las columnas a mano, aclarado en el hint. Los 3 KPI de
+  // arriba (acumulados desde el 23/07) NO cambian, siguen usando acumU/acumImp/acumCli tal cual.
+  const mesesKeys=[...new Set(fechas.map(f=>f.slice(0,7)))].sort();
+  function mesLabel(mk){ const [y,m]=mk.split('-'); return MESES_ES[parseInt(m,10)-1].slice(0,3)+' '+y.slice(2); }
+  function cellMes(diasObj,mk,m){
+    let u=0,imp=0,cli=0,huboDato=false;
+    fechas.filter(f=>f.slice(0,7)===mk).forEach(f=>{ const o=diasObj[f]; if(o){ huboDato=true; u+=o.u; imp+=o.imp; cli+=o.cli; } });
+    if(!huboDato) return '·';
+    if(m==='u') return AR.format(u); if(m==='imp') return peso(imp); return AR.format(cli);
+  }
   function getScope(v){ return v==='todos' ? A.todos : ((A.canales||{})[v]); }
   const descTxt=CANALES.filter(cn=>M.descuentos&&M.descuentos[cn]!=null).map(cn=>cn+' '+M.descuentos[cn]+'%').join(' · ');
   const card=el('div','card');
-  let head=`<div class="ctitle"><h2>Acción de precio — ${M.nombre}</h2><span class="hint">cód. ${M.codigo} · descuentos: ${descTxt} · días accionados desde ${fd(M.desde)}</span></div>`;
+  let head=`<div class="ctitle"><h2>Acción de precio — ${M.nombre}</h2><span class="hint">cód. ${M.codigo} · descuentos: ${descTxt} · días accionados desde ${fd(M.desde)} · tabla agrupada por mes (en "Clientes", suma de clientes-día de cada mes: si un cliente compró en más de un día del mismo mes cuenta una vez por día, no es cliente único del mes)</span></div>`;
   head+='<div style="display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 12px">';
   head+='<select id="accScope" class="fsel">'+CANALES.map(cn=>`<option value="${cn}">Canal: ${cn}${M.descuentos&&M.descuentos[cn]!=null?' ('+M.descuentos[cn]+'% desc.)':''}</option>`).join('')+'<option value="todos">Canal: Todos</option></select>';
   head+='<select id="accMetric" class="fsel"><option value="u">Métrica: Unidades</option><option value="imp">Métrica: Importe $</option><option value="cli">Métrica: Clientes</option></select>';
@@ -1710,20 +1724,20 @@ function renderAccion(){
       <div class="supcard"><h3>Importe acumulado</h3><div class="big num">${peso(sc.total.acumImp)}</div><div class="who">con IVA</div></div>
       <div class="supcard"><h3>Clientes</h3><div class="big num">${AR.format(sc.total.acumCli)}</div><div class="who">distintos con acción</div></div></div>`;
     let h='<div class="twrap"><table><thead><tr><th>Vendedor / Equipo</th>';
-    fechas.forEach(f=>{ h+=`<th class="num">${fd(f)}</th>`; });
+    mesesKeys.forEach(mk=>{ h+=`<th class="num">${mesLabel(mk)}</th>`; });
     h+='<th class="num">Acum. acción</th></tr></thead><tbody>';
     sc.porSupervisor.forEach(sup=>{
       h+=`<tr class="subhead"><td>Equipo ${sup.supervisor}</td>`;
-      fechas.forEach(f=>{ h+=`<td class="num">${cell(sup.dias[f],m)}</td>`; });
+      mesesKeys.forEach(mk=>{ h+=`<td class="num">${cellMes(sup.dias,mk,m)}</td>`; });
       h+=`<td class="num">${acc(sup,m)}</td></tr>`;
       sc.porVendedor.filter(v=>v.supervisor===sup.supervisor).forEach(v=>{
         h+=`<tr><td class="name">${v.nombre}</td>`;
-        fechas.forEach(f=>{ h+=`<td class="num">${cell(v.dias[f],m)}</td>`; });
+        mesesKeys.forEach(mk=>{ h+=`<td class="num">${cellMes(v.dias,mk,m)}</td>`; });
         h+=`<td class="num">${acc(v,m)}</td></tr>`;
       });
     });
     h+=`<tr class="total"><td>TOTAL ${selS.value==='todos'?'todos los canales':selS.value}</td>`;
-    fechas.forEach(f=>{ h+=`<td class="num">${cell(sc.total.dias[f],m)}</td>`; });
+    mesesKeys.forEach(mk=>{ h+=`<td class="num">${cellMes(sc.total.dias,mk,m)}</td>`; });
     h+=`<td class="num">${acc(sc.total,m)}</td></tr>`;
     h+='</tbody></table></div>'; box.innerHTML=h;
   }
