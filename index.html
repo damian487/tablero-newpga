@@ -2568,6 +2568,40 @@ async function fetchRelevamiento(force){
   _relevCache=j.respuestas||[];
   return _relevCache;
 }
+function exportarRelevamientoExcel(rows,artNombres){
+  const aoaDet=[['Fecha','Vendedor','Cliente','Dirección','Nos compró',...artNombres,'Observaciones','Foto']];
+  [...rows].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).forEach(r=>{
+    const fila=[r.fecha?r.fecha.slice(0,10):'',r.vendedor||'',r.cliente||'',r.direccion||'',
+      r.nosCompro==='SI'?'Sí':(r.nosCompro==='NO'?'No':'—')];
+    artNombres.forEach(nombre=>{
+      const a=(r.articulos||[]).find(x=>x.nombre===nombre);
+      fila.push(a&&a.tiene==='SI'?(a.precio!==''&&a.precio!=null?Number(a.precio):'sin precio'):'—');
+    });
+    fila.push(r.obs||'', r.foto||'—');
+    aoaDet.push(fila);
+  });
+  const wsDet=XLSX.utils.aoa_to_sheet(aoaDet);
+  wsDet['!cols']=[{wch:11},{wch:24},{wch:26},{wch:26},{wch:11},...artNombres.map(()=>({wch:16})),{wch:30},{wch:40}];
+
+  const aoaRes=[['Producto','Con stock','% de relevados','Precio prom.','Precio mín.','Precio máx.']];
+  artNombres.forEach(nombre=>{
+    const vals=rows.map(r=>(r.articulos||[]).find(a=>a.nombre===nombre)).filter(Boolean);
+    const conStock=vals.filter(a=>a.tiene==='SI');
+    const precios=conStock.map(a=>Number(a.precio)).filter(n=>isFinite(n)&&n>0);
+    aoaRes.push([nombre, `${conStock.length}/${vals.length}`,
+      vals.length?Math.round(conStock.length/vals.length*1000)/10:0,
+      precios.length?Math.round(precios.reduce((s,n)=>s+n,0)/precios.length):'—',
+      precios.length?Math.min(...precios):'—',
+      precios.length?Math.max(...precios):'—']);
+  });
+  const wsRes=XLSX.utils.aoa_to_sheet(aoaRes);
+  wsRes['!cols']=[{wch:32},{wch:12},{wch:14},{wch:14},{wch:14},{wch:14}];
+
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, wsDet, 'Detalle');
+  XLSX.utils.book_append_sheet(wb, wsRes, 'Resumen por producto');
+  XLSX.writeFile(wb, `Relevamiento_Precios_NewPGA_${hoyLocalStr()}.xlsx`);
+}
 async function renderRelevamiento(force){
   const p=document.getElementById('p-relevamiento');
   if(!p.innerHTML) p.innerHTML='<div class="card"><p style="color:var(--muted)">Cargando relevamiento…</p></div>';
@@ -2579,9 +2613,10 @@ async function renderRelevamiento(force){
   const totalUniverso=DATA.porVendedor.filter(v=>!v.mayorista).reduce((s,v)=>s+v.universo,0);
   const clientesUnicos=new Set(rows.map(r=>r.vendedorCod+'|'+r.clienteCod)).size;
   const nosCompraSi=rows.filter(r=>r.nosCompro==='SI').length;
+  const artNombres=[...new Set(rows.flatMap(r=>(r.articulos||[]).map(a=>a.nombre)))];
 
   const head=el('div','card');
-  head.appendChild(el('div','ctitle','<h2>🏷️ Relevamiento de Precios — New PGA</h2><span class="hint">precio de góndola relevado por los vendedores en el local del cliente · cargado desde el celular, independiente de la corrida diaria</span><button id="btnRelevRefresh" style="margin-top:8px;font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer">🔄 Actualizar</button>'));
+  head.appendChild(el('div','ctitle','<h2>🏷️ Relevamiento de Precios — New PGA</h2><span class="hint">precio de góndola relevado por los vendedores en el local del cliente · cargado desde el celular, independiente de la corrida diaria</span><button id="btnRelevRefresh" style="margin-top:8px;font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer">🔄 Actualizar</button> <button id="btnRelevExport" style="margin-top:8px;font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer">📥 Exportar Excel</button>'));
   const sg=el('div','supgrid');
   sg.appendChild(el('div','supcard',`<div class="who">Clientes relevados</div><div class="big num">${AR.format(clientesUnicos)}</div>`));
   sg.appendChild(el('div','supcard',`<div class="who">Cobertura del universo</div><div class="big num">${pct(totalUniverso?Math.round(clientesUnicos/totalUniverso*1000)/10:0)}</div>`));
@@ -2590,6 +2625,11 @@ async function renderRelevamiento(force){
   head.appendChild(sg);
   p.appendChild(head);
   document.getElementById('btnRelevRefresh').onclick=()=>renderRelevamiento(true);
+  // "Exportar Excel" (24/9, pedido de Damian - informe para el ejecutivo de P&G): mismo patron que
+  // el export de "cart_import" (XLSX.js ya cargado en el <head>) - 2 hojas, Detalle (un
+  // relevamiento por fila, igual a la tabla de abajo) + Resumen por producto (igual al panel de
+  // abajo), sin pegarle de nuevo al Worker (usa los mismos "rows" ya cargados en esta pantalla).
+  document.getElementById('btnRelevExport').onclick=()=>exportarRelevamientoExcel(rows,artNombres);
 
   // ---- uso de la herramienta: quien releva y quien todavia no (pedido de Damian 16/9) ----
   const vendActivos=DATA.porVendedor.filter(v=>!v.mayorista).map(v=>({cod:String(v.cod),nombre:v.nombre,supervisor:v.supervisor}));
@@ -2624,8 +2664,6 @@ async function renderRelevamiento(force){
   p.appendChild(usoCard);
 
   if(!rows.length){ p.appendChild(el('div','card','<p style="color:var(--muted)">Todavía no hay relevamientos cargados.</p>')); return; }
-
-  const artNombres=[...new Set(rows.flatMap(r=>(r.articulos||[]).map(a=>a.nombre)))];
 
   const artCard=el('div','card');
   artCard.appendChild(el('div','ctitle','<h2>Resumen por producto</h2><span class="hint">sobre los relevamientos cargados · precio de góndola</span>'));
