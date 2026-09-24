@@ -4529,7 +4529,11 @@ function renderRutaReal(){
   const p=document.getElementById('p-rutareal');
   if(p.dataset.built){ return; }
   p.dataset.built='1';
-  const vends=[...DATA.porVendedor].sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  // Excluye codigos 20/21/51 (Deposito/Mayorista/Martin) del selector - pedido de Damian (23/9):
+  // no tienen seguimiento GPS (no son vendedores de ruta con Axum), asi que solo generan un
+  // combo vacio/sin datos en este panel.
+  const SIN_GPS_COD=new Set(['20','21','51']);
+  const vends=[...DATA.porVendedor].filter(v=>!SIN_GPS_COD.has(String(v.cod))).sort((a,b)=>a.nombre.localeCompare(b.nombre));
 
   const head=el('div','card');
   head.appendChild(el('div','ctitle','<h2>Mapa por vendedor</h2><span class="hint">recorrido físico real de un vendedor puntual ese día, según Axum GPS · la línea celeste tenue es el trayecto real por las calles, con bandera verde de inicio y roja de cierre · el número conecta solo las paradas reales (≥3 min): verde = compró, naranja = no compró · los puntitos grises son "de largo" (pasó cerca, no paró) · círculos rojos punteados = clientes planificados para ese día que NO tuvieron ninguna señal GPS (no atendidos) · requiere conexión a internet</span>'));
