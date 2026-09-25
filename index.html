@@ -4916,7 +4916,47 @@ function renderConfig(){
     msuBtn.disabled=false;
   };
 
-  /* ---- Carga inicial: precarga los 3 formularios con el efectivo actual ---- */
+  /* ---- Objetivos PFP Red GANA (programa aparte del Concurso Nubi de arriba, ver [[gescom-objetivacion-msu]]) ---- */
+  const PFP_CATS_SELLOUT=['DESODORANTES','CUIDADO DEL BEBE','CUIDADO ORAL','CUIDADO DE LA ROPA','PILAS Y BATERIAS','CUIDADO FEMENINO','CUIDADO DEL CABELLO','AFEITADO Y CUIDADO DE LA BARBA'];
+  const PFP_CATS_SURTIDO=['AFEITADO Y CUIDADO DE LA BARBA','CUIDADO DE LA ROPA','CUIDADO DEL BEBE','CUIDADO DEL CABELLO','CUIDADO FEMENINO','CUIDADO ORAL','DESODORANTES','PILAS Y BATERIAS'];
+  const PFP_CANALES=['Autoservicios','Almacenes','Kioscos'];
+  const pfpCard=el('div','card');
+  pfpCard.appendChild(el('div','ctitle','<h2>Objetivos PFP Red GANA</h2><span class="hint">objetivos del trimestre nuevo tal como los manda el ejecutivo de P&G (captura de Talamus) · Sell Out = Objetivo MSU por categoría, Surtido = Objetivo CCC por categoría, Canales = Objetivo CCC acumulado del trimestre · usa las mismas fechas de trimestre que "Objetivos del trimestre" de arriba</span>'));
+  function pfpMiniTable(titulo,cats,step){
+    const wrap=el('div',null,'<h3 style="margin:14px 0 6px;font-size:14px">'+titulo+'</h3>');
+    const grid=el('div',null,''); grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;max-width:900px';
+    const inputs={};
+    cats.forEach(cat=>{ const inp=document.createElement('input'); inp.type='number'; inp.step=step; inputs[cat]=inp; grid.appendChild(field(cat,inp)); });
+    wrap.appendChild(grid);
+    return {wrap,inputs};
+  }
+  const pfpSellOut=pfpMiniTable('Sell Out — Objetivo MSU por categoría',PFP_CATS_SELLOUT,'0.01');
+  const pfpSurtido=pfpMiniTable('Surtido — Objetivo CCC por categoría',PFP_CATS_SURTIDO,'1');
+  const pfpCanal=pfpMiniTable('Canales — Objetivo CCC acumulado trimestral',PFP_CANALES,'1');
+  pfpCard.appendChild(pfpSellOut.wrap); pfpCard.appendChild(pfpSurtido.wrap); pfpCard.appendChild(pfpCanal.wrap);
+  const pfpBtn=document.createElement('button'); pfpBtn.className='tab'; pfpBtn.textContent='Guardar objetivos PFP'; pfpBtn.style.marginTop='10px';
+  const pfpMsg=el('div','note',''); pfpMsg.style.marginTop='8px';
+  pfpCard.appendChild(pfpBtn); pfpCard.appendChild(pfpMsg);
+  p.appendChild(pfpCard);
+
+  pfpBtn.onclick=async()=>{
+    let pw=''; try{ pw=sessionStorage.getItem('gpw')||''; }catch(_){ }
+    pfpBtn.disabled=true; statusMsg(pfpMsg,true,'Guardando…');
+    const selloutObjetivoMsu={}, surtidoObjetivoCcc={}, canalObjetivoCcc={};
+    PFP_CATS_SELLOUT.forEach(cat=>selloutObjetivoMsu[cat]=Number(pfpSellOut.inputs[cat].value)||0);
+    PFP_CATS_SURTIDO.forEach(cat=>surtidoObjetivoCcc[cat]=Number(pfpSurtido.inputs[cat].value)||0);
+    PFP_CANALES.forEach(cg=>canalObjetivoCcc[cg]=Number(pfpCanal.inputs[cg].value)||0);
+    const data={selloutObjetivoMsu,surtidoObjetivoCcc,canalObjetivoCcc};
+    try{
+      const res=await fetch(CONFIG_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json','X-Dashboard-Password':pw},body:JSON.stringify({tipo:'pfp',data})});
+      const json=await res.json();
+      if(!json.ok) throw new Error(json.error||'error del servidor');
+      statusMsg(pfpMsg,true,'Guardado. Se aplica en la próxima actualización del tablero.');
+    }catch(e){ statusMsg(pfpMsg,false,'No se pudo guardar ('+e.message+').'); }
+    pfpBtn.disabled=false;
+  };
+
+  /* ---- Carga inicial: precarga los 4 formularios con el efectivo actual ---- */
   async function cargarConfig(){
     let pw=''; try{ pw=sessionStorage.getItem('gpw')||''; }catch(_){ }
     try{
@@ -4928,6 +4968,11 @@ function renderConfig(){
       iNotas.value=json.accion.notas||'';
       pintarCombos([...(json.combosDefault||[]),...(json.combosExtra||[])]);
       mStart.value=json.msu.start; mFin.value=json.msu.fintrim; mMeta.value=json.msu.metaMsu; mPesos.value=json.msu.selloutMetaFijo;
+      if(json.pfp){
+        PFP_CATS_SELLOUT.forEach(cat=>{ pfpSellOut.inputs[cat].value=json.pfp.selloutObjetivoMsu[cat]??''; });
+        PFP_CATS_SURTIDO.forEach(cat=>{ pfpSurtido.inputs[cat].value=json.pfp.surtidoObjetivoCcc[cat]??''; });
+        PFP_CANALES.forEach(cg=>{ pfpCanal.inputs[cg].value=json.pfp.canalObjetivoCcc[cg]??''; });
+      }
     }catch(e){
       comboTableWrap.innerHTML='<p style="color:var(--bad)">No se pudo cargar la configuración actual ('+e.message+').</p>';
     }
