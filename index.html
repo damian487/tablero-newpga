@@ -5328,11 +5328,15 @@ function buildTrimestreData(meses){
   const porMarcaConPct=(()=>{ const tot=porMarca.reduce((a,r)=>a+r.venta,0); porMarca.forEach(r=>r.pct=tot>0?round1(100*r.venta/tot):0); return porMarca; })();
   const porCanalGrupo=combinarLista('porCanalGrupo','canal',['venta','ccc']);
   const porSupervisor=combinarLista('porSupervisor','supervisor',['venta','ccc']);
+  // porVendedor tambien se suma entre meses (antes quedaba con el valor del mes en curso nomas,
+  // por eso la Ficha por Equipo mostraba KPIs de un solo mes aunque el filtro de arriba dijera
+  // Trimestre - pedido de Damian 25/9).
+  const porVendedor=combinarLista('porVendedor','cod',['venta','ccc','lineas']).sort((a,b)=>b.venta-a.venta);
 
   const evoMap=new Map(); meses.forEach(m=>{ (m.data.evolucion||[]).forEach(e=>evoMap.set(e.fecha,e)); });
   const evolucion=[...evoMap.values()].sort((a,b)=>a.fecha<b.fecha?-1:1);
 
-  return { ...LIVE_DATA, __trimestre:true, kpis, porMarca:porMarcaConPct, porCanalGrupo, porCanal:porCanalGrupo, porSupervisor, evolucion, meta:{...LIVE_DATA.meta} };
+  return { ...LIVE_DATA, __trimestre:true, kpis, porMarca:porMarcaConPct, porCanalGrupo, porCanal:porCanalGrupo, porSupervisor, porVendedor, evolucion, meta:{...LIVE_DATA.meta} };
 }
 
 (function initMesSelector(){
