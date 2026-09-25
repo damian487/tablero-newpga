@@ -4021,7 +4021,7 @@ function renderFicha(){
   }
 
   fillVendSel('TODOS');
-  sel.value=ranked[0].cod;
+  sel.value='TODOS';
   equipoSel.onchange=()=>{ fillVendSel(equipoSel.value); draw(sel.value); };
   sel.onchange=()=>draw(sel.value);
   draw(sel.value);
