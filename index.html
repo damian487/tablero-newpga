@@ -5400,16 +5400,30 @@ function buildTrimestreData(meses){
     const o=el('option',null,MESES_ES[parseInt(m,10)-1]+' '+y); o.value=kArch;
     sel.appendChild(o);
   });
-  if(archKeys.length){
-    const primerMes=MESES_ES[parseInt(archKeys[0].split('-')[1],10)-1];
-    const ultimoMes=MESES_ES[parseInt(mLive,10)-1];
-    const trimOpt=el('option',null,`Trimestre (${primerMes.slice(0,3)}-${ultimoMes.slice(0,3)})`); trimOpt.value='__TRIM__';
-    sel.appendChild(trimOpt);
-  }
+  // Trimestres: agrupados por trimestre CALENDARIO real (Jul-Sep / Oct-Dic / ...), no "todo lo
+  // archivado + el mes en curso" como antes - eso mezclaba, apenas arrancaba un trimestre nuevo,
+  // el trimestre YA CERRADO con el mes en curso del trimestre siguiente (pedido de Damian 22/10:
+  // "guardá el trimestre pasado congelado para poder verlo filtrando, para ver el cierre cerrado" -
+  // separado del trimestre nuevo en curso, no mezclado en una sola opcion "Trimestre").
+  function trimQ(mesKey){ const [y,m]=mesKey.split('-').map(Number); return y+'-Q'+Math.ceil(m/3); }
+  const grupos={};
+  [...archKeys, kLive].forEach(k=>{ const q=trimQ(k); (grupos[q]=grupos[q]||[]).push(k); });
+  Object.keys(grupos).sort().reverse().forEach(q=>{
+    const meses=grupos[q].sort();
+    if(meses.length<2 && meses.includes(kLive)) return; // un solo mes = el mes en curso, ya tiene su propia opcion arriba
+    const primerMes=MESES_ES[parseInt(meses[0].split('-')[1],10)-1];
+    const ultimoMes=MESES_ES[parseInt(meses[meses.length-1].split('-')[1],10)-1];
+    const anio=meses[0].split('-')[0];
+    const esActual=meses.includes(kLive);
+    const o=el('option',null,`Trimestre ${primerMes.slice(0,3)}-${ultimoMes.slice(0,3)} ${anio}${esActual?' (actual)':' (cerrado)'}`);
+    o.value='__TRIM_'+q+'__';
+    sel.appendChild(o);
+  });
   sel.value='__LIVE__';
   sel.onchange=()=>{
-    if(sel.value==='__TRIM__'){
-      const meses=[...archKeys.map(k=>({key:k,data:ARCHIVO[k]})), {key:kLive,data:LIVE_DATA}];
+    if(sel.value.indexOf('__TRIM_')===0){
+      const q=sel.value.slice(7,-2);
+      const meses=grupos[q].map(k=>({key:k, data: k===kLive?LIVE_DATA:ARCHIVO[k]}));
       DATA = buildTrimestreData(meses);
     } else {
       DATA = (sel.value==='__LIVE__') ? LIVE_DATA : ARCHIVO[sel.value];
