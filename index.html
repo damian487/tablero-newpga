@@ -2086,6 +2086,13 @@ function renderCombos(){
   function cell(o,m){ if(!o) return '·'; if(m==='u') return AR.format(o.u); if(m==='imp') return peso(o.imp); return AR.format(o.cli); }
   function acc(o,m){ if(m==='u') return AR.format(o.acumU); if(m==='imp') return peso(o.acumImp); return AR.format(o.acumCli); }
   const hoyRef=DATA.meta.ultimaFecha;
+  const porVencer=lista.filter(cb=>cb.hasta&&cb.diasParaVencer!=null&&cb.diasParaVencer<=7&&cb.diasParaVencer>=0);
+  if(porVencer.length){
+    const dMin=Math.min(...porVencer.map(cb=>cb.diasParaVencer));
+    const av=el('div','card'); av.style.borderLeft='4px solid var(--warn2)';
+    av.innerHTML='<div class="ctitle"><h2>⏰ '+porVencer.length+' combo'+(porVencer.length===1?'':'s')+' vence'+(porVencer.length===1?'':'n')+(dMin===0?' hoy':' en '+dMin+' día'+(dMin===1?'':'s'))+'</h2><span class="hint">verificar la continuidad con New PGA/Gescom: después de la fecha de fin el tablero deja de medirlos</span></div><div class="note">'+porVencer.map(cb=>cb.nombre+' — vence el '+cb.hasta.slice(8,10)+'/'+cb.hasta.slice(5,7)).join('<br>')+'</div>';
+    p.appendChild(av);
+  }
   const card=el('div','card');
   let head='<div class="ctitle"><h2>Combos — seguimiento por combo</h2><span class="hint">líneas de venta con el descuento del combo ya aplicado por el motor de promociones de Gescom (id real, no estimado)</span></div>';
   head+='<div style="display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 12px">';
@@ -2173,7 +2180,7 @@ function renderCombos(){
     const cb=lista[parseInt(selC.value,10)], m=selM.value, sup=selSup.value, fechas=cb.fechas||[];
     const scope=cbScope(cb,sup);
     const combosHoyScope=(scope.dias&&scope.dias[hoyRef])?scope.dias[hoyRef].cli:0;
-    metaEl.innerHTML=`<div class="note">Canal: ${cb.canal} · descuento ${cb.descuentoPct}% · vigente desde ${fd(cb.desde)} · condición: ${cb.condicion}${sup!=='TODOS'?' · vista: Equipo '+sup:''}</div>`;
+    metaEl.innerHTML=`<div class="note">Canal: ${cb.canal} · descuento ${cb.descuentoPct}% · vigente desde ${fd(cb.desde)}${cb.hasta?' hasta '+fd(cb.hasta)+(cb.diasParaVencer!=null&&cb.diasParaVencer<=7&&cb.diasParaVencer>=0?' ⏰ (vence en '+cb.diasParaVencer+' d)':''):''} · condición: ${cb.condicion}${sup!=='TODOS'?' · vista: Equipo '+sup:''}</div>`;
     sumEl.innerHTML=`<div class="kpitiles" style="grid-template-columns:repeat(4,1fr)">
       <div class="supcard"><h3>Combos vendidos hoy</h3><div class="big num" style="color:var(--accent)">${AR.format(combosHoyScope)}</div><div class="who">${fd(hoyRef)}</div></div>
       <div class="supcard"><h3>Combos vendidos (acumulado)</h3><div class="big num" style="color:var(--good)">${AR.format(scope.acumCli)}</div><div class="who">desde ${fd(cb.desde)}</div></div>
@@ -4857,11 +4864,19 @@ function renderConfig(){
   comboCard.appendChild(comboBtn); comboCard.appendChild(comboMsg);
   p.appendChild(comboCard);
 
-  function pintarCombos(lista){
-    if(!lista.length){ comboTableWrap.innerHTML='<p style="color:var(--muted)">No hay combos cargados.</p>'; return; }
-    let h='<div class="twrap"><table class="tbl-compact"><thead><tr><th>Nombre</th><th>Canal</th><th>PromoId</th><th class="num">Desc. %</th><th>Desde</th><th>Detalle</th></tr></thead><tbody>';
-    lista.forEach(c=>{ h+=`<tr><td>${c.nombre}</td><td>${c.canal}</td><td>${(c.promoIds||[]).join(', ')}</td><td class="num">${c.descuentoPct}%</td><td>${c.desde}</td><td style="color:var(--muted);font-size:12px">${c.detalle||'—'}</td></tr>`; });
-    h+='</tbody></table></div>';
+  function venceTxt(c){
+    if(!c.hasta) return '<span style="color:var(--muted)">—</span>';
+    const f=c.hasta.slice(8,10)+'/'+c.hasta.slice(5,7)+'/'+c.hasta.slice(0,4);
+    const d=c.diasParaVencer;
+    if(d!=null && d<=7) return '<b style="color:var(--bad)">⏰ '+f+' (en '+d+' d)</b>';
+    return f;
+  }
+  function pintarCombos(lista,ocultos){
+    const nota=ocultos>0?'<p style="color:var(--muted);font-size:12px;margin:6px 0 0">Se ocultan '+ocultos+' combo'+(ocultos===1?'':'s')+' vencido'+(ocultos===1?'':'s')+' (Gescom ya los dio de baja) · el tablero mide solo los vigentes, y avisa por Telegram 7 y 2 días antes de que venzan.</p>':'';
+    if(!lista.length){ comboTableWrap.innerHTML='<p style="color:var(--muted)">No hay combos vigentes cargados.</p>'+nota; return; }
+    let h='<div class="twrap"><table class="tbl-compact"><thead><tr><th>Nombre</th><th>Canal</th><th>PromoId</th><th class="num">Desc. %</th><th>Desde</th><th>Vence</th><th>Detalle</th></tr></thead><tbody>';
+    lista.forEach(c=>{ h+=`<tr><td>${c.nombre}</td><td>${c.canal}</td><td>${(c.promoIds||[]).join(', ')}</td><td class="num">${c.descuentoPct}%</td><td>${c.desde}</td><td>${venceTxt(c)}</td><td style="color:var(--muted);font-size:12px">${c.detalle||'—'}</td></tr>`; });
+    h+='</tbody></table></div>'+nota;
     comboTableWrap.innerHTML=h;
   }
 
@@ -4966,7 +4981,7 @@ function renderConfig(){
       iCodigo.value=json.accion.codigo; iNombre.value=json.accion.nombre; iDesde.value=json.accion.desde; iRef.value=json.accion.ref;
       iAuto.value=json.accion.descuentos.Autoservicios; iAlm.value=json.accion.descuentos.Almacenes; iKio.value=json.accion.descuentos.Kioscos;
       iNotas.value=json.accion.notas||'';
-      pintarCombos([...(json.combosDefault||[]),...(json.combosExtra||[])]);
+      pintarCombos([...(json.combosDefault||[]),...(json.combosExtra||[])],json.combosVencidosOcultos||0);
       mStart.value=json.msu.start; mFin.value=json.msu.fintrim; mMeta.value=json.msu.metaMsu; mPesos.value=json.msu.selloutMetaFijo;
       if(json.pfp){
         PFP_CATS_SELLOUT.forEach(cat=>{ pfpSellOut.inputs[cat].value=json.pfp.selloutObjetivoMsu[cat]??''; });
