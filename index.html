@@ -3857,6 +3857,7 @@ function renderFicha(){
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
         <span style="font-size:12px;color:var(--muted);font-weight:700">Desde</span><select id="fichaDesde" class="fsel"></select>
         <span style="font-size:12px;color:var(--muted);font-weight:700">Hasta</span><select id="fichaHasta" class="fsel"></select>
+        <span id="fichaSinVenta" style="display:inline-flex;align-items:baseline;gap:6px;padding:6px 14px;border-radius:999px;font-size:12.5px;font-weight:700"></span>
         </div><div id="fichaVentaBox"></div></div>`;
     }
 
@@ -4060,6 +4061,15 @@ function renderFicha(){
         vh+=`<tr class="grandtotal"><td>TOTAL del rango</td><td class="num">${peso(tv)}</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>`;
         vh+='</tbody></table></div>';
         vBox.innerHTML=vh;
+        // Banner de dias sin venta en el rango elegido (pedido de Damian 29/10): se recalcula al
+        // mover Desde/Hasta, asi a medida que se agranda el rango se ve como se acumulan.
+        const sinVenta=items.filter(d=>!(d.venta>0)).length;
+        let racha=0; for(let i=items.length-1;i>=0&&!(items[i].venta>0);i--) racha++;
+        const sv=document.getElementById('fichaSinVenta');
+        const malo=sinVenta>0;
+        sv.style.background=malo?'color-mix(in srgb, var(--bad) 14%, transparent)':'color-mix(in srgb, var(--good) 14%, transparent)';
+        sv.style.color=malo?'var(--bad)':'var(--good)';
+        sv.innerHTML=`Días sin venta: <span class="num" style="font-size:17px">${sinVenta}</span><span style="font-weight:400;color:var(--muted)">de ${items.length} días hábiles${racha>1?` · ${racha} seguidos al final del rango`:''}</span>`;
       }
       dSel.onchange=drawVenta; hSel.onchange=drawVenta; drawVenta();
     }
