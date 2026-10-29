@@ -2088,29 +2088,29 @@ function renderFilos(){
   const M=F.meta, MES={'2026-10':'Octubre','2026-11':'Noviembre'};
   const card=el('div','card');
   const arts=Object.entries(M.articulos).map(([c,n])=>`${n} (cód. ${c})`).join(' · ');
-  let h=`<div class="ctitle"><h2>${M.nombre} — clientes con compra en ${M.canal}</h2><span class="hint">${arts} · objetivo: promedio ${MES[M.meses[0]]}-${MES[M.meses[M.meses.length-1]]} ≥ ${M.target} clientes · ${M.nota}</span></div>`;
+  let h=`<div class="ctitle"><h2>${M.nombre} — Autoservicios que cumplen (2 PB3 + 1 UG2)</h2><span class="hint">${arts} · objetivo: promedio ${MES[M.meses[0]]}-${MES[M.meses[M.meses.length-1]]} ≥ ${M.target} clientes · ${M.nota}</span></div>`;
   const tiles=F.meses.map(m=>{
     const col=m.futuro?'var(--muted)':(m.ccc>=M.target?'var(--good)':'var(--bad)');
-    const sub=m.futuro?'todavía no empezó':(m.enCurso?`en curso · proyección ${AR.format(m.proyeccion||0)} · UG2 ${m.ug2} · PB3 ${m.pb3}`:`cerrado · UG2 ${m.ug2} · PB3 ${m.pb3}`);
+    const sub=m.futuro?'todavía no empezó':(m.enCurso?`en curso · proyección ${AR.format(m.proyeccion||0)} · compraron Filos ${m.compradores??'-'} · a un paso ${m.aUnPaso??'-'}`:`cerrado · compraron Filos ${m.compradores??'-'} · no llegaron ${m.aUnPaso??'-'}`);
     return `<div class="supcard"><h3>${MES[m.mes]||m.mes}</h3><div class="big num" style="color:${col}">${AR.format(m.ccc)}</div><div class="who">${sub}</div></div>`;
   }).join('');
   const prom=F.promedioActual;
   h+=`<div class="kpitiles" style="grid-template-columns:repeat(${F.meses.length+2},1fr)">${tiles}
     <div class="supcard"><h3>Promedio a hoy</h3><div class="big num" style="color:${prom>=M.target?'var(--good)':'var(--bad)'}">${AR.format(prom)} / ${M.target}</div><div class="who">${Math.round(prom/M.target*100)}% del objetivo</div></div>
     <div class="supcard"><h3>Necesario por mes restante</h3><div class="big num">${AR.format(F.necesarioPorMesRestante)}</div><div class="who">clientes de Autoservicios (universo ${AR.format(F.universoAS)})</div></div></div>`;
-  h+='<h3 style="margin:14px 0 6px">Clientes con compra por vendedor</h3><div class="twrap"><table><thead><tr><th>Vendedor</th><th>Equipo</th>'+M.meses.map(m=>`<th class="num">${MES[m]||m}</th>`).join('')+'</tr></thead><tbody>';
+  h+='<h3 style="margin:14px 0 6px">Autoservicios que cumplen, por vendedor</h3><div class="twrap"><table><thead><tr><th>Vendedor</th><th>Equipo</th>'+M.meses.map(m=>`<th class="num">${MES[m]||m}</th>`).join('')+'</tr></thead><tbody>';
   F.porVendedor.forEach(v=>{ h+=`<tr><td class="name">${v.nombre}</td><td style="color:var(--muted)">${v.supervisor}</td>`+M.meses.map(m=>`<td class="num">${v.meses[m]||'·'}</td>`).join('')+'</tr>'; });
   h+='</tbody></table></div>';
   const vends=[...new Set(F.pendientes.map(x=>x.vendedor))].sort();
-  h+=`<h3 style="margin:14px 0 6px">Autoservicios que todavía no compraron Filos este mes (${AR.format(F.pendientesTotal)})</h3>
+  h+=`<h3 style="margin:14px 0 6px">Autoservicios que todavía no cumplen este mes (${AR.format(F.pendientesTotal)}) — primero los que ya compraron y les falta poco</h3>
     <div style="margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap"><select id="filVend" class="fsel"><option value="">Todos los vendedores</option>${vends.map(v=>`<option>${v}</option>`).join('')}</select>
     <label style="font-size:12px"><input type="checkbox" id="filAntes" checked> solo los que ya compraron Filos antes</label></div><div id="filPend"></div>`;
   card.innerHTML=h; p.appendChild(card);
   const box=card.querySelector('#filPend'), sv=card.querySelector('#filVend'), ca=card.querySelector('#filAntes');
   function draw(){
-    const rows=F.pendientes.filter(x=>(!sv.value||x.vendedor===sv.value)&&(!ca.checked||x.comproAntes));
-    let t='<div class="twrap"><table><thead><tr><th>Cliente</th><th>Razón social</th><th>Vendedor</th><th>Compró Filos antes</th><th>Última compra</th><th class="num">Unidades antes</th></tr></thead><tbody>';
-    rows.slice(0,300).forEach(x=>{ t+=`<tr><td>${x.cliente}</td><td class="name">${x.razonSocial}</td><td>${x.vendedor}</td><td style="color:${x.comproAntes?'var(--good)':'var(--muted)'}">${x.comproAntes?'Sí':'No'}</td><td>${x.ultimaCompra?x.ultimaCompra.slice(8,10)+'/'+x.ultimaCompra.slice(5,7):'—'}</td><td class="num">${x.unidadesAntes||'·'}</td></tr>`; });
+    const rows=F.pendientes.filter(x=>(!sv.value||x.vendedor===sv.value)&&(!ca.checked||x.comproAntes||x.aUnPaso));
+    let t='<div class="twrap"><table><thead><tr><th>Cliente</th><th>Razón social</th><th>Vendedor</th><th class="num">UG2 este mes</th><th class="num">PB3 este mes</th><th>Le falta</th><th>Compró Filos antes</th><th>Última compra</th><th class="num">Unidades antes</th></tr></thead><tbody>';
+    rows.slice(0,300).forEach(x=>{ t+=`<tr><td>${x.cliente}</td><td class="name">${x.razonSocial}</td><td>${x.vendedor}</td><td class="num">${x.ug2Mes||'·'}</td><td class="num">${x.pb3Mes||'·'}</td><td style="color:${x.aUnPaso?'var(--warn2)':'var(--muted)'};font-weight:${x.aUnPaso?600:400}">${[x.faltaPB3?x.faltaPB3+' PB3':'',x.faltaUG2?x.faltaUG2+' UG2':''].filter(Boolean).join(' + ')}</td><td style="color:${x.comproAntes?'var(--good)':'var(--muted)'}">${x.comproAntes?'Sí':'No'}</td><td>${x.ultimaCompra?x.ultimaCompra.slice(8,10)+'/'+x.ultimaCompra.slice(5,7):'—'}</td><td class="num">${x.unidadesAntes||'·'}</td></tr>`; });
     t+=`</tbody></table></div><div class="hint">${rows.length} clientes${rows.length>300?' (se muestran los primeros 300)':''}</div>`;
     box.innerHTML=t;
   }
