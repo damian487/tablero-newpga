@@ -399,6 +399,7 @@ td.name{font-weight:600}
   <section class="panel" id="p-accion" role="tabpanel"></section>
   <section class="panel" id="p-combos" role="tabpanel"></section>
   <section class="panel" id="p-filos" role="tabpanel"></section>
+  <section class="panel" id="p-venus" role="tabpanel"></section>
   <section class="panel" id="p-ruta" role="tabpanel"></section>
   <section class="panel" id="p-covmarca" role="tabpanel"></section>
   <section class="panel" id="p-metaago" role="tabpanel"></section>
@@ -635,6 +636,7 @@ const TAB_GROUPS=[
   [ {id:'p-accion',label:'🏷️ Acción precio'},
     {id:'p-combos',label:'🎁 Combos'},
     {id:'p-filos',label:'🪒 Plan Filos'},
+    {id:'p-venus',label:'🌸 Plan Venus'},
     {id:'p-concurso',label:'🏆 Concurso Nubi'},
     {id:'p-msu',label:'🎯 Meta del trimestre'},
     {id:'p-metaago',label:'🎯 Meta Cobertura del mes'},
@@ -2081,6 +2083,43 @@ function renderPFP(){
 
 /* ---------- PANEL: Combos ---------- */
 
+function renderVenus(){
+  const p=document.getElementById('p-venus'); p.innerHTML='';
+  const V=DATA.venus;
+  if(!V){ p.innerHTML='<div class="card"><div class="ctitle"><h2>Plan Venus (Filos Femeninos)</h2></div><p style="color:var(--muted)">Sin datos todavía (se calcula en la próxima actualización).</p></div>'; return; }
+  const M=V.meta, MES={'2026-10':'Octubre','2026-11':'Noviembre'}, S=V.stock||{};
+  const card=el('div','card');
+  let h=`<div class="ctitle"><h2>${M.nombre} — puntos de venta con venta, ${M.canal.toLowerCase()}</h2><span class="hint">${M.descripcion} · EAN ${M.ean} · nuestro código ${M.codigo} · objetivo: promedio ${MES[M.meses[0]]}-${MES[M.meses[M.meses.length-1]]} ≥ ${M.target} · ${M.nota}</span></div>`;
+  const tiles=V.meses.map(m=>{
+    const col=m.futuro?'var(--muted)':(m.ccc>=M.target?'var(--good)':'var(--bad)');
+    const sub=m.futuro?'todavía no empezó':(m.enCurso?`en curso · proyección ${AR.format(m.proyeccion||0)} · ${AR.format(m.unidades)} carteles`:`cerrado · ${AR.format(m.unidades)} carteles`);
+    return `<div class="supcard"><h3>${MES[m.mes]||m.mes}</h3><div class="big num" style="color:${col}">${AR.format(m.ccc)}</div><div class="who">${sub}</div></div>`;
+  }).join('');
+  const prom=V.promedioActual;
+  const stCol=S.diasCobertura==null?'var(--muted)':(S.diasCobertura<10?'var(--bad)':(S.diasCobertura<20?'var(--warn2)':'var(--good)'));
+  h+=`<div class="kpitiles" style="grid-template-columns:repeat(${V.meses.length+3},1fr)">${tiles}
+    <div class="supcard"><h3>Promedio a hoy</h3><div class="big num" style="color:${prom>=M.target?'var(--good)':'var(--bad)'}">${AR.format(prom)} / ${M.target}</div><div class="who">${Math.round(prom/M.target*100)}% del objetivo</div></div>
+    <div class="supcard"><h3>Necesario por mes restante</h3><div class="big num">${AR.format(V.necesarioPorMesRestante)}</div><div class="who">puntos de venta con compra</div></div>
+    <div class="supcard"><h3>Stock disponible</h3><div class="big num" style="color:${stCol}">${AR.format(S.carteles||0)}</div><div class="who">carteles · ${S.ritmoDia||0}/día${S.diasCobertura!=null?' · ~'+S.diasCobertura+' días hábiles':''}</div></div></div>`;
+  if(S.nota) h+=`<div class="note" style="margin-top:8px">⚠️ ${S.nota} Para llegar a más puntos de venta conviene 1 cartel por cliente, no volumen concentrado en pocos.</div>`;
+  h+='<h3 style="margin:14px 0 6px">Puntos de venta con compra, por vendedor</h3><div class="twrap"><table><thead><tr><th>Vendedor</th><th>Equipo</th>'+M.meses.map(m=>`<th class="num">${MES[m]||m}</th>`).join('')+'</tr></thead><tbody>';
+  V.porVendedor.forEach(v=>{ h+=`<tr><td class="name">${v.nombre}</td><td style="color:var(--muted)">${v.supervisor}</td>`+M.meses.map(m=>`<td class="num">${v.meses[m]||'·'}</td>`).join('')+'</tr>'; });
+  h+='</tbody></table></div>';
+  const vends=[...new Set(V.pendientes.map(x=>x.vendedor))].sort();
+  h+=`<h3 style="margin:14px 0 6px">Clientes que todavía no compraron Venus este mes (${AR.format(V.pendientesTotal)} · ${AR.format(V.pendientesComproAntes)} ya lo compraron antes)</h3>
+    <div style="margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap"><select id="venVend" class="fsel"><option value="">Todos los vendedores</option>${vends.map(v=>`<option>${v}</option>`).join('')}</select>
+    <label style="font-size:12px"><input type="checkbox" id="venAntes" checked> solo los que ya compraron Venus antes</label></div><div id="venPend"></div>`;
+  card.innerHTML=h; p.appendChild(card);
+  const box=card.querySelector('#venPend'), sv=card.querySelector('#venVend'), ca=card.querySelector('#venAntes');
+  function draw(){
+    const rows=V.pendientes.filter(x=>(!sv.value||x.vendedor===sv.value)&&(!ca.checked||x.comproAntes));
+    let t='<div class="twrap"><table><thead><tr><th>Cliente</th><th>Razón social</th><th>Canal</th><th>Vendedor</th><th>Compró antes</th><th>Última compra</th><th class="num">Carteles antes</th></tr></thead><tbody>';
+    rows.slice(0,300).forEach(x=>{ t+=`<tr><td>${x.cliente}</td><td class="name">${x.razonSocial}</td><td style="font-size:11.5px;color:var(--muted)">${x.canal}</td><td>${x.vendedor}</td><td style="color:${x.comproAntes?'var(--good)':'var(--muted)'}">${x.comproAntes?'Sí':'No'}</td><td>${x.ultimaCompra?x.ultimaCompra.slice(8,10)+'/'+x.ultimaCompra.slice(5,7):'—'}</td><td class="num">${x.unidadesAntes||'·'}</td></tr>`; });
+    t+=`</tbody></table></div><div class="hint">${rows.length} clientes${rows.length>300?' (se muestran los primeros 300)':''}</div>`;
+    box.innerHTML=t;
+  }
+  sv.onchange=draw; ca.onchange=draw; draw();
+}
 function renderFilos(){
   const p=document.getElementById('p-filos'); p.innerHTML='';
   const F=DATA.filos;
@@ -5385,7 +5424,7 @@ const DIAS_ES=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sába
 
 /* ---------- init ---------- */
 function renderAll(){
-  renderHeaderKpis(); renderVend(); renderVentaDia(); renderFicha(); renderPerformance(); renderDiario(); renderResumen(); renderResultadosMes(); renderEfec(); renderConcurso(); renderMSU(); renderPFP(); renderCanales(); renderMarcas(); renderEvo(); renderDev(); renderInfaltables(); renderStock(); renderAccion(); renderCombos(); renderFilos(); renderRuta(); renderCoberturaMarcas(); renderMetaAgosto(); renderSeguimientoDiario(); renderMatinal(); renderMapa(); renderPlanSupervisor();
+  renderHeaderKpis(); renderVend(); renderVentaDia(); renderFicha(); renderPerformance(); renderDiario(); renderResumen(); renderResultadosMes(); renderEfec(); renderConcurso(); renderMSU(); renderPFP(); renderCanales(); renderMarcas(); renderEvo(); renderDev(); renderInfaltables(); renderStock(); renderAccion(); renderCombos(); renderFilos(); renderVenus(); renderRuta(); renderCoberturaMarcas(); renderMetaAgosto(); renderSeguimientoDiario(); renderMatinal(); renderMapa(); renderPlanSupervisor();
 }
 // "Trimestre (Jul-Sep)" en el selector de Mes (21/9, pedido de Damian: "que me permita sumar meses,
 // Septiembre+Agosto+Julio") - combina LIVE_DATA + todos los meses de ARCHIVO en un DATA sintetico.
