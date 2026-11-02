@@ -722,6 +722,42 @@ function areaChart(items,{w=980,h=280,critFn=null}){
 }
 
 /* ---------- PANEL: Vendedores & CCC ---------- */
+// Clientes atendidos de todas las marcas vs compradores P&G (2/11, pedido de Damian): el "100% real" del vendedor
+// son los comercios a los que ya les vendio algo; los que no llevaron P&G son la oportunidad en la misma visita.
+function renderAtendidos(p,sup){
+  const A=DATA.atendidos; if(!A||!A.porVendedor) return;
+  const per=window._atPer||'sem';
+  const fd=s=>s?s.slice(8,10)+'/'+s.slice(5,7):'';
+  const P=A.periodos||{};
+  const opciones=[['dia','Último día ('+fd(P.dia)+')'],['sem','Semana actual (desde '+fd(P.semDesde)+')'],['semAnt','Semana anterior ('+fd(P.semAntDesde)+' al '+fd(P.semAntHasta)+')'],['mes','Mes (desde '+fd(P.mesDesde)+')']];
+  const card=el('div','card');
+  card.appendChild(el('div','ctitle','<h2>Clientes atendidos vs compradores P&amp;G</h2><span class="hint">atendidos = comercios con venta de cualquier marca (Pepsico, Peñaflor, P&amp;G…) · es el 100% real de la visita</span>'));
+  const seg=el('div','seg');
+  opciones.forEach(([k,l])=>{const b=el('button',null,l); b.setAttribute('aria-pressed',k===per?'true':'false'); b.onclick=()=>{window._atPer=k; renderVend(sup);}; seg.appendChild(b);});
+  card.appendChild(seg);
+  const vend=DATA.porVendedor.filter(v=>!v.mayorista && (sup==='TODOS'||v.supervisor===sup));
+  const groups={}; vend.forEach(v=>{(groups[v.supervisor]=groups[v.supervisor]||[]).push(v);});
+  const pc=(a,b)=>b?Math.round(1000*a/b)/10:null;
+  const celdas=(u,x)=>{const t=x?x.tot:0,g=x?x.pg:0,r=pc(g,t);
+    return `<td class="num">${u||'—'}</td><td class="num">${AR.format(t)}</td><td class="num">${AR.format(g)}</td>
+      <td><div class="cov"><span class="pct num">${r==null?'—':pct(r)}</span><span class="track"><span class="fill" style="width:${Math.min(100,r||0)}%;background:${(r||0)>=50?'var(--good, #2e7d32)':(r||0)>=25?'var(--warn, #ef6c00)':'var(--bad, #c62828)'}"></span></span></div></td>
+      <td class="num">${AR.format(Math.max(0,t-g))}</td><td class="num">${u&&t!=null?pct(pc(t,u)):'—'}</td>`;};
+  let h=`<table class="tbl-compact"><thead><tr><th>Vendedor</th><th>Universo P&amp;G</th><th>Atendidos (todas las marcas)</th><th>Compradores P&amp;G</th><th>% P&amp;G s/ atendidos</th><th>Atendidos sin P&amp;G (oportunidad)</th><th>% atendidos s/ universo</th></tr></thead><tbody>`;
+  let gu=0;
+  Object.keys(groups).forEach(g=>{
+    const arr=groups[g].slice().sort((a,b)=>((A.porVendedor[b.cod]||{})[per]||{tot:0}).tot-((A.porVendedor[a.cod]||{})[per]||{tot:0}).tot);
+    h+=`<tr class="subhead"><td colspan="7">${grupoLabel(g)}</td></tr>`;
+    let u=0;
+    arr.forEach(v=>{u+=v.universo||0; h+=`<tr><td class="name">${v.nombre}</td>${celdas(v.universo,(A.porVendedor[v.cod]||{})[per])}</tr>`;});
+    gu+=u;
+    h+=`<tr class="total"><td>Subtotal ${grupoLabel(g)}</td>${celdas(u,(A.porSupervisor[g]||{})[per])}</tr>`;
+  });
+  if(sup==='TODOS' && A.total) h+=`<tr class="grandtotal"><td>TOTAL</td>${celdas(gu,A.total[per])}</tr>`;
+  h+='</tbody></table>';
+  const tw=el('div','twrap'); tw.innerHTML=h; card.appendChild(tw);
+  card.appendChild(el('div','note','Los totales por equipo cuentan cada comercio una sola vez aunque lo atiendan dos vendedores. El universo es el de clientes asignados para P&amp;G; los atendidos pueden superarlo porque incluyen comercios de otras marcas.'));
+  p.appendChild(card);
+}
 function renderVend(sup='TODOS'){
   const p=document.getElementById('p-vend'); p.innerHTML='';
   // filtro supervisores (solo los reales, sin mayorista)
@@ -749,6 +785,7 @@ function renderVend(sup='TODOS'){
   });
   const scard=el('div','card'); scard.appendChild(el('div','ctitle','<h2>Totales por supervisor</h2>')); scard.appendChild(sg);
   p.appendChild(scard);
+  renderAtendidos(p,sup);
 
   // grouped table
   const rows=DATA.porVendedor.filter(v=> sup==='TODOS'? true : v.supervisor===sup);
