@@ -637,7 +637,6 @@ const TAB_GROUPS=[
     {id:'p-combos',label:'🎁 Combos'},
     {id:'p-filos',label:'🪒 Plan Filos'},
     {id:'p-venus',label:'🌸 Plan Venus'},
-    {id:'p-concurso',label:'🏆 Concurso Nubi'},
     {id:'p-msu',label:'🎯 Meta del trimestre'},
     {id:'p-metaago',label:'🎯 Meta Cobertura del mes'},
     {id:'p-matinal',label:'🌅 Matinal'},
@@ -1814,6 +1813,17 @@ function renderAccion(){
 /* ---------- PANEL: Meta MSU (objetivo Nubi alineado a Stat Factor oficial, todas las categorias) ---------- */
 function renderMSU(){
   const p=document.getElementById('p-msu'); p.innerHTML='';
+  // Sub-solapas (2/11, sugerencia de Damian): el Concurso Nubi (cerrado Jul-Sep) vive dentro de "Meta del trimestre";
+  // el plan vigente de Oct-Dic es el PFP Red GANA.
+  const nubiData=DATA.concurso||(ARCHIVO['2026-09']&&ARCHIVO['2026-09'].concurso)||null;
+  if(nubiData){
+    const sub=window._msuSub||(DATA.concurso?'nubi':'pfp');
+    const seg=el('div','seg'); seg.style.margin='0 0 12px';
+    [['pfp',DATA.concurso?'🎯 Meta MSU del trimestre':'🎯 PFP Red GANA · Oct-Dic (vigente)'],['nubi',DATA.concurso?'🏆 Concurso Nubi':'🏆 Concurso Nubi · Jul-Sep (cerrado)']].forEach(([k,l])=>{
+      const b=el('button',null,l); b.setAttribute('aria-pressed',k===sub?'true':'false'); b.onclick=()=>{window._msuSub=k; renderMSU();}; seg.appendChild(b);});
+    p.appendChild(seg);
+    if(sub==='nubi'){ const box=el('div'); p.appendChild(box); renderConcurso(box,nubiData); p.insertBefore(seg,box); return; }
+  }
   const M=DATA.msu;
   if(!M){ p.innerHTML='<div class="card"><div class="ctitle"><h2>🎯 Meta del trimestre</h2></div><p style="color:var(--muted)">Sin datos todavía.</p></div>'; return; }
   const barColorFor=pc=>pc>=100?'var(--good)':(pc>=75?'var(--warn)':(pc>=40?'var(--warn2)':'var(--bad)'));
@@ -3377,9 +3387,9 @@ function renderNoVisitadosSemana(p){
 }
 
 /* ---------- PANEL: Concurso Nubi ---------- */
-function renderConcurso(){
-  const p=document.getElementById('p-concurso');p.innerHTML='';
-  const C=DATA.concurso; if(!C){p.innerHTML='<div class="card"><div class="ctitle"><h2>🏆 Concurso Nubi</h2></div><p style="color:var(--muted)">'+(DATA.concursoInactivo||'Sin datos de concurso.')+' Los meses de julio a septiembre se pueden ver con el selector de mes.</p></div>';return;}
+function renderConcurso(target,Cin){
+  const p=target||document.getElementById('p-concurso');p.innerHTML='';
+  const C=Cin||DATA.concurso; if(!C){p.innerHTML='<div class="card"><div class="ctitle"><h2>🏆 Concurso Nubi</h2></div><p style="color:var(--muted)">'+(DATA.concursoInactivo||'Sin datos de concurso.')+' Los meses de julio a septiembre se pueden ver con el selector de mes.</p></div>';return;}
   const head=el('div','card');
   head.appendChild(el('div','ctitle',`<h2>Concurso "Acelera 2026" — Nubi</h2><span class="hint">vigencia ${C.vigencia} · quedan ${C.diasRestantes} días</span>`));
   const g=el('div','grid g2');
