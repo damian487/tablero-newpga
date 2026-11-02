@@ -1727,7 +1727,8 @@ function renderAccion(){
   const p=document.getElementById('p-accion'); p.innerHTML='';
   const A=DATA.accion;
   if(!A){ p.innerHTML='<div class="card"><div class="ctitle"><h2>Acción de precio</h2></div><p style="color:var(--muted)">Sin datos de acción configurada.</p></div>'; return; }
-  const M=A.meta, fechas=A.fechas;
+  // Columnas de la fecha mas reciente a la mas vieja (2/11, pedido de Damian): lo ultimo se ve primero.
+  const M=A.meta, fechas=(A.fechas||[]).slice().sort().reverse();
   const CANALES=['Autoservicios','Almacenes','Kioscos'];
   function fd(f){ return f.slice(8,10)+'/'+f.slice(5,7); }
   function cell(o,m){ if(!o) return '·'; if(m==='u') return AR.format(o.u); if(m==='imp') return peso(o.imp); return AR.format(o.cli); }
