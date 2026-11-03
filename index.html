@@ -400,6 +400,7 @@ td.name{font-weight:600}
   <section class="panel" id="p-combos" role="tabpanel"></section>
   <section class="panel" id="p-filos" role="tabpanel"></section>
   <section class="panel" id="p-venus" role="tabpanel"></section>
+  <section class="panel" id="p-cobertura" role="tabpanel"></section>
   <section class="panel" id="p-ruta" role="tabpanel"></section>
   <section class="panel" id="p-covmarca" role="tabpanel"></section>
   <section class="panel" id="p-metaago" role="tabpanel"></section>
@@ -637,6 +638,7 @@ const TAB_GROUPS=[
     {id:'p-combos',label:'🎁 Combos'},
     {id:'p-filos',label:'🪒 Plan Filos'},
     {id:'p-venus',label:'🌸 Plan Venus'},
+    {id:'p-cobertura',label:'🔋 Sachets y Pilas'},
     {id:'p-msu',label:'🎯 Meta del trimestre'},
     {id:'p-metaago',label:'🎯 Meta Cobertura del mes'},
     {id:'p-matinal',label:'🌅 Matinal'},
@@ -2131,6 +2133,56 @@ function renderPFP(){
 
 /* ---------- PANEL: Combos ---------- */
 
+function renderCobertura(){
+  const p=document.getElementById('p-cobertura'); p.innerHTML='';
+  const C=DATA.cobertura;
+  if(!C){ p.innerHTML='<div class="card"><div class="ctitle"><h2>Sachets y Pilas</h2></div><p style="color:var(--muted)">Sin datos todavía (se calcula en la próxima actualización).</p></div>'; return; }
+  const MES={'2026-11':'Noviembre','2026-12':'Diciembre'};
+  if(!window._covPlan) window._covPlan=C.planes[0].id;
+  if(!window._covMes) window._covMes=C.mesActual;
+  const top=el('div','card');
+  top.innerHTML=`<div class="ctitle"><h2>Planes de cobertura P&G — Sachets H&S y Pilas Philco</h2><span class="hint">${C.nota}</span></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><div class="seg">${C.planes.map(pl=>`<button class="covb" aria-pressed="${pl.id===window._covPlan}" data-id="${pl.id}">${pl.nombre}</button>`).join('')}</div>
+    <select id="covMes" class="fsel">${C.meses.map(m=>`<option value="${m}"${m===window._covMes?' selected':''}>${MES[m]||m}</option>`).join('')}</select></div>`;
+  p.appendChild(top);
+  top.querySelectorAll('.covb').forEach(b=>b.onclick=()=>{ window._covPlan=b.dataset.id; renderCobertura(); });
+  top.querySelector('#covMes').onchange=e=>{ window._covMes=e.target.value; renderCobertura(); };
+  const pl=C.planes.find(x=>x.id===window._covPlan)||C.planes[0];
+  const mes=window._covMes, mo=pl.meses.find(m=>m.mes===mes)||pl.meses[0];
+  const col=(v,o)=>o==null?'':(v>=o?'var(--good)':(v>=o*0.7?'var(--warn2)':'var(--bad)'));
+  const card=el('div','card');
+  const arts=Object.entries(pl.articulos).map(([c,n])=>`${n} (cód. ${c})`).join(' · ');
+  let h=`<div class="ctitle"><h2>${pl.nombre} — clientes con compra en ${(MES[mes]||mes).toLowerCase()}</h2><span class="hint">${arts} · meta P&G ${pl.targetPG} (promedio nov-dic) · objetivo interno ${pl.objetivoTotal} por mes</span></div>`;
+  const sub=mo.futuro?'todavía no empezó':(mo.enCurso?`en curso · proyección ${AR.format(mo.proyeccion||0)}`:'cerrado');
+  const eqTiles=Object.entries(pl.equipos).map(([e,o])=>{ const v=mo.porEquipo[e]||0; return `<div class="supcard"><h3>Equipo ${e}</h3><div class="big num" style="color:${col(v,o.total)}">${AR.format(v)} / ${o.total}</div><div class="who">${Math.round(v/o.total*100)}% · ${o.porVend} por vendedor</div></div>`; }).join('');
+  const stk=pl.stock.map(s=>`${s.nombre.split(' (')[0]}: ${AR.format(s.stock)}`).join(' · ');
+  h+=`<div class="kpitiles" style="grid-template-columns:repeat(4,1fr)">
+    <div class="supcard"><h3>Total ${MES[mes]||mes}</h3><div class="big num" style="color:${col(mo.ccc,pl.objetivoTotal)}">${AR.format(mo.ccc)} / ${pl.objetivoTotal}</div><div class="who">${sub} · meta P&G ${pl.targetPG}</div></div>
+    ${eqTiles}
+    <div class="supcard"><h3>Stock</h3><div class="big num">${AR.format(pl.stock.reduce((s,x)=>s+x.stock,0))}</div><div class="who">${stk}</div></div></div>`;
+  h+='<h3 style="margin:14px 0 6px">Por vendedor</h3><div class="twrap"><table><thead><tr><th>Vendedor</th><th>Equipo</th><th class="num">Objetivo</th>'+C.meses.map(m=>`<th class="num">${MES[m]||m}</th>`).join('')+`<th class="num">% ${MES[mes]||mes}</th></tr></thead><tbody>`;
+  const eqs=[...new Set(pl.porVendedor.map(v=>v.equipo))];
+  eqs.forEach(e=>{
+    const vs=pl.porVendedor.filter(v=>v.equipo===e);
+    vs.forEach(v=>{ const x=v.meses[mes]||0; h+=`<tr><td class="name">${v.nombre}</td><td style="color:var(--muted)">${e}</td><td class="num">${v.objetivo??'·'}</td>`+C.meses.map(m=>`<td class="num" style="${m===mes?'font-weight:600;color:'+col(v.meses[m]||0,v.objetivo):''}">${v.meses[m]||'·'}</td>`).join('')+`<td class="num">${v.objetivo?Math.round(x/v.objetivo*100)+'%':'·'}</td></tr>`; });
+    const o=pl.equipos[e]; const tot=k=>vs.reduce((s,v)=>s+(v.meses[k]||0),0);
+    h+=`<tr style="background:var(--soft,rgba(0,0,0,.04));font-weight:600"><td>Total equipo ${e}</td><td></td><td class="num">${o?o.total:'·'}</td>`+C.meses.map(m=>`<td class="num">${tot(m)||'·'}</td>`).join('')+`<td class="num">${o?Math.round(tot(mes)/o.total*100)+'%':'·'}</td></tr>`;
+  });
+  h+='</tbody></table></div><div class="hint">Cada cliente cuenta 1 vez por mes, para el vendedor que le vendió. Si un cliente compró a dos vendedores del mismo equipo, el total del equipo puede quedar 1 por debajo de la suma.</div>';
+  const vends=[...new Set(pl.pendientes.map(x=>x.vendedor))].sort();
+  h+=`<h3 style="margin:14px 0 6px">Clientes que lo compraron antes (ago-oct) y todavía no este mes (${AR.format(pl.pendientesTotal)})</h3>
+    <div style="margin-bottom:8px"><select id="covVend" class="fsel"><option value="">Todos los vendedores</option>${vends.map(v=>`<option>${v}</option>`).join('')}</select></div><div id="covPend"></div>`;
+  card.innerHTML=h; p.appendChild(card);
+  const box=card.querySelector('#covPend'), sv=card.querySelector('#covVend');
+  function draw(){
+    const rows=pl.pendientes.filter(x=>!sv.value||x.vendedor===sv.value);
+    let t='<div class="twrap"><table><thead><tr><th>Cliente</th><th>Razón social</th><th>Canal</th><th>Vendedor</th><th>Equipo</th><th>Última compra</th><th class="num">Unidades antes</th></tr></thead><tbody>';
+    rows.slice(0,300).forEach(x=>{ t+=`<tr><td>${x.cliente}</td><td class="name">${x.razonSocial}</td><td style="font-size:11.5px;color:var(--muted)">${x.canal}</td><td>${x.vendedor}</td><td>${x.equipo}</td><td>${x.ultimaCompra.slice(8,10)}/${x.ultimaCompra.slice(5,7)}</td><td class="num">${x.unidadesAntes}</td></tr>`; });
+    t+=`</tbody></table></div><div class="hint">${rows.length} clientes${rows.length>300?' (se muestran los primeros 300)':''}</div>`;
+    box.innerHTML=t;
+  }
+  sv.onchange=draw; draw();
+}
 function renderVenus(){
   const p=document.getElementById('p-venus'); p.innerHTML='';
   const V=DATA.venus;
@@ -5472,7 +5524,7 @@ const DIAS_ES=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sába
 
 /* ---------- init ---------- */
 function renderAll(){
-  renderHeaderKpis(); renderVend(); renderVentaDia(); renderFicha(); renderPerformance(); renderDiario(); renderResumen(); renderResultadosMes(); renderEfec(); renderConcurso(); renderMSU(); renderPFP(); renderCanales(); renderMarcas(); renderEvo(); renderDev(); renderInfaltables(); renderStock(); renderAccion(); renderCombos(); renderFilos(); renderVenus(); renderRuta(); renderCoberturaMarcas(); renderMetaAgosto(); renderSeguimientoDiario(); renderMatinal(); renderMapa(); renderPlanSupervisor();
+  renderHeaderKpis(); renderVend(); renderVentaDia(); renderFicha(); renderPerformance(); renderDiario(); renderResumen(); renderResultadosMes(); renderEfec(); renderConcurso(); renderMSU(); renderPFP(); renderCanales(); renderMarcas(); renderEvo(); renderDev(); renderInfaltables(); renderStock(); renderAccion(); renderCombos(); renderFilos(); renderVenus(); renderCobertura(); renderRuta(); renderCoberturaMarcas(); renderMetaAgosto(); renderSeguimientoDiario(); renderMatinal(); renderMapa(); renderPlanSupervisor();
 }
 // "Trimestre (Jul-Sep)" en el selector de Mes (21/9, pedido de Damian: "que me permita sumar meses,
 // Septiembre+Agosto+Julio") - combina LIVE_DATA + todos los meses de ARCHIVO en un DATA sintetico.
