@@ -400,6 +400,7 @@ td.name{font-weight:600}
   <section class="panel" id="p-combos" role="tabpanel"></section>
   <section class="panel" id="p-filos" role="tabpanel"></section>
   <section class="panel" id="p-venus" role="tabpanel"></section>
+  <section class="panel" id="p-plandia" role="tabpanel"></section>
   <section class="panel" id="p-cobertura" role="tabpanel"></section>
   <section class="panel" id="p-ruta" role="tabpanel"></section>
   <section class="panel" id="p-covmarca" role="tabpanel"></section>
@@ -620,6 +621,7 @@ const TAB_GROUPS=[
     {id:'p-diario',label:'📋 Reporte diario'},
     {id:'p-ventadia',label:'📈 Venta del Día'},
     {id:'p-evo',label:'Evolución diaria'} ],
+  [ {id:'p-plandia',label:'🎯 Mi plan del día'} ],
   [ {id:'p-pfp',label:'💰 PFP Red GANA'} ],
   [ {id:'p-ficha',label:'Ficha por Equipo'},
     {id:'p-vend',label:'Vendedores & CCC'},
@@ -2133,6 +2135,65 @@ function renderPFP(){
 
 /* ---------- PANEL: Combos ---------- */
 
+function renderPlanDia(){
+  const p=document.getElementById('p-plandia'); p.innerHTML='';
+  const P=DATA.planDia;
+  if(!P){ p.innerHTML='<div class="card"><div class="ctitle"><h2>Mi plan del día</h2></div><p style="color:var(--muted)">Sin datos todavía (se calcula en la próxima actualización).</p></div>'; return; }
+  const DIAS=[['Lu','Lunes'],['Ma','Martes'],['Mi','Miércoles'],['Ju','Jueves'],['Vi','Viernes']];
+  const hoy=hoyLocalStr(), dowHoy=new Date(hoy+'T12:00:00Z').getUTCDay();
+  if(!window._pdDia) window._pdDia=DIAS[(dowHoy>=1&&dowHoy<=5?dowHoy:1)-1][0];
+  if(window._pdVend==null) window._pdVend='';
+  const colP=x=>x>=1?'var(--good)':(x>=0.9?'var(--warn2)':'var(--bad)');
+  const L=P.llave;
+  const top=el('div','card');
+  top.innerHTML=`<div class="ctitle"><h2>Concurso P&G noviembre — llave de la empresa</h2><span class="hint">${P.reglas}</span></div>
+    <div class="kpitiles" style="grid-template-columns:repeat(4,1fr)">
+      <div class="supcard"><h3>Facturado noviembre</h3><div class="big num" style="color:${colP(L.pct)}">${pesoC(L.mtd)} / ${pesoC(L.meta)}</div><div class="who">${Math.round(L.pct*100)}% de la llave</div></div>
+      <div class="supcard"><h3>Falta</h3><div class="big num">${pesoC(Math.max(0,L.meta-L.mtd))}</div><div class="who">${P.diasRestan} días hábiles (de ${P.diasMes})</div></div>
+      <div class="supcard"><h3>Necesario por día (equipo)</h3><div class="big num">${pesoC(L.hoy)}</div><div class="who">desde hoy hasta el 30/11</div></div>
+      <div class="supcard"><h3>Supervisores</h3><div class="who" style="font-size:13px;line-height:1.5">${Object.entries(P.grupos).map(([g,x])=>`<b>${x.nombre}</b>: ${pesoC(x.mtd)} / ${pesoC(x.objetivo)} (${Math.round(x.mtd/x.objetivo*100)}%)`).join('<br>')}</div></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">
+      <select id="pdVend" class="fsel"><option value="">Todos los vendedores (ranking)</option>${P.vendedores.map(v=>`<option value="${v.cod}"${v.cod===window._pdVend?' selected':''}>${v.nombre} (${v.grupo})</option>`).join('')}</select>
+      <div class="seg">${DIAS.map(([c,n])=>`<button class="pdd" data-d="${c}" aria-pressed="${c===window._pdDia}">${n}</button>`).join('')}</div>
+    </div>`;
+  p.appendChild(top);
+  top.querySelector('#pdVend').onchange=e=>{ window._pdVend=e.target.value; renderPlanDia(); };
+  top.querySelectorAll('.pdd').forEach(b=>b.onclick=()=>{ window._pdDia=b.dataset.d; renderPlanDia(); });
+
+  const card=el('div','card'); let h='';
+  if(!window._pdVend){
+    h+=`<div class="ctitle"><h2>Ranking del concurso</h2><span class="hint">Objetivo de facturación P&G c/IVA de noviembre · "Hoy necesita" = lo que le falta dividido por los días hábiles que quedan</span></div>
+      <div class="twrap"><table><thead><tr><th>Vendedor</th><th>Grupo</th><th class="num">Objetivo</th><th class="num">Vendido</th><th class="num">%</th><th class="num">Hoy necesita</th><th class="num">Clientes</th><th class="num">Premio</th></tr></thead><tbody>`;
+    ['KAF','Juan','Mayorista'].forEach(g=>{
+      const vs=P.vendedores.filter(v=>v.grupo===g).sort((a,b)=>b.pct-a.pct);
+      vs.forEach(v=>{ h+=`<tr><td class="name">${v.nombre}</td><td style="color:var(--muted)">${g}</td><td class="num">${pesoC(v.objetivo)}</td><td class="num">${pesoC(v.mtd)}</td><td class="num" style="font-weight:600;color:${colP(v.pct)}">${Math.round(v.pct*100)}%</td><td class="num">${pesoC(v.hoy)}</td><td class="num">${v.objCli?v.cliMes+' / '+v.objCli:'·'}</td><td class="num">${v.premio?peso(v.premio):'comisión'}</td></tr>`; });
+    });
+    h+='</tbody></table></div>';
+  } else {
+    const v=P.vendedores.find(x=>x.cod===window._pdVend);
+    const fecha=fechaDeDiaEnSemana(hoy,window._pdDia), diaN=DIAS.find(d=>d[0]===window._pdDia)[1];
+    h+=`<div class="ctitle"><h2>${v.nombre} — plan del ${diaN.toLowerCase()} ${fdate(fecha)}</h2><span class="hint">Premio ${v.premio?peso(v.premio):'por comisión'} si llega al 100% y la empresa pasa los $150M</span></div>
+      <div class="kpitiles" style="grid-template-columns:repeat(4,1fr)">
+        <div class="supcard"><h3>Hoy tenés que traer</h3><div class="big num">${pesoC(v.hoy)}</div><div class="who">ritmo normal ${pesoC(v.ritmoNecesario)}/día</div></div>
+        <div class="supcard"><h3>Vendido en noviembre</h3><div class="big num" style="color:${colP(v.pct)}">${pesoC(v.mtd)} / ${pesoC(v.objetivo)}</div><div class="who">${Math.round(v.pct*100)}% del objetivo</div></div>
+        <div class="supcard"><h3>Clientes compradores</h3><div class="big num" style="color:${v.objCli?colP(v.cliMes/v.objCli):'var(--muted)'}">${v.cliMes}${v.objCli?' / '+v.objCli:''}</div><div class="who">${v.objCli?'faltan '+Math.max(0,v.objCli-v.cliMes):''}</div></div>
+        <div class="supcard"><h3>Te falta</h3><div class="big num">${pesoC(Math.max(0,v.objetivo-v.mtd))}</div><div class="who">${P.diasRestan} días hábiles</div></div></div>`;
+    h+='<h3 style="margin:14px 0 6px">Hoy, por familia</h3><div class="twrap"><table><thead><tr><th>Familia</th><th class="num">Hoy $</th><th class="num">Vendido en nov.</th><th>Qué ofrecer</th></tr></thead><tbody>';
+    v.familias.slice().sort((a,b)=>b.hoy-a.hoy).forEach(f=>{ const st=P.stock.find(s=>s.familia===f.familia)||{}; h+=`<tr><td class="name">${f.familia}</td><td class="num" style="font-weight:600">${pesoC(f.hoy)}</td><td class="num">${pesoC(f.mtd)}</td><td style="font-size:12px">${st.acciones||''}${st.factor<1?' <span style="color:var(--bad)">· stock limitado</span>':''}</td></tr>`; });
+    h+='</tbody></table></div>';
+    const cls=P.clientes.filter(c=>c.v===v.cod&&c.d===window._pdDia&&esVisitaEnFechaJS(c.fr,c.pv,fecha))
+      .sort((a,b)=>((a.mes>0)-(b.mes>0))||(b.m3-a.m3));
+    h+=`<h3 style="margin:14px 0 6px">Clientes de la ruta del ${diaN.toLowerCase()} (${cls.length}) — primero los que todavía no compraron este mes</h3>
+      <div class="twrap"><table><thead><tr><th>Cliente</th><th>Razón social</th><th>Canal</th><th class="num">Promedio mensual P&G</th><th class="num">Nov.</th><th>Última compra</th><th>Le falta este mes</th></tr></thead><tbody>`;
+    cls.forEach(c=>{ h+=`<tr><td>${c.c}</td><td class="name">${c.rs}<div style="font-size:11px;color:var(--muted)">${c.dir||''}</div></td><td style="font-size:11.5px;color:var(--muted)">${c.canal}</td><td class="num">${c.m3>0?pesoC(c.m3):'—'}</td><td class="num" style="${c.mes>0?'color:var(--good);font-weight:600':''}">${c.mes>0?pesoC(c.mes):'·'}</td><td>${c.u?fdate(c.u):'sin compra en 90 días'}</td><td style="font-size:12px">${c.falta.join(', ')||(c.m3>0?'':'Ofrecer P&G: no compra')}</td></tr>`; });
+    h+='</tbody></table></div><div class="hint">"Le falta este mes" = familias P&G que el cliente compró en los últimos 3 meses y en noviembre todavía no.</div>';
+  }
+  h+='<h3 style="margin:16px 0 6px">Qué hay para vender (stock a precio de venta) y acciones del mes</h3><div class="twrap"><table><thead><tr><th>Familia</th><th class="num">Stock</th><th>Acciones</th></tr></thead><tbody>';
+  P.stock.slice().sort((a,b)=>b.stock-a.stock).forEach(s=>{ h+=`<tr><td class="name">${s.familia}</td><td class="num">${pesoC(s.stock)}</td><td style="font-size:12px">${s.acciones}</td></tr>`; });
+  h+=`</tbody></table></div><details style="margin-top:8px"><summary>Artículos en quiebre: no ofrecer (${P.quiebres.length})</summary><div style="font-size:12px;columns:2;margin-top:6px">${P.quiebres.map(q=>`<div>${q.familia} · ${q.desc} (${q.codigo})</div>`).join('')}</div></details>`;
+  card.innerHTML=h; p.appendChild(card);
+}
 function renderCobertura(){
   const p=document.getElementById('p-cobertura'); p.innerHTML='';
   const C=DATA.cobertura;
@@ -5524,7 +5585,7 @@ const DIAS_ES=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sába
 
 /* ---------- init ---------- */
 function renderAll(){
-  renderHeaderKpis(); renderVend(); renderVentaDia(); renderFicha(); renderPerformance(); renderDiario(); renderResumen(); renderResultadosMes(); renderEfec(); renderConcurso(); renderMSU(); renderPFP(); renderCanales(); renderMarcas(); renderEvo(); renderDev(); renderInfaltables(); renderStock(); renderAccion(); renderCombos(); renderFilos(); renderVenus(); renderCobertura(); renderRuta(); renderCoberturaMarcas(); renderMetaAgosto(); renderSeguimientoDiario(); renderMatinal(); renderMapa(); renderPlanSupervisor();
+  renderHeaderKpis(); renderVend(); renderVentaDia(); renderFicha(); renderPerformance(); renderDiario(); renderResumen(); renderResultadosMes(); renderEfec(); renderConcurso(); renderMSU(); renderPFP(); renderCanales(); renderMarcas(); renderEvo(); renderDev(); renderInfaltables(); renderStock(); renderAccion(); renderCombos(); renderFilos(); renderVenus(); renderCobertura(); renderPlanDia(); renderRuta(); renderCoberturaMarcas(); renderMetaAgosto(); renderSeguimientoDiario(); renderMatinal(); renderMapa(); renderPlanSupervisor();
 }
 // "Trimestre (Jul-Sep)" en el selector de Mes (21/9, pedido de Damian: "que me permita sumar meses,
 // Septiembre+Agosto+Julio") - combina LIVE_DATA + todos los meses de ARCHIVO en un DATA sintetico.
