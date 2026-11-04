@@ -2145,6 +2145,9 @@ function renderPlanDia(){
   if(window._pdVend==null) window._pdVend='';
   const colP=x=>x>=1?'var(--good)':(x>=0.9?'var(--warn2)':'var(--bad)');
   const L=P.llave;
+  // cobertura del concurso = planes Sachets H&S y Pilas Philco (pestaña Sachets y Pilas)
+  const covV=cod=>{ const C=DATA.cobertura; if(!C) return []; return C.planes.map(pl=>{ const x=pl.porVendedor.find(y=>y.cod===cod); return x&&x.objetivo?{n:pl.id==='pilas'?'Pilas':'Sachets',v:x.meses[P.mes]||0,o:x.objetivo}:null; }).filter(Boolean); };
+  const covTxt=cod=>{ const c=covV(cod); return c.length?c.map(x=>`<span style="color:${x.v>=x.o?'var(--good)':'var(--bad)'}">${x.n} ${x.v}/${x.o}</span>`).join(' · '):'·'; };
   const top=el('div','card');
   top.innerHTML=`<div class="ctitle"><h2>Concurso P&G noviembre — meta de la empresa $150M</h2><span class="hint">${P.reglas}</span></div>
     <div class="kpitiles" style="grid-template-columns:repeat(4,1fr)">
@@ -2164,20 +2167,20 @@ function renderPlanDia(){
   const card=el('div','card'); let h='';
   if(!window._pdVend){
     h+=`<div class="ctitle"><h2>Ranking del concurso</h2><span class="hint">Objetivo de facturación P&G c/IVA de noviembre · "Hoy necesita" = lo que le falta dividido por los días hábiles que quedan</span></div>
-      <div class="twrap"><table><thead><tr><th>Vendedor</th><th>Grupo</th><th class="num">Objetivo</th><th class="num">Vendido</th><th class="num">%</th><th class="num">Hoy necesita</th><th class="num">Clientes</th><th class="num">Premio</th></tr></thead><tbody>`;
+      <div class="twrap"><table><thead><tr><th>Vendedor</th><th>Grupo</th><th class="num">Objetivo</th><th class="num">Vendido</th><th class="num">%</th><th class="num">Hoy necesita</th><th>Cobertura sachets · pilas</th><th class="num">Premio</th></tr></thead><tbody>`;
     ['KAF','Juan','Mayorista'].forEach(g=>{
       const vs=P.vendedores.filter(v=>v.grupo===g).sort((a,b)=>b.pct-a.pct);
-      vs.forEach(v=>{ h+=`<tr><td class="name">${v.nombre}</td><td style="color:var(--muted)">${g}</td><td class="num">${pesoC(v.objetivo)}</td><td class="num">${pesoC(v.mtd)}</td><td class="num" style="font-weight:600;color:${colP(v.pct)}">${Math.round(v.pct*100)}%</td><td class="num">${pesoC(v.hoy)}</td><td class="num">${v.objCli?v.cliMes+' / '+v.objCli:'·'}</td><td class="num">${v.premio?peso(v.premio):'comisión'}</td></tr>`; });
+      vs.forEach(v=>{ h+=`<tr><td class="name">${v.nombre}</td><td style="color:var(--muted)">${g}</td><td class="num">${pesoC(v.objetivo)}</td><td class="num">${pesoC(v.mtd)}</td><td class="num" style="font-weight:600;color:${colP(v.pct)}">${Math.round(v.pct*100)}%</td><td class="num">${pesoC(v.hoy)}</td><td style="font-size:12px">${covTxt(v.cod)}</td><td class="num">${v.premio?peso(v.premio):'comisión'}</td></tr>`; });
     });
     h+='</tbody></table></div>';
   } else {
     const v=P.vendedores.find(x=>x.cod===window._pdVend);
     const fecha=fechaDeDiaEnSemana(hoy,window._pdDia), diaN=DIAS.find(d=>d[0]===window._pdDia)[1];
-    h+=`<div class="ctitle"><h2>${v.nombre} — plan del ${diaN.toLowerCase()} ${fdate(fecha)}</h2><span class="hint">Premio ${v.premio?peso(v.premio):'por comisión'} si llega al 100% de su objetivo (y a su objetivo de clientes)</span></div>
+    h+=`<div class="ctitle"><h2>${v.nombre} — plan del ${diaN.toLowerCase()} ${fdate(fecha)}</h2><span class="hint">Premio ${v.premio?peso(v.premio):'por comisión'} si llega al 100% de su objetivo y a la cobertura de sachets y pilas (sin cobertura cobra 50%)</span></div>
       <div class="kpitiles" style="grid-template-columns:repeat(4,1fr)">
         <div class="supcard"><h3>Hoy tenés que traer</h3><div class="big num">${pesoC(v.hoy)}</div><div class="who">ritmo normal ${pesoC(v.ritmoNecesario)}/día</div></div>
         <div class="supcard"><h3>Vendido en noviembre</h3><div class="big num" style="color:${colP(v.pct)}">${pesoC(v.mtd)} / ${pesoC(v.objetivo)}</div><div class="who">${Math.round(v.pct*100)}% del objetivo</div></div>
-        <div class="supcard"><h3>Clientes compradores</h3><div class="big num" style="color:${v.objCli?colP(v.cliMes/v.objCli):'var(--muted)'}">${v.cliMes}${v.objCli?' / '+v.objCli:''}</div><div class="who">${v.objCli?'faltan '+Math.max(0,v.objCli-v.cliMes):''}</div></div>
+        <div class="supcard"><h3>Cobertura (llave del premio)</h3><div class="num" style="font-size:18px;font-weight:700">${covTxt(v.cod)}</div><div class="who">clientes con compra en noviembre · ${v.cliMes} clientes P&G en total</div></div>
         <div class="supcard"><h3>Te falta</h3><div class="big num">${pesoC(Math.max(0,v.objetivo-v.mtd))}</div><div class="who">${P.diasRestan} días hábiles</div></div></div>`;
     h+='<h3 style="margin:14px 0 6px">Hoy, por familia</h3><div class="twrap"><table><thead><tr><th>Familia</th><th class="num">Hoy $</th><th class="num">Vendido en nov.</th><th>Qué ofrecer</th></tr></thead><tbody>';
     v.familias.slice().sort((a,b)=>b.hoy-a.hoy).forEach(f=>{ const st=P.stock.find(s=>s.familia===f.familia)||{}; h+=`<tr><td class="name">${f.familia}</td><td class="num" style="font-weight:600">${pesoC(f.hoy)}</td><td class="num">${pesoC(f.mtd)}</td><td style="font-size:12px">${st.acciones||''}${st.factor<1?' <span style="color:var(--bad)">· stock limitado</span>':''}</td></tr>`; });
