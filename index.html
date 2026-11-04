@@ -2146,9 +2146,9 @@ function renderPlanDia(){
   const colP=x=>x>=1?'var(--good)':(x>=0.9?'var(--warn2)':'var(--bad)');
   const L=P.llave;
   const top=el('div','card');
-  top.innerHTML=`<div class="ctitle"><h2>Concurso P&G noviembre — llave de la empresa</h2><span class="hint">${P.reglas}</span></div>
+  top.innerHTML=`<div class="ctitle"><h2>Concurso P&G noviembre — meta de la empresa $150M</h2><span class="hint">${P.reglas}</span></div>
     <div class="kpitiles" style="grid-template-columns:repeat(4,1fr)">
-      <div class="supcard"><h3>Facturado noviembre</h3><div class="big num" style="color:${colP(L.pct)}">${pesoC(L.mtd)} / ${pesoC(L.meta)}</div><div class="who">${Math.round(L.pct*100)}% de la llave</div></div>
+      <div class="supcard"><h3>Facturado noviembre</h3><div class="big num" style="color:${colP(L.pct)}">${pesoC(L.mtd)} / ${pesoC(L.meta)}</div><div class="who">${Math.round(L.pct*100)}% de la meta</div></div>
       <div class="supcard"><h3>Falta</h3><div class="big num">${pesoC(Math.max(0,L.meta-L.mtd))}</div><div class="who">${P.diasRestan} días hábiles (de ${P.diasMes})</div></div>
       <div class="supcard"><h3>Necesario por día (equipo)</h3><div class="big num">${pesoC(L.hoy)}</div><div class="who">desde hoy hasta el 30/11</div></div>
       <div class="supcard"><h3>Supervisores</h3><div class="who" style="font-size:13px;line-height:1.5">${Object.entries(P.grupos).map(([g,x])=>`<b>${x.nombre}</b>: ${pesoC(x.mtd)} / ${pesoC(x.objetivo)} (${Math.round(x.mtd/x.objetivo*100)}%)`).join('<br>')}</div></div>
@@ -2173,7 +2173,7 @@ function renderPlanDia(){
   } else {
     const v=P.vendedores.find(x=>x.cod===window._pdVend);
     const fecha=fechaDeDiaEnSemana(hoy,window._pdDia), diaN=DIAS.find(d=>d[0]===window._pdDia)[1];
-    h+=`<div class="ctitle"><h2>${v.nombre} — plan del ${diaN.toLowerCase()} ${fdate(fecha)}</h2><span class="hint">Premio ${v.premio?peso(v.premio):'por comisión'} si llega al 100% y la empresa pasa los $150M</span></div>
+    h+=`<div class="ctitle"><h2>${v.nombre} — plan del ${diaN.toLowerCase()} ${fdate(fecha)}</h2><span class="hint">Premio ${v.premio?peso(v.premio):'por comisión'} si llega al 100% de su objetivo (y a su objetivo de clientes)</span></div>
       <div class="kpitiles" style="grid-template-columns:repeat(4,1fr)">
         <div class="supcard"><h3>Hoy tenés que traer</h3><div class="big num">${pesoC(v.hoy)}</div><div class="who">ritmo normal ${pesoC(v.ritmoNecesario)}/día</div></div>
         <div class="supcard"><h3>Vendido en noviembre</h3><div class="big num" style="color:${colP(v.pct)}">${pesoC(v.mtd)} / ${pesoC(v.objetivo)}</div><div class="who">${Math.round(v.pct*100)}% del objetivo</div></div>
