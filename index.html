@@ -2166,11 +2166,24 @@ function renderPlanDia(){
 
   const card=el('div','card'); let h='';
   if(!window._pdVend){
-    h+=`<div class="ctitle"><h2>Ranking del concurso</h2><span class="hint">Objetivo de facturación P&G c/IVA de noviembre · "Hoy necesita" = lo que le falta dividido por los días hábiles que quedan</span></div>
-      <div class="twrap"><table><thead><tr><th>Vendedor</th><th>Grupo</th><th class="num">Objetivo</th><th class="num">Vendido</th><th class="num">%</th><th class="num">Hoy necesita</th><th>Cobertura sachets · pilas</th><th class="num">Premio</th></tr></thead><tbody>`;
-    ['KAF','Juan','Mayorista'].forEach(g=>{
-      const vs=P.vendedores.filter(v=>v.grupo===g).sort((a,b)=>b.pct-a.pct);
-      vs.forEach(v=>{ h+=`<tr><td class="name">${v.nombre}</td><td style="color:var(--muted)">${g}</td><td class="num">${pesoC(v.objetivo)}</td><td class="num">${pesoC(v.mtd)}</td><td class="num" style="font-weight:600;color:${colP(v.pct)}">${Math.round(v.pct*100)}%</td><td class="num">${pesoC(v.hoy)}</td><td style="font-size:12px">${covTxt(v.cod)}</td><td class="num">${v.premio?peso(v.premio):'comisión'}</td></tr>`; });
+    // meses base elegibles (ej. sep+oct) para comparar el objetivo contra lo que vendio cada uno
+    const MESN=m=>MESES_ES[+m.slice(5,7)-1].slice(0,3);
+    const mesesH=Object.keys(P.histTotal||{}).filter(m=>m<P.mes).sort().slice(-6);
+    if(!window._pdBase) window._pdBase=mesesH.slice(-2);
+    const base=window._pdBase.filter(m=>mesesH.includes(m));
+    const prom=v=>base.length?base.reduce((s,m)=>s+((v.hist||{})[m]||0),0)/base.length:0;
+    const lbl=base.length?base.map(MESN).join('-'):'—';
+    const dif=(o,pr)=>pr>0?`${o-pr>=0?'+':'−'}${pesoC(Math.abs(o-pr))} <span style="color:var(--muted)">(${o-pr>=0?'+':''}${Math.round((o/pr-1)*100)}%)</span>`:'·';
+    h+=`<div class="ctitle"><h2>Ranking del concurso</h2><span class="hint">Objetivo de facturación P&G c/IVA de noviembre · "Hoy necesita" = lo que le falta dividido por los días hábiles que quedan · Elegí uno o varios meses para comparar el objetivo contra su promedio</span></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px"><span style="font-size:12px;color:var(--muted)">Meses base:</span><div class="seg">${mesesH.map(m=>`<button class="pdm" data-m="${m}" aria-pressed="${base.includes(m)}">${MESN(m)}</button>`).join('')}</div>
+      <span style="font-size:12px;color:var(--muted)">Total empresa prom. ${lbl}: <b>${pesoC(base.length?base.reduce((s,m)=>s+(P.histTotal[m]||0),0)/base.length:0)}</b> · meta ${pesoC(L.meta)}</span></div>
+      <div class="twrap"><table><thead><tr><th>Vendedor</th><th>Grupo</th>${base.map(m=>`<th class="num">${MESN(m)}</th>`).join('')}<th class="num">Prom. ${lbl}</th><th class="num">Objetivo</th><th class="num">Objetivo vs prom. ($ y %)</th><th class="num">Vendido nov.</th><th class="num">%</th><th class="num">Hoy necesita</th><th>Cobertura sachets · pilas</th><th class="num">Premio</th></tr></thead><tbody>`;
+    const EQ=[['Equipo Lucy',['24','25','26','27','28']],['Equipo Juan',['1','2','3','4','5','6','7','8','9','10']],['Mayorista',['51']]];
+    EQ.forEach(([g,ids])=>{
+      const vs=P.vendedores.filter(v=>ids.includes(v.cod)).sort((a,b)=>b.objetivo-a.objetivo);
+      vs.forEach(v=>{ const pr=prom(v); h+=`<tr><td class="name">${v.nombre}</td><td style="color:var(--muted)">${v.grupo}</td>${base.map(m=>`<td class="num">${pesoC((v.hist||{})[m]||0)}</td>`).join('')}<td class="num" style="font-weight:600">${pesoC(pr)}</td><td class="num">${pesoC(v.objetivo)}</td><td class="num">${dif(v.objetivo,pr)}</td><td class="num">${pesoC(v.mtd)}</td><td class="num" style="font-weight:600;color:${colP(v.pct)}">${Math.round(v.pct*100)}%</td><td class="num">${pesoC(v.hoy)}</td><td style="font-size:12px">${covTxt(v.cod)}</td><td class="num">${v.premio?peso(v.premio):'comisión'}</td></tr>`; });
+      const sm=k=>vs.reduce((s,v)=>s+k(v),0), pr=sm(prom), ob=sm(v=>v.objetivo), mt=sm(v=>v.mtd);
+      h+=`<tr style="background:var(--soft,rgba(0,0,0,.04));font-weight:600"><td>Total ${g}</td><td></td>${base.map(m=>`<td class="num">${pesoC(sm(v=>(v.hist||{})[m]||0))}</td>`).join('')}<td class="num">${pesoC(pr)}</td><td class="num">${pesoC(ob)}</td><td class="num">${dif(ob,pr)}</td><td class="num">${pesoC(mt)}</td><td class="num">${ob?Math.round(mt/ob*100)+'%':'·'}</td><td></td><td></td><td></td></tr>`;
     });
     h+='</tbody></table></div>';
   } else {
@@ -2196,6 +2209,7 @@ function renderPlanDia(){
   P.stock.slice().sort((a,b)=>b.stock-a.stock).forEach(s=>{ h+=`<tr><td class="name">${s.familia}</td><td class="num">${pesoC(s.stock)}</td><td style="font-size:12px">${s.acciones}</td></tr>`; });
   h+=`</tbody></table></div><details style="margin-top:8px"><summary>Artículos en quiebre: no ofrecer (${P.quiebres.length})</summary><div style="font-size:12px;columns:2;margin-top:6px">${P.quiebres.map(q=>`<div>${q.familia} · ${q.desc} (${q.codigo})</div>`).join('')}</div></details>`;
   card.innerHTML=h; p.appendChild(card);
+  card.querySelectorAll('.pdm').forEach(b=>b.onclick=()=>{ const m=b.dataset.m, a=window._pdBase||[]; window._pdBase=a.includes(m)?a.filter(x=>x!==m):[...a,m].sort(); renderPlanDia(); });
 }
 function renderCobertura(){
   const p=document.getElementById('p-cobertura'); p.innerHTML='';
