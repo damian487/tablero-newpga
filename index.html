@@ -2149,7 +2149,7 @@ function renderPlanDia(){
   const covV=cod=>{ const C=DATA.cobertura; if(!C) return []; return C.planes.map(pl=>{ const x=pl.porVendedor.find(y=>y.cod===cod); return x&&x.objetivo?{n:pl.id==='pilas'?'Pilas':'Sachets',v:x.meses[P.mes]||0,o:x.objetivo}:null; }).filter(Boolean); };
   const covTxt=cod=>{ const c=covV(cod); return c.length?c.map(x=>`<span style="color:${x.v>=x.o?'var(--good)':'var(--bad)'}">${x.n} ${x.v}/${x.o}</span>`).join(' · '):'·'; };
   const top=el('div','card');
-  top.innerHTML=`<div class="ctitle"><h2>Concurso P&G noviembre — meta de la empresa $150M</h2><span class="hint">${P.reglas}</span></div>
+  top.innerHTML=`<div class="ctitle"><h2>Concurso P&G noviembre — meta de la empresa ${pesoC(P.llave.meta)}</h2><span class="hint">${P.reglas}</span></div>
     <div class="kpitiles" style="grid-template-columns:repeat(4,1fr)">
       <div class="supcard"><h3>Facturado noviembre</h3><div class="big num" style="color:${colP(L.pct)}">${pesoC(L.mtd)} / ${pesoC(L.meta)}</div><div class="who">${Math.round(L.pct*100)}% de la meta</div></div>
       <div class="supcard"><h3>Falta</h3><div class="big num">${pesoC(Math.max(0,L.meta-L.mtd))}</div><div class="who">${P.diasRestan} días hábiles (de ${P.diasMes})</div></div>
