@@ -4275,28 +4275,24 @@ function renderFicha(){
         let desde=dSel.value, hasta=hSel.value; if(desde>hasta){ [desde,hasta]=[hasta,desde]; }
         const items=serie.filter(d=>d.fecha>=desde&&d.fecha<=hasta);
         let vh='';
-        if(items.length>=2) vh+=areaChart(items,{critFn:d=>d.venta<20000&&d.fecha!==((DATA.meta&&DATA.meta.generado)||'')});
+        if(items.length>=2) vh+=areaChart(items,{critFn:d=>d.venta<20000});
         else vh+='<p style="color:var(--muted)">Elegí un rango de al menos 2 días para ver el gráfico.</p>';
         vh+='<div class="twrap"><table><thead><tr><th>Fecha</th><th>Venta $</th><th>CCC</th><th>% Efectividad</th><th>Marcas</th></tr></thead><tbody>';
-        let tv=0; items.forEach(d=>{ tv+=d.venta; const critico=d.venta<20000&&d.fecha!==((DATA.meta&&DATA.meta.generado)||''); vh+=`<tr><td class="name">${fdate(d.fecha)}/${d.fecha.slice(0,4)}${d.fecha===((DATA.meta&&DATA.meta.generado)||'')?' <span style="color:var(--muted);font-weight:400">(hoy, en curso)</span>':''}</td><td class="num"${critico?' style="color:var(--bad);font-weight:700"':''}>${peso(d.venta)}</td><td class="num">${AR.format(d.ccc)}</td><td class="num">${d.efectividad!=null?pct(d.efectividad):'—'}</td><td class="num">${d.marcas!=null?AR.format(d.marcas):'—'}</td></tr>`; });
+        let tv=0; items.forEach(d=>{ tv+=d.venta; const critico=d.venta<20000; vh+=`<tr><td class="name">${fdate(d.fecha)}/${d.fecha.slice(0,4)}</td><td class="num"${critico?' style="color:var(--bad);font-weight:700"':''}>${peso(d.venta)}</td><td class="num">${AR.format(d.ccc)}</td><td class="num">${d.efectividad!=null?pct(d.efectividad):'—'}</td><td class="num">${d.marcas!=null?AR.format(d.marcas):'—'}</td></tr>`; });
         vh+=`<tr class="grandtotal"><td>TOTAL del rango</td><td class="num">${peso(tv)}</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>`;
         vh+='</tbody></table></div>';
         vBox.innerHTML=vh;
         // Banner de dias sin venta en el rango elegido (pedido de Damian 29/10): se recalcula al
         // mover Desde/Hasta, asi a medida que se agranda el rango se ve como se acumulan.
-        // El dia de la corrida (hoy) esta en curso: la facturacion del dia todavia no termino, asi
-        // que un $0 hoy NO es un dia sin venta (pedido de Damian 9/11). No se cuenta ni en el total
-        // de dias habiles ni en la racha.
-        const hoyCurso=(DATA.meta&&DATA.meta.generado)||'';
-        const cerrados=items.filter(d=>d.fecha!==hoyCurso);
-        const enCurso=cerrados.length<items.length;
-        const sinVenta=cerrados.filter(d=>!(d.venta>0)).length;
-        let racha=0; for(let i=cerrados.length-1;i>=0&&!(cerrados[i].venta>0);i--) racha++;
+        // Dia sin venta = venta menor a $20.000 (mismo umbral que el punto rojo del grafico),
+        // incluido el dia de hoy (pedido de Damian 9/11).
+        const sinVenta=items.filter(d=>!(d.venta>=20000)).length;
+        let racha=0; for(let i=items.length-1;i>=0&&!(items[i].venta>=20000);i--) racha++;
         const sv=document.getElementById('fichaSinVenta');
         const malo=sinVenta>0;
         sv.style.background=malo?'color-mix(in srgb, var(--bad) 14%, transparent)':'color-mix(in srgb, var(--good) 14%, transparent)';
         sv.style.color=malo?'var(--bad)':'var(--good)';
-        sv.innerHTML=`Días sin venta: <span class="num" style="font-size:17px">${sinVenta}</span><span style="font-weight:400;color:var(--muted)">de ${cerrados.length} días hábiles${racha>1?` · ${racha} seguidos al final del rango`:''}${enCurso?' · hoy en curso, no cuenta':''}</span>`;
+        sv.innerHTML=`Días sin venta: <span class="num" style="font-size:17px">${sinVenta}</span><span style="font-weight:400;color:var(--muted)">de ${items.length} días hábiles (venta menor a $20.000)${racha>1?` · ${racha} seguidos al final del rango`:''}</span>`;
       }
       const onRango=()=>{ window._fichaRango={d:dSel.value,h:hSel.value}; drawVenta(); };
       dSel.onchange=onRango; hSel.onchange=onRango; drawVenta();
