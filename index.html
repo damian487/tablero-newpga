@@ -4076,6 +4076,7 @@ function renderFicha(){
         <span style="font-size:12px;color:var(--muted);font-weight:700">Desde</span><select id="fichaDesde" class="fsel"></select>
         <span style="font-size:12px;color:var(--muted);font-weight:700">Hasta</span><select id="fichaHasta" class="fsel"></select>
         <span id="fichaSinVenta" style="display:inline-flex;align-items:baseline;gap:6px;padding:6px 14px;border-radius:999px;font-size:12.5px;font-weight:700"></span>
+        <span id="fichaPromVenta" style="display:inline-flex;align-items:baseline;gap:6px;padding:6px 14px;border-radius:999px;font-size:12.5px;font-weight:700;background:color-mix(in srgb, var(--accent, #0f7c8a) 14%, transparent);color:var(--accent, #0f7c8a)"></span>
         </div><div id="fichaVentaBox"></div></div>`;
     }
 
@@ -4293,6 +4294,9 @@ function renderFicha(){
         sv.style.background=malo?'color-mix(in srgb, var(--bad) 14%, transparent)':'color-mix(in srgb, var(--good) 14%, transparent)';
         sv.style.color=malo?'var(--bad)':'var(--good)';
         sv.innerHTML=`Días sin venta: <span class="num" style="font-size:17px">${sinVenta}</span><span style="font-weight:400;color:var(--muted)">de ${items.length} días hábiles (venta menor a $20.000)${racha>1?` · ${racha} seguidos al final del rango`:''}</span>`;
+        // Promedio de venta diaria del rango elegido (pedido de Damian 10/11): total del rango / dias habiles del rango.
+        const pv=document.getElementById('fichaPromVenta');
+        if(pv) pv.innerHTML=items.length?`Promedio de venta: <span class="num" style="font-size:17px">${peso(Math.round(tv/items.length))}</span><span style="font-weight:400;color:var(--muted)">por día hábil (${items.length} días)</span>`:'';
       }
       const onRango=()=>{ window._fichaRango={d:dSel.value,h:hSel.value}; drawVenta(); };
       dSel.onchange=onRango; hSel.onchange=onRango; drawVenta();
