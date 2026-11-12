@@ -2058,6 +2058,21 @@ function renderPFP(){
     document.getElementById('pfpLvSel').onchange=drawL; drawL();
   }
 
+  /* ---- POA Combos Filos: reintegro reclamable a P&G (solo en esta pestaña restringida) ---- */
+  if(F.poa){
+    const Q=F.poa, MESN={'2026-11':'Noviembre','2026-12':'Diciembre'}, qc=el('div','card');
+    qc.appendChild(el('div','ctitle','<h2>🧾 POA Combos Filos — reintegro a reclamar a P&G</h2><span class="hint">monto fijo por combo armado en cada PDV (Sell Out), con tope por PDV · montos sin IVA</span>'));
+    const tot=Q.porMes.reduce((s,m)=>s+m.reclamable,0);
+    qc.appendChild(el('div','kpitiles',Q.porMes.map(m=>`<div class="supcard"><h3>${MESN[m.mes]||m.mes}</h3><div class="big num">${peso(m.reclamable)}</div><div class="who">${m.combos} combos · ${m.clientes} clientes · ${m.aUnPaso} a un paso</div></div>`).join('')
+      +`<div class="supcard"><h3>Total vigencia</h3><div class="big num">${peso(tot)}</div><div class="who">nov-dic 2026</div></div>`));
+    qc.lastChild.style.gridTemplateColumns=`repeat(${Q.porMes.length+1},1fr)`;
+    let t='<div class="twrap"><table><thead><tr><th>Vendedor</th><th class="num">Clientes con combo</th><th class="num">Combos</th><th class="num">Reclamable</th></tr></thead><tbody>';
+    Q.porVendedor.filter(v=>v.reclamable>0).forEach(v=>{ t+=`<tr><td class="name">${v.vn||v.v}</td><td class="num">${v.clientes}</td><td class="num">${v.combos}</td><td class="num">${peso(v.reclamable)}</td></tr>`; });
+    qc.appendChild(el('div','',t+'</tbody></table></div>'));
+    qc.appendChild(el('div','note','Pagos por combo (sin IVA): UG2+Venus $1.618 en Autoservicios / $1.090 en Almacenes y Kioscos · PB3+Venus $1.175 / $865. Topes por PDV por mes: 4 / 3 / 2. A confirmar con P&G: validación por factura o por mes, tope mensual o del período, y la equivalencia del cartel de PB3. La lista de clientes a un paso está en la pestaña Plan Filos.'));
+    p.appendChild(qc);
+  }
+
   /* ---- Sell Out: 2% por categoria, independiente ---- */
   const soCard=el('div','card');
   soCard.appendChild(el('div','ctitle','<h2>Sell Out — 2% del Sell In por categoría</h2><span class="hint">se cobra cada categoría en forma independiente · 90-99,99% de alcance = 70% del premio · ≥100% = 100% del premio</span>'));
@@ -2362,6 +2377,36 @@ function renderFilos(){
     box.innerHTML=t;
   }
   sv.onchange=draw; ca.onchange=draw; draw();
+  renderPOACombos(p);
+}
+/* POA Combos Filos de P&G (12/11/2026): combos UG2+Venus / PB3+Venus armados por cliente y lista "a un paso".
+   Sin montos de reintegro (eso va solo en la pestaña PFP, restringida). */
+function renderPOACombos(p){
+  const P=DATA.poa; if(!P) return;
+  const MESN={'2026-11':'Noviembre','2026-12':'Diciembre'};
+  const card=el('div','card');
+  card.appendChild(el('div','ctitle',`<h2>🎁 Combo Filos (UG2 + Venus · PB3 + Venus)</h2><span class="hint">clientes que ya armaron el combo y los que están a un paso · ${fdate(P.vigencia.desde)} al ${fdate(P.vigencia.hasta)} · Autoservicios, Almacenes y Kioscos</span>`));
+  const tiles=P.porMes.map(m=>`<div class="supcard"><h3>${MESN[m.mes]||m.mes}</h3><div class="big num">${AR.format(m.combos)} <span style="font-size:13px;font-weight:600;color:var(--muted)">combos</span></div><div class="who">${AR.format(m.clientes)} clientes · UG2+Venus ${m.combosUG2} · PB3+Venus ${m.combosPB3} · <b style="color:var(--warn2)">${AR.format(m.aUnPaso)} a un paso</b></div></div>`).join('');
+  card.appendChild(el('div','kpitiles',tiles)); card.lastChild.style.gridTemplateColumns=`repeat(${Math.max(1,P.porMes.length)},1fr)`;
+  const meses=P.porMes.map(m=>m.mes), mesAct=meses[meses.length-1];
+  const vends=[...new Set(P.clientes.map(x=>x.vn||x.v))].sort();
+  card.appendChild(el('div','',`<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:4px 0 10px">
+    <select id="poaMes" class="fsel" style="min-width:160px">${meses.map(m=>`<option value="${m}"${m===mesAct?' selected':''}>${MESN[m]||m}</option>`).join('')}</select>
+    <select id="poaVend" class="fsel"><option value="">Todos los vendedores</option>${vends.map(v=>`<option>${v}</option>`).join('')}</select>
+    <label style="font-size:13px"><input type="checkbox" id="poaPaso" checked> Solo los que están a un paso</label></div>`));
+  const box=el('div',''); card.appendChild(box);
+  card.appendChild(el('div','note','Mínimo por combo: Autoservicios 2 carteles UG2 (o 1 PB3) + 1 Venus · Almacenes y Kioscos 1 cartel UG2 (o 1 PB3) + 1 Venus. Máximo por cliente: 4 combos en Autoservicios, 3 en Almacenes, 2 en Kioscos.'));
+  p.appendChild(card);
+  const sm=card.querySelector('#poaMes'), sv=card.querySelector('#poaVend'), sp=card.querySelector('#poaPaso');
+  function draw(){
+    const rows=P.clientes.filter(x=>x.mes===sm.value&&(!sv.value||(x.vn||x.v)===sv.value)&&(!sp.checked||x.falta));
+    let t='<div class="twrap"><table><thead><tr><th>Cliente</th><th>Razón social</th><th>Vendedor</th><th>Canal</th><th class="num">UG2</th><th class="num">PB3</th><th class="num">Venus</th><th class="num">Combos</th><th>Le falta</th></tr></thead><tbody>';
+    const CAN={SMM:'Autoservicio',Tradicional:'Almacén',Kiosco:'Kiosco'};
+    rows.slice(0,300).forEach(x=>{ t+=`<tr><td>${x.c}</td><td class="name">${x.rs}</td><td>${x.vn||x.v}</td><td>${CAN[x.canal]||x.canal}</td><td class="num">${x.ug2||'·'}</td><td class="num">${x.pb3||'·'}</td><td class="num">${x.ven||'·'}</td><td class="num">${(x.combosUG2+x.combosPB3)||'·'}</td><td style="color:var(--warn2);font-weight:600">${x.falta||''}</td></tr>`; });
+    t+=`</tbody></table></div><div class="hint">${rows.length} clientes${rows.length>300?' (se muestran los primeros 300)':''}</div>`;
+    box.innerHTML=t;
+  }
+  sm.onchange=draw; sv.onchange=draw; sp.onchange=draw; draw();
 }
 function renderCombos(){
   const p=document.getElementById('p-combos'); p.innerHTML='';
