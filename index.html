@@ -2029,6 +2029,35 @@ function renderPFP(){
   }
   paCard.innerHTML+=paH; p.appendChild(paCard);
 
+  /* ---- Listas de trabajo por vendedor (pedido de Damian 11/11/2026) ---- */
+  if(F.listas){
+    const L=F.listas, lc=el('div','card');
+    lc.appendChild(el('div','ctitle','<h2>📋 Listas de trabajo por vendedor</h2><span class="hint">a quién visitar para sumar Autoservicios (Canales) y categorías (Surtido) en el trimestre</span>'));
+    const nom=c=>((DATA.porVendedor||[]).find(v=>v.cod===c)||{}).nombre||('Vendedor '+c);
+    const vends=[...new Set([...L.autoservicios,...L.surtido].map(x=>x.v))].sort((a,b)=>(+a||999)-(+b||999));
+    lc.appendChild(el('div','',`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><select id="pfpLvSel" class="fsel"><option value="TODOS">Todos los vendedores</option>${vends.map(v=>`<option value="${v}">${nom(v)}</option>`).join('')}</select><span style="font-size:12px;color:var(--muted)">Categorías de Surtido en foco: <b>${L.categoriasSurtido.join(' · ')}</b></span></div>`));
+    const box=el('div',''); lc.appendChild(box);
+    if(F.notaSellIn) lc.appendChild(el('div','note',`<b>Recordatorio:</b> ${F.notaSellIn}`));
+    const cap=s=>s?s.charAt(0)+s.slice(1).toLowerCase():s;
+    function drawL(){
+      const v=document.getElementById('pfpLvSel').value, f=x=>v==='TODOS'||x.v===v;
+      const A=L.autoservicios.filter(f), S=L.surtido.filter(f);
+      const p1=A.filter(x=>x.p===1).length;
+      let h=`<h3 style="margin:6px 0">Autoservicios sin compra P&G en el trimestre <span style="font-weight:400;color:var(--muted);font-size:13px">· ${AR.format(A.length)} clientes · ${AR.format(p1)} compraban P&G antes (empezar por esos)</span></h3>`;
+      h+='<div class="twrap" style="max-height:420px;overflow:auto"><table><thead><tr><th>Prioridad</th>'+(v==='TODOS'?'<th>Vendedor</th>':'')+'<th>Código</th><th>Cliente</th><th>Día</th><th>Frecuencia</th><th>P&G antes del trimestre</th><th>Última compra P&G</th></tr></thead><tbody>';
+      A.forEach(x=>{ h+=`<tr><td>${x.p===1?'<span class="pill ok">Compraba P&G</span>':'<span class="pill">Nunca P&G</span>'}</td>${v==='TODOS'?`<td>${nom(x.v)}</td>`:''}<td class="num">${x.c}</td><td class="name">${x.rs}</td><td>${x.d||'—'}</td><td>${x.fr||'—'}</td><td class="num">${x.ant?peso(x.ant):'—'}</td><td>${x.uf?fdate(x.uf):'—'}</td></tr>`; });
+      h+='</tbody></table></div>';
+      const rc=S.filter(x=>x.recompra.length).length;
+      h+=`<h3 style="margin:16px 0 6px">Surtido: clientes con P&G en el trimestre a los que les falta alguna categoría <span style="font-weight:400;color:var(--muted);font-size:13px">· ${AR.format(S.length)} clientes · ${AR.format(rc)} la compraban antes (recompra)</span></h3>`;
+      h+='<div class="twrap" style="max-height:420px;overflow:auto"><table><thead><tr>'+(v==='TODOS'?'<th>Vendedor</th>':'')+'<th>Código</th><th>Cliente</th><th>Canal</th><th>Día</th><th>Le falta</th><th>Recompra (la compraba antes)</th></tr></thead><tbody>';
+      S.forEach(x=>{ h+=`<tr>${v==='TODOS'?`<td>${nom(x.v)}</td>`:''}<td class="num">${x.c}</td><td class="name">${x.rs}</td><td>${x.canal}</td><td>${x.d||'—'}</td><td>${x.falta.map(cap).join(', ')}</td><td>${x.recompra.length?x.recompra.map(cap).join(', '):'—'}</td></tr>`; });
+      h+='</tbody></table></div>';
+      box.innerHTML=h;
+    }
+    p.appendChild(lc);
+    document.getElementById('pfpLvSel').onchange=drawL; drawL();
+  }
+
   /* ---- Sell Out: 2% por categoria, independiente ---- */
   const soCard=el('div','card');
   soCard.appendChild(el('div','ctitle','<h2>Sell Out — 2% del Sell In por categoría</h2><span class="hint">se cobra cada categoría en forma independiente · 90-99,99% de alcance = 70% del premio · ≥100% = 100% del premio</span>'));
