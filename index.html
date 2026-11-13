@@ -4205,7 +4205,8 @@ function renderFicha(){
     if(!msuAgg&&!conAgg&&!maAgg) objetivosHtml+='<p style="color:var(--muted)">Sin objetivos vigentes.</p>';
     objetivosHtml+='</div></div>';
 
-    /* 4) Uso de herramientas */
+    /* 4) Uso de herramientas - se arma aca pero va al final de todo; en su lugar van los Objetivos del concurso (pedido de Damián 13/11) */
+    const _hHerr=h.length;
     h+='<div class="card"><div class="ctitle"><h2>Uso de herramientas</h2><span class="hint">Acción de precio y Combos — acumulado del mes en curso</span></div>';
     h+='<div class="twrap"><table><thead><tr><th>Herramienta</th><th>Usa</th><th class="num">Unidades</th><th class="num">Clientes</th><th class="num">Importe $</th></tr></thead><tbody>';
     if(DATA.accion&&DATA.accion.meta){
@@ -4227,6 +4228,7 @@ function renderFicha(){
     });
     if(!(DATA.accion&&DATA.accion.meta)&&!combosLista.length) h+='<tr><td colspan="5" style="color:var(--muted)">Sin herramientas activas este mes.</td></tr>';
     h+='</tbody></table></div></div>';
+    const herramientasHtml=h.slice(_hHerr); h=h.slice(0,_hHerr)+'%%OBJ_CONCURSO%%';
 
     /* 5) Mix por familia y marca */
     if(single){
@@ -4331,8 +4333,9 @@ function renderFicha(){
 
     /* Objetivos e Infaltables se muestran al final del todo (pedido de Damián) - Infaltables
        ahora es el último panel de la ficha, después de Objetivos. */
+    h=h.replace('%%OBJ_CONCURSO%%',infaltablesHtml);
     h+=objetivosHtml;
-    h+=infaltablesHtml;
+    h+=herramientasHtml;
 
     box.innerHTML=h;
 
