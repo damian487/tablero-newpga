@@ -1740,7 +1740,8 @@ function renderAccion(){
   function getScope(v){ return v==='todos' ? A.todos : ((A.canales||{})[v]); }
   const descTxt=CANALES.filter(cn=>M.descuentos&&M.descuentos[cn]!=null).map(cn=>cn+' '+M.descuentos[cn]+'%').join(' · ');
   const card=el('div','card');
-  let head=`<div class="ctitle"><h2>Acción de precio — ${M.nombre}</h2><span class="hint">cód. ${M.codigo} · descuentos: ${descTxt} · días accionados desde ${fd(M.desde)}</span></div>`;
+  let head=`<div class="ctitle"><h2>Acción de precio — ${M.nombre}</h2><span class="hint">cód. ${M.codigo} · descuentos: ${descTxt} · días accionados desde ${fd(M.desde)}${M.hasta?' hasta '+fd(M.hasta):''}</span></div>`;
+  if(M.hasta) head+=`<div class="note" style="margin:6px 0">⏸️ Medición congelada al ${fd(M.hasta)}: no suma ventas posteriores hasta que se cargue una acción nueva en Configuración.</div>`;
   head+='<div style="display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 12px">';
   head+='<select id="accScope" class="fsel">'+CANALES.map(cn=>`<option value="${cn}">Canal: ${cn}${M.descuentos&&M.descuentos[cn]!=null?' ('+M.descuentos[cn]+'% desc.)':''}</option>`).join('')+'<option value="todos">Canal: Todos</option></select>';
   head+='<select id="accMetric" class="fsel"><option value="u">Métrica: Unidades</option><option value="imp">Métrica: Importe $</option><option value="cli">Métrica: Clientes</option></select>';
@@ -4214,7 +4215,7 @@ function renderFicha(){
       if(single){ const a=accVMap[single.cod]; if(a){u=a.acumU;cli=a.acumCli;imp=a.acumImp;} }
       else{ scope.forEach(v=>{ const a=accVMap[v.cod]; if(a){u+=a.acumU;cli+=a.acumCli;imp+=a.acumImp;} }); }
       const usa=u>0;
-      h+=`<tr><td class="name">Acción de precio — ${DATA.accion.meta.nombre}</td>
+      h+=`<tr><td class="name">Acción de precio — ${DATA.accion.meta.nombre}${DATA.accion.meta.hasta?' <span style="color:var(--muted);font-weight:400">(congelada al '+DATA.accion.meta.hasta.slice(8,10)+'/'+DATA.accion.meta.hasta.slice(5,7)+')</span>':''}</td>
         <td class="num" style="color:${usa?'var(--good)':'var(--bad)'};font-weight:700">${usa?'Sí':'No'}</td>
         <td class="num">${AR.format(u)}</td><td class="num">${AR.format(cli)}</td><td class="num">${peso(imp)}</td></tr>`;
     }
