@@ -4280,25 +4280,35 @@ function renderFicha(){
       h+='</tbody></table></div></div>';
     }
 
-    /* 7) Infaltables (armado acá, pero se agrega al final del todo - ver más abajo, pedido de Damián 21/9) */
+    /* 7) Objetivos del concurso (de "Mi plan del día") - reemplaza a Infaltables (pedido de Damián 13/11) */
     let infaltablesHtml='';
-    if(infDetalle.length){
-      let infRows, infUniverso;
-      if(single){
-        infRows=infDetalle.filter(d=>d.v&&d.v[single.cod]>0).map(d=>({categoria:d.categoria,descripcion:d.descripcion,cant:d.v[single.cod]}));
-        infUniverso=infMap[single.cod]?infMap[single.cod].clientes:null;
-      } else {
-        infRows=infDetalle.map(d=>{ let tot=0; scope.forEach(v=>{ tot+=(d.v&&d.v[v.cod])||0; }); return {categoria:d.categoria,descripcion:d.descripcion,cant:tot}; }).filter(d=>d.cant>0);
-        infUniverso=scope.reduce((a,v)=>a+((infMap[v.cod]&&infMap[v.cod].clientes)||0),0);
+    const PD=DATA.planDia;
+    if(PD&&PD.vendedores){
+      const pv=PD.vendedores.filter(v=>codsSet.has(String(v.cod)));
+      if(pv.length){
+        const colP=x=>x>=1?'var(--good)':(x>=0.9?'var(--warn2)':'var(--bad)');
+        const sm=k=>pv.reduce((a,v)=>a+(k(v)||0),0);
+        const obj=sm(v=>v.objetivo), mtd=sm(v=>v.mtd), pc=obj?mtd/obj:0;
+        const tend=pv.every(v=>v.tend!=null)?sm(v=>v.tend):null, hoyN=sm(v=>v.hoy);
+        const tdTxt=(t,o)=>t==null||!o?'·':`<span style="color:${colP(t/o)}">${pesoC(t)} (${Math.round(t/o*100)}%)</span>`;
+        const cov=cods=>{ const C=DATA.cobertura; if(!C) return []; return C.planes.map(pl=>{ let v=0,o=0; pl.porVendedor.forEach(x=>{ if(cods.includes(String(x.cod))&&x.objetivo){ v+=x.meses[PD.mes]||0; o+=x.objetivo; } }); return o?{n:pl.id==='pilas'?'Pilas':'Sachets',v,o}:null; }).filter(Boolean); };
+        const covTxt=cods=>{ const c=cov(cods); return c.length?c.map(x=>`<span style="color:${x.v>=x.o?'var(--good)':'var(--bad)'}">${x.n} ${x.v}/${x.o}</span>`).join(' · '):'·'; };
+        const mesN=(typeof MESES_ES!=='undefined'&&PD.mes)?MESES_ES[+PD.mes.slice(5,7)-1].toLowerCase():'el mes';
+        infaltablesHtml=`<div class="card"><div class="ctitle"><h2>Objetivos de ${mesN} (concurso P&G)</h2><span class="hint">facturación P&G c/IVA · mismos datos que "Mi plan del día" · ${PD.diasRestan} días hábiles restantes de ${PD.diasMes}</span></div>
+          <div class="supgrid" style="margin-bottom:12px">
+            <div class="supcard"><h3>Objetivo</h3><div class="big num">${pesoC(obj)}</div><div class="who">${pv.length===1?pv[0].nombre:pv.length+' vendedores'}</div></div>
+            <div class="supcard"><h3>Vendido</h3><div class="big num" style="color:${colP(pc)}">${pesoC(mtd)}</div><div class="who">${Math.round(pc*100)}% del objetivo</div></div>
+            <div class="supcard"><h3>Tendencia de cierre</h3><div class="big num">${tdTxt(tend,obj)}</div><div class="who">ritmo actual × días hábiles del mes</div></div>
+            <div class="supcard"><h3>Hoy necesita</h3><div class="big num">${pesoC(hoyN)}</div><div class="who">falta ${pesoC(Math.max(0,obj-mtd))}</div></div>
+            <div class="supcard"><h3>Cobertura (llave del premio)</h3><div class="num" style="font-size:18px;font-weight:700">${covTxt(pv.map(v=>String(v.cod)))}</div><div class="who">sachets H&S y pilas Philco</div></div>
+          </div>`;
+        if(pv.length>1){
+          infaltablesHtml+='<div class="twrap"><table><thead><tr><th>Vendedor</th><th class="num">Objetivo</th><th class="num">Vendido</th><th class="num">%</th><th class="num">Tendencia de cierre</th><th class="num">Hoy necesita</th><th>Cobertura sachets · pilas</th></tr></thead><tbody>';
+          pv.slice().sort((a,b)=>b.pct-a.pct).forEach(v=>{ infaltablesHtml+=`<tr><td class="name">${v.nombre}</td><td class="num">${pesoC(v.objetivo)}</td><td class="num">${pesoC(v.mtd)}</td><td class="num" style="font-weight:600;color:${colP(v.pct)}">${Math.round(v.pct*100)}%</td><td class="num">${tdTxt(v.tend,v.objetivo)}</td><td class="num">${pesoC(v.hoy)}</td><td style="font-size:12px">${covTxt([String(v.cod)])}</td></tr>`; });
+          infaltablesHtml+='</tbody></table></div>';
+        }
+        infaltablesHtml+='</div>';
       }
-      infaltablesHtml=`<div class="card"><div class="ctitle"><h2>Infaltables</h2><span class="hint">artículos del catálogo de infaltables colocados en al menos un cliente</span></div>
-        <div class="supgrid" style="margin-bottom:12px">${ftile('Infaltables colocados',infRows.length+' / '+infDetalle.length)}${infUniverso!=null?ftile('Universo elegible',AR.format(infUniverso)):''}</div>`;
-      if(infRows.length){
-        infaltablesHtml+='<div class="twrap"><table><thead><tr><th>Categoría</th><th>Infaltable</th><th class="num">Clientes</th></tr></thead><tbody>';
-        infRows.slice().sort((a,b)=>b.cant-a.cant).forEach(d=>{ infaltablesHtml+=`<tr><td class="name">${d.categoria}</td><td>${d.descripcion}</td><td class="num">${AR.format(d.cant)}</td></tr>`; });
-        infaltablesHtml+='</tbody></table></div>';
-      }
-      infaltablesHtml+='</div>';
     }
 
     /* 8) Clientes */
