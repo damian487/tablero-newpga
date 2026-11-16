@@ -82,6 +82,8 @@ header{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--surfa
 nav.tabs{display:flex;gap:10px;flex-wrap:wrap;padding-bottom:4px}
 .tabgroup{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:6px;border-radius:16px;
   background:color-mix(in srgb,var(--surface2) 45%,transparent);border:1px solid color-mix(in srgb,var(--border) 70%,transparent)}
+.tabgroup-lab{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);padding:0 4px 0 6px}
+.tabgroup-foco{border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
 .tab{border:1px solid var(--border);background:var(--surface);color:var(--muted);padding:8px 14px;border-radius:999px;
   font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
 .tab:hover{color:var(--ink);border-color:var(--accent2)}
@@ -620,7 +622,9 @@ const TAB_GROUPS=[
     {id:'p-resultados',label:'📊 Resultados del mes'},
     {id:'p-diario',label:'📋 Reporte diario'},
     {id:'p-ventadia',label:'📈 Venta del Día'},
-    {id:'p-evo',label:'Evolución diaria'} ],
+    {id:'p-evo',label:'Evolución diaria'},
+    {id:'p-msu',label:'🎯 Meta del trimestre'},
+    {id:'p-accion',label:'🏷️ Acción precio (cerrada)'} ],
   [ {id:'p-pfp',label:'💰 PFP Red GANA'} ],
   [ {id:'p-ficha',label:'Ficha por Equipo'},
     {id:'p-vend',label:'Vendedores & CCC'},
@@ -635,19 +639,19 @@ const TAB_GROUPS=[
     {id:'p-infaltables',label:'Infaltables'},
     {id:'p-stock',label:'📦 Días de stock'} ],
   [ {id:'p-plansup',label:'Plan de acción por supervisor'} ],
-  [ {id:'p-filos',label:'🪒 Plan Filos'},
+  /* Focos del mes separados de las herramientas (Damián 16/11: los vendedores estaban mareados) */
+  [ {id:'p-plandia',label:'🎯 Mi plan del día'},
+    {id:'p-filos',label:'🪒 Plan Filos'},
     {id:'p-venus',label:'🌸 Plan Venus'},
     {id:'p-cobertura',label:'🔋 Sachets y Pilas'},
     {id:'p-combos',label:'🎁 Combos'},
-    {id:'p-accion',label:'🏷️ Acción precio'},
-    {id:'p-msu',label:'🎯 Meta del trimestre'},
-    {id:'p-metaago',label:'🎯 Meta Cobertura del mes'},
-    {id:'p-matinal',label:'🌅 Matinal'},
+    {id:'p-metaago',label:'🎯 Meta Cobertura del mes'} ],
+  [ {id:'p-matinal',label:'🌅 Matinal'},
     {id:'p-mapa',label:'🗺️ Mapa'},
     {id:'p-relevamiento',label:'🏷️ Relevamiento Precios'},
-    {id:'p-config',label:'⚙️ Configuración'},
-    {id:'p-plandia',label:'🎯 Mi plan del día'} ],
+    {id:'p-config',label:'⚙️ Configuración'} ],
 ];
+const TAB_GROUP_LABELS={5:'🎯 Focos de '+MESES_ES[new Date().getMonth()].toLowerCase(),6:'🧰 Herramientas'};
 const TABS=TAB_GROUPS.flat();
 const tabsEl=document.getElementById('tabs');
 let tabIdx=0;
@@ -661,8 +665,9 @@ function pfpBloquear(){
   const panel=document.getElementById('p-pfp');
   if(panel && panel.classList.contains('on') && typeof renderPFP==='function') renderPFP();
 }
-TAB_GROUPS.forEach(group=>{
-  const g=el('div','tabgroup');
+TAB_GROUPS.forEach((group,gi)=>{
+  const g=el('div','tabgroup'+(gi===5?' tabgroup-foco':''));
+  if(TAB_GROUP_LABELS[gi]) g.appendChild(el('span','tabgroup-lab',TAB_GROUP_LABELS[gi]));
   group.forEach(t=>{
     const i=tabIdx++;
     const b=el('button','tab',t.label); b.setAttribute('role','tab'); b.setAttribute('aria-selected',i===0?'true':'false');
