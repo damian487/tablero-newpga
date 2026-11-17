@@ -167,7 +167,7 @@ tr.me td{background:var(--amber-soft);font-weight:700}
 .oro3{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-top:8px}
 .oro3 div{background:#fff;border:1px solid #f3dfb0;border-radius:10px;padding:8px;text-align:center}
 .oro3 span{display:block;font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
-.oro3 b{font-size:19px;color:var(--ink)}
+.oro3 b{font-size:19px;color:var(--ink)}.oro3 small{display:block;font-size:10.5px;color:var(--muted);margin-top:1px}
 .orof{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.orof span{background:#fff;border:1px solid #f3dfb0;border-radius:999px;padding:4px 10px;font-size:12.5px}.orof span.cero{opacity:.55}
 .oroln{margin-top:8px;font-size:13px;line-height:1.35}
 .oroc{padding:6px 0;border-bottom:1px solid var(--line);font-size:12.5px}.oroc:last-of-type{border-bottom:0}
@@ -713,7 +713,10 @@ function minutoDeOro(v, conTags, fecha){
   if(!hoyR.length||!v.objetivo) return '';
   /* metas del dia */
   const cliDia = v.objCli ? Math.max(0,Math.ceil((v.objCli-(v.cliMes||0))/Math.max(1,P.diasRestan))) : null;
-  const ms = ((DATA.msu||{}).porVendedor||[]).find(x=>x.cod===v.cod);
+  /* pedidos que necesita hoy = venta de hoy / su ticket promedio por pedido del mes (en vez de cajas PFP: mas facil de entender) */
+  let vt=0, pt=0; const desde=(DATA.kpis||{}).mesDesde||(P.mes+'-01');
+  Object.entries(DATA.reporteDiario||{}).forEach(([f,r])=>{ if(f<desde||f>=fecha) return; const x=(r.porVendedor||[]).find(y=>y.cod===v.cod); if(x&&x.ccc>0){ vt+=x.venta||0; pt+=x.ccc; } });
+  const ticket = pt?vt/pt:0, pedidos = ticket>0?Math.ceil((v.hoy||0)/ticket):null;
   /* foco del dia: el foco con mas clientes para ofrecer en la ruta de hoy */
   /* focos fijos del dia (Damian 17/11): PB2 + Venus (= UG2, la PB3 esta faltante), Sachets H&S y Pilas; con cuantos clientes de hoy para ofrecer */
   const FOCOS_DIA=[['PB2 + Venus',t=>t==='Venus'||(/^(Filos|Combo Filos)/.test(t)&&/UG2/.test(t))],['Sachets H&S',t=>t==='Sachets H&S'],['Pilas',t=>t==='Pilas']];
@@ -731,7 +734,7 @@ function minutoDeOro(v, conTags, fecha){
     <div class="oro3">
       <div><span>Venta hoy</span><b>${pesoC(v.hoy)}</b></div>
       ${cliDia!=null?`<div><span>Clientes a sumar</span><b>${cliDia}</b></div>`:''}
-      ${ms?`<div><span>PFP hoy</span><b>${Math.round(ms.ritmoNecesarioCajas||0)} cajas</b></div>`:''}
+      ${pedidos?`<div><span>Pedidos hoy</span><b>${pedidos}</b><small>de ${hoyR.length} en ruta · ticket ${pesoC(ticket)}</small></div>`:''}
     </div>
     <div class="oroln">🎯 <b>Focos del día</b><div class="orof">${focos.map(f=>`<span class="${f.c?'':'cero'}"><b>${f.n}</b>${f.c?` · ${f.c} cliente${f.c>1?'s':''} hoy`:' · sin pendientes hoy'}</span>`).join('')}</div></div>
     ${combo?`<div class="oroln">🎁 <b>${esc(combo.nombre.replace(/^Combo\s*/i,'Combo '))}</b>${combo.diasParaVencer<=15?` · vence en ${combo.diasParaVencer} días`:''}</div>`:''}
