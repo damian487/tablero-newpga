@@ -795,6 +795,19 @@ function minutoDeOro(v, conTags, fecha){
     <div class="note" style="margin-top:6px">Maqueta: el compromiso todavía queda solo en este celular.</div>
   </div>`;
 }
+/* Damian 18/11: separar la RUTA DEL DIA (dia de visita + frecuencia) de lo que el GPS registra fuera de esa ruta.
+   La efectividad se mide sobre la ruta del dia. Lo usan el Mapa (Recorrido de hoy) y la vista Supervisor. */
+function rutaSplit(cod, gg, f){
+  f=f||hoyStr(); const dc=['Do','Lu','Ma','Mi','Ju','Vi','Sa'][new Date(f+'T12:00:00').getDay()];
+  const ruta=new Set(DATA.planDia.clientes.filter(c=>c.v===String(cod)&&(c.d||'').split(' ').includes(dc)&&esVisita(c.fr,c.pv,f)).map(c=>String(c.c)));
+  const ps=(gg&&gg.puntos)||[], enR=ps.filter(p=>ruta.has(String(p.clienteId))), fueraR=ps.filter(p=>!ruta.has(String(p.clienteId)));
+  const ent=x=>new Set(x.filter(p=>(p.duracionMin||0)>=3).map(p=>String(p.clienteId))).size, ped=x=>new Set(x.filter(p=>p.conVenta).map(p=>String(p.clienteId))).size;
+  const sinG=(gg&&gg.ventasSinGps)||[];
+  const pasoR=new Set(enR.map(p=>String(p.clienteId))).size;
+  const pedR=ped(enR)+sinG.filter(x=>ruta.has(String(x.clienteId))).length;
+  return { ruta:ruta.size, pasoR, entR:ent(enR), pedR, efect:ruta.size?pedR/ruta.size:0, sinVisita:ruta.size-pasoR,
+           fuera:new Set(fueraR.map(p=>String(p.clienteId))).size, entF:ent(fueraR), pedF:ped(fueraR)+sinG.filter(x=>!ruta.has(String(x.clienteId))).length };
+}
 function gpsVend(cod, fecha){ const k=cod+'|'+fecha; if(k in GPS.v) return GPS.v[k]; if(!GPS.pend[k]){ GPS.pend[k]=1; gpsFetch(`/api/ruta-real?vendedor=${encodeURIComponent(cod)}&fecha=${fecha}`).then(j=>{ GPS.v[k]=j&&j.ok?j:false; reRender(); }); } return undefined; }
 /* volver a dibujar sin saltar arriba (cuando llega un dato que se pidió en segundo plano) */
 function reRender(){ const y=window.scrollY; render(); window.scrollTo(0,y); }
@@ -911,15 +924,9 @@ function renderMapa(){
       ley.innerHTML=`<div class="lab">🛰️ Recorrido de hoy · ${esc(nombreV(gg.vendedorNombre||''))}</div>
         <div class="note" style="line-height:1.8"><span style="color:#1f9d55;font-weight:800">●</span> compró · <span style="color:#ea7a2a;font-weight:800">●</span> entró sin pedido (3+ min) · <span style="color:#9fb0c4;font-weight:800">●</span> pasó de largo · <span style="color:#7b4fc9;font-weight:800">●</span> cliente del KAF en P&G (solo Pepsico) · numerados en orden de visita<br>${kd.length?`<span style="color:#6a3fb5;font-weight:700">🔁 ${kd.length} paradas en clientes que P&G lo atiende el KAF · ${kdMin} min dedicados solo a Pepsico</span><br>`:''}
         <span style="color:#2e7d32;font-weight:800">▼</span> <b>Inicio ${horaDe(k.desde)}</b> · <span style="color:#c62828;font-weight:800">▼</span> <b>${new Date().getHours()>=18?'Fin':'Última posición'} ${horaDe(k.hasta)}</b><br>
-        ${(()=>{ /* Damian 18/11: separar la RUTA DEL DIA (dia + frecuencia) de lo que pasa fuera de ruta, para que la efectividad sea sobre la ruta de hoy */
-          const f=hoyStr(), dc=['Do','Lu','Ma','Mi','Ju','Vi','Sa'][new Date(f+'T12:00:00').getDay()];
-          const ruta=new Set(DATA.planDia.clientes.filter(c=>c.v===String(S.mapV)&&(c.d||'').split(' ').includes(dc)&&esVisita(c.fr,c.pv,f)).map(c=>String(c.c)));
-          const enR=ps.filter(p=>ruta.has(String(p.clienteId))), fueraR=ps.filter(p=>!ruta.has(String(p.clienteId)));
-          const ent=x=>x.filter(p=>(p.duracionMin||0)>=3).length, ped=x=>x.filter(p=>p.conVenta).length;
-          const pedR=ped(enR)+(gg.ventasSinGps||[]).filter(x=>ruta.has(String(x.clienteId))).length;
-          return ruta.size?`<div style="margin-top:6px;padding:8px 10px;background:var(--bg);border-radius:10px;line-height:1.7">
-            📍 <b>Ruta de hoy: ${ruta.size} clientes</b> · pasó por <b>${enR.length}</b> · entró en <b>${ent(enR)}</b> · <b>${pedR} con pedido</b> → efectividad <b>${Math.round(pedR/ruta.size*100)}%</b> <span style="color:var(--muted)">(${ruta.size-enR.length} de la ruta sin visitar)</span><br>
-            ↪️ <b>Fuera de la ruta de hoy: ${fueraR.length}</b> · entró en <b>${ent(fueraR)}</b> · <b>${ped(fueraR)} con pedido</b></div>`:''; })()}
+        ${(()=>{ const x=rutaSplit(S.mapV, gg); return x.ruta?`<div style="margin-top:6px;padding:8px 10px;background:var(--bg);border-radius:10px;line-height:1.7">
+            📍 <b>Ruta de hoy: ${x.ruta} clientes</b> · pasó por <b>${x.pasoR}</b> · entró en <b>${x.entR}</b> · <b>${x.pedR} con pedido</b> → efectividad <b>${Math.round(x.efect*100)}%</b> <span style="color:var(--muted)">(${x.sinVisita} de la ruta sin visitar)</span><br>
+            ↪️ <b>Fuera de la ruta de hoy: ${x.fuera}</b> · entró en <b>${x.entF}</b> · <b>${x.pedF} con pedido</b></div>`:''; })()}
         <span style="color:var(--muted)">Total del GPS: ${ps.length} clientes · ${n} paradas · ${conV.length+(gg.ventasSinGps||[]).length} con pedido · ${pesoC(vt)} · ${k.kmAprox||0} km</span></div>`;
       setTimeout(()=>map.invalidateSize(),60); return;
     }
@@ -1599,7 +1606,11 @@ function renderSup(){
         ${v.objetivo?barH(f.pct,s,esperado,''):''}
         ${(()=>{ const cs=new Map(); DATA.planDia.clientes.forEach(c=>{ if(c.v===v.cod&&esDupKaf(c)) cs.set(c.c,c); }); const au=[...cs.values()].filter(c=>/autoservicio/i.test(c.canal||'')).length;
           return cs.size?`<div class="note" style="margin-top:10px;background:#f1ebfb;color:#5b3596;border-radius:9px;padding:7px 9px">🔁 <b>${cs.size}</b> clientes de su ruta (${au} autoservicios) los atiende el KAF en P&G: los visita solo por Pepsico</div>`:''; })()}
-        ${gv?`<div class="note" style="margin-top:12px;background:var(--bg);border-radius:9px;padding:7px 9px">🛰️ Hoy: pasó <b>${gv.paso}</b> (de ${gv.cartera} de su ruta) · entró <b>${gv.entro}</b> · <b>${gv.conPedido} con pedido</b>${gv.ventaCalle?' · '+pesoC(gv.ventaCalle):''} · salió ${horaDe(gv.arranque)}${gv.sinVisita?` · <span class="c-bad">${gv.sinVisita} de la ruta sin visitar</span>`:''}</div>`:''}
+        ${gv?(()=>{ const gg=gpsVend(v.cod,hoyStr()), x=gg?rutaSplit(v.cod,gg):null;
+          if(!x||!x.ruta) return `<div class="note" style="margin-top:12px;background:var(--bg);border-radius:9px;padding:7px 9px">🛰️ Hoy: pasó <b>${gv.paso}</b> (de ${gv.cartera} de su ruta) · entró <b>${gv.entro}</b> · <b>${gv.conPedido} con pedido</b>${gv.ventaCalle?' · '+pesoC(gv.ventaCalle):''} · salió ${horaDe(gv.arranque)}${gv.sinVisita?` · <span class="c-bad">${gv.sinVisita} de la ruta sin visitar</span>`:''}</div>`;
+          const s2=x.efect>=0.5?'good':(x.efect>=0.25?'warn':'bad');
+          return `<div class="note" style="margin-top:12px;background:var(--bg);border-radius:9px;padding:7px 9px;line-height:1.6">🛰️ <b>Ruta de hoy: ${x.ruta}</b> · pasó ${x.pasoR} · entró ${x.entR} · <b>${x.pedR} con pedido</b> → efectividad <b class="c-${s2}">${Math.round(x.efect*100)}%</b>${x.sinVisita?` · <span class="c-bad">${x.sinVisita} sin visitar</span>`:''}<br>
+            ↪️ Fuera de ruta: ${x.fuera} (entró ${x.entF}${x.pedF?`, ${x.pedF} con pedido`:''}) · salió ${horaDe(gv.arranque)}${gv.ventaCalle?' · '+pesoC(gv.ventaCalle)+' en calle':''}${x.ruta&&!x.pasoR&&x.fuera?' · <span class="c-bad">⚠️ hoy no pasó por su ruta del día</span>':''}</div>`; })():''}
         ${f.nv.dias?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">
           <span class="tag ${f.nv.sin?'t-red':'t-green'}" style="font-size:12.5px;padding:5px 10px">${f.nv.sin?'⛔':'✓'} ${f.nv.sin} ${f.nv.sin===1?'día':'días'} sin venta de ${f.nv.dias}${f.nv.racha>1?' · '+f.nv.racha+' seguidos':''}</span>
           <span class="tag t-amber" style="font-size:12.5px;padding:5px 10px">Promedio ${pesoC(f.nv.prom)}/día</span></div>`:''}
