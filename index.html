@@ -853,7 +853,7 @@ function renderMapa(){
   document.getElementById('mvsel').onchange=e=>{ S.mapV=e.target.value; render(); };
 
   const GRAD={0.15:'#fde9b3',0.4:'#f5b73b',0.65:'#ea7a2a',0.85:'#d6452b',1:'#9e1b1b'};   /* calor: una sola familia ámbar→rojo */
-  const FRIO={0.3:'#bfe6f7',0.65:'#1fb5c4',1:'#0b2e6f'};                                     /* hueco: familia azul (3 niveles) */
+  const FRIO={0.3:'#bfe6f7',0.65:'#2f8fd8',1:'#0b2e6f'};                                     /* hueco: familia azul (3 niveles) */
   /* la caja se toma AHORA: si se vuelve a dibujar la pantalla antes de que cargue Leaflet, esta carga vieja no toca la nueva */
   const box=document.getElementById('mapa');
   cargarLeaflet().then(()=>{
@@ -914,7 +914,7 @@ function renderMapa(){
         { const dO=datos.filter(d=>d.v===3).length, dA=datos.filter(d=>d.v===2).length, dN=datos.filter(d=>d.v===1).length;
           expl=`<b>Contra qué mide:</b> clientes de las rutas (sin los que P&G atiende el KAF) que <b>no compraron P&G en ${mesN}</b> (desde el ${fdate((DATA.kpis||{}).mesDesde||'')}). Son <b>${AR.format(datos.length)}</b> de ${AR.format(vivos.length)} con ubicación en el mapa.
             <div style="margin-top:6px;line-height:1.7"><span style="color:#0b2e6f;font-weight:800">●</span> <b>${AR.format(dO)}</b> nos compraron <b>otras líneas</b> este mes (cualquier empresa), pero P&G no: los más fáciles.<br>
-            <span style="color:#1fb5c4;font-weight:800">●</span> <b>${AR.format(dA)}</b> <b>compraban P&G</b> (tienen compra en los últimos 3 meses) y este mes todavía no.<br>
+            <span style="color:#2f8fd8;font-weight:800">●</span> <b>${AR.format(dA)}</b> <b>compraban P&G</b> (tienen compra en los últimos 3 meses) y este mes todavía no.<br>
             <span style="color:#9fd8ef;font-weight:800">●</span> <b>${AR.format(dN)}</b> <b>sin P&G en los últimos 3 meses</b> y sin compras de otras líneas este mes.</div>`; } }
       const cols=Object.entries(grad).sort((a,b)=>+a[0]-+b[0]).map(e=>e[1]) /* JS pone la clave '1' primero: ordenar por numero */, qs=datos.map(d=>d.v).sort((a,b)=>a-b);
       /* escala por cuantiles: cada color agrupa una parte parecida de clientes (si no, 3 clientes grandes pintan todo de claro) */
