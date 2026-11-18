@@ -55,8 +55,8 @@ body{overflow-x:hidden}
 .c-good{color:var(--good)}.c-warn{color:var(--warn)}.c-bad{color:var(--bad)}
 .b-good{background:var(--good)}.b-warn{background:var(--amber)}.b-bad{background:var(--bad)}
 /* ---- ruta ---- */
-.filters{display:flex;gap:6px;overflow-x:auto;margin:0 0 10px;padding-bottom:2px;scrollbar-width:none}
-.filters button{border:1px solid var(--line);background:var(--card);border-radius:20px;padding:6px 11px;font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;cursor:pointer}
+.filters{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px;padding-bottom:2px}
+.filters button{border:1px solid var(--line);background:var(--card);border-radius:20px;padding:5px 10px;font-size:12px;font-weight:600;color:var(--ink);white-space:nowrap;cursor:pointer}
 .filters button[aria-pressed=true]{background:var(--navy);color:#fff;border-color:var(--navy)}
 #capas{flex-wrap:wrap;overflow:visible}#capas button{font-size:11.5px;padding:5px 9px}
 .cli{padding:12px 14px}
@@ -96,8 +96,8 @@ tr.me td{background:var(--amber-soft);font-weight:700}
 .bottom .in{max-width:520px;margin:0 auto}
 .bottom .t{display:flex;justify-content:space-between;font-size:12px;font-weight:700}
 .bottom .bar{height:6px;margin:6px 0 0}
-.tabs{display:flex;gap:6px;margin-top:8px}
-.tabs button{flex:1;min-width:0;border:0;background:var(--chip);border-radius:10px;padding:6px 0 5px;font-size:10.5px;white-space:nowrap;overflow:hidden;font-weight:700;color:var(--muted);cursor:pointer}
+.tabs{display:flex;gap:4px;margin-top:8px}
+.tabs button{flex:1;min-width:0;border:0;background:var(--chip);border-radius:10px;padding:6px 0 5px;font-size:10px;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;font-weight:700;color:var(--muted);cursor:pointer}
 .tabs button[aria-pressed=true]{background:var(--amber-soft);color:var(--navy)}
 /* ---- supervisor ---- */
 .alert{display:flex;gap:10px;align-items:flex-start;padding:11px 14px}
@@ -160,7 +160,7 @@ tr.me td{background:var(--amber-soft);font-weight:700}
 .mtx td:first-child{text-align:left;font-weight:700;white-space:nowrap;padding-right:6px}
 .mtx td:nth-child(2){color:var(--muted)}
 .mtx tr[data-fv]{cursor:pointer}.mtx tr.sel td:first-child{color:#6a5acd}
-.arow{display:grid;grid-template-columns:78px 1fr auto;gap:8px;align-items:center;padding:5px 0}
+.arow{display:grid;grid-template-columns:92px 1fr auto;gap:8px;align-items:center;padding:5px 0}
 .arow .an{font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .abar{height:9px;background:var(--track);border-radius:5px;overflow:hidden}.abar i{display:block;height:100%;border-radius:5px}
 .arow .ap{text-align:right;font-size:12.5px;line-height:1.15;min-width:84px}.arow .ap span{display:block;font-size:10.5px;color:var(--muted)}
@@ -185,6 +185,7 @@ tr.me td{background:var(--amber-soft);font-weight:700}
 .stp button{border:0;background:#eef2f6;width:32px;height:32px;font-size:18px;font-weight:800;cursor:pointer;color:var(--ink)}
 .stp b{min-width:34px;text-align:center;font-size:15px}
 .antlink{flex:1;display:flex;align-items:center;justify-content:center;border:1px dashed rgba(255,255,255,.4);border-radius:9px;padding:7px 8px;font-size:12px;font-weight:700;color:#e6eef5;text-decoration:none;white-space:nowrap}
+@media (max-width:360px){.tabs button{font-size:9px;letter-spacing:-.02em}.bottom{padding-left:10px;padding-right:10px}table{font-size:11.5px}td,th{padding:6px 2px}th{letter-spacing:0;font-size:9.5px}}
 @media (max-width:420px){.logo img.lp{height:66px;width:66px;margin-top:-18px}.logo .pill img{height:33px}.logo{gap:6px}}
 </style>
 </head>
@@ -231,7 +232,7 @@ const k = c => String(c==null?'':c).trim();
 const S = { vend:null, dia:null, filtro:'todos', modo:'vend', sup:'Juan' };
 const eqDe = g => (g==='KAF'||g==='Lucy') ? 'Lucy' : g;   /* KAF 24-27 + 28 = equipo Lucy */
 const SUP = { Juan:{grupo:'Juan', nombre:'JUAN ARMANDOLA'}, Lucy:{grupo:'KAF', nombre:'LUCY CEJAS'} };
-const TABS = [['vend','👤','Vendedor'],['sup','👥','Supervisor'],['foc','🎯','Focos'],['dia','📅','El día'],['map','🗺️','Mapa'],['ger','🏢','Gerencia']];
+const TABS = [['vend','👤','Vendedor'],['sup','👥','Supervisor'],['foc','🎯','Focos'],['dia','📅','Mi día'],['map','🗺️','Mapa'],['ger','🏢','Gerencia']];
 /* colores por equipo (paleta categórica validada: slot 1 azul, slot 2 naranja) */
 const COL_EQ = {Lucy:'#2a78d6', Juan:'#eb6834', Mayorista:'#6b7a8c'};
 const navTabs = () => `<div class="tabs">${TABS.map(([m,i,n])=>`<button data-m="${m}" aria-pressed="${S.modo===m||(m==='ger'&&['his','pfp','gra','alc'].includes(S.modo))}"><span style="display:block;font-size:16px;line-height:1.1">${i}</span>${n}</button>`).join('')}</div>`;
@@ -274,7 +275,7 @@ function start(){
   S.vend = (P.vendedores.find(v=>v.cod===guardado)||P.vendedores[0]).cod;
   const dow = new Date(hoyStr()+'T12:00:00').getDay();
   S.dia = DIAS[(dow>=1&&dow<=5?dow:1)-1][0];
-  S.modo = 'dia'; /* al ingresar siempre arranca en "El día" (pedido de Damián 17/11) */
+  S.modo = 'dia'; /* al ingresar siempre arranca en "Mi día" (pedido de Damián 17/11) */
   /* historial de meses cerrados (julio en adelante), servido por el Worker con la clave; el mes en curso sale en vivo de DATA */
   gpsFetch('/api/historial').then(h=>{ window.HIST=h; if(['ger','his','gra'].includes(S.modo)) render(); }).catch(()=>{});
   S.sup = ls.get('v3sup')==='Lucy' ? 'Lucy' : 'Juan';
@@ -526,7 +527,7 @@ function renderDia(){
   <header class="top">
     <div class="brand">${LOGO()}
       <select class="vsel" id="fsel">${fechas.slice().reverse().map(x=>`<option value="${x}"${x===f?' selected':''}>${(RD[x].dia||'')} ${fdate(x)}</option>`).join('')}</select></div>
-    <div class="hello">El día</div>
+    <div class="hello">Mi día</div>
     <div class="sub">${R.dia||''} ${fdate(f)}${esHoyI?` · actualizado ${I.hhmm}hs (se actualiza cada hora hasta las 15:30)`:''}</div>
     <div class="days">${['Todos','Juan','Lucy'].map(k=>`<button data-e="${k}" aria-pressed="${k===eq}">${k==='Todos'?'Toda la empresa':'Equipo '+k}</button>`).join('')}</div>
   </header>
