@@ -911,7 +911,16 @@ function renderMapa(){
       ley.innerHTML=`<div class="lab">🛰️ Recorrido de hoy · ${esc(nombreV(gg.vendedorNombre||''))}</div>
         <div class="note" style="line-height:1.8"><span style="color:#1f9d55;font-weight:800">●</span> compró · <span style="color:#ea7a2a;font-weight:800">●</span> entró sin pedido (3+ min) · <span style="color:#9fb0c4;font-weight:800">●</span> pasó de largo · <span style="color:#7b4fc9;font-weight:800">●</span> cliente del KAF en P&G (solo Pepsico) · numerados en orden de visita<br>${kd.length?`<span style="color:#6a3fb5;font-weight:700">🔁 ${kd.length} paradas en clientes que P&G lo atiende el KAF · ${kdMin} min dedicados solo a Pepsico</span><br>`:''}
         <span style="color:#2e7d32;font-weight:800">▼</span> <b>Inicio ${horaDe(k.desde)}</b> · <span style="color:#c62828;font-weight:800">▼</span> <b>${new Date().getHours()>=18?'Fin':'Última posición'} ${horaDe(k.hasta)}</b><br>
-        <b>${ps.length}</b> clientes · <b>${n}</b> paradas · <b>${conV.length+(gg.ventasSinGps||[]).length}</b> con pedido · <b>${pesoC(vt)}</b> · ${k.kmAprox||0} km</div>`;
+        ${(()=>{ /* Damian 18/11: separar la RUTA DEL DIA (dia + frecuencia) de lo que pasa fuera de ruta, para que la efectividad sea sobre la ruta de hoy */
+          const f=hoyStr(), dc=['Do','Lu','Ma','Mi','Ju','Vi','Sa'][new Date(f+'T12:00:00').getDay()];
+          const ruta=new Set(DATA.planDia.clientes.filter(c=>c.v===String(S.mapV)&&(c.d||'').split(' ').includes(dc)&&esVisita(c.fr,c.pv,f)).map(c=>String(c.c)));
+          const enR=ps.filter(p=>ruta.has(String(p.clienteId))), fueraR=ps.filter(p=>!ruta.has(String(p.clienteId)));
+          const ent=x=>x.filter(p=>(p.duracionMin||0)>=3).length, ped=x=>x.filter(p=>p.conVenta).length;
+          const pedR=ped(enR)+(gg.ventasSinGps||[]).filter(x=>ruta.has(String(x.clienteId))).length;
+          return ruta.size?`<div style="margin-top:6px;padding:8px 10px;background:var(--bg);border-radius:10px;line-height:1.7">
+            📍 <b>Ruta de hoy: ${ruta.size} clientes</b> · pasó por <b>${enR.length}</b> · entró en <b>${ent(enR)}</b> · <b>${pedR} con pedido</b> → efectividad <b>${Math.round(pedR/ruta.size*100)}%</b> <span style="color:var(--muted)">(${ruta.size-enR.length} de la ruta sin visitar)</span><br>
+            ↪️ <b>Fuera de la ruta de hoy: ${fueraR.length}</b> · entró en <b>${ent(fueraR)}</b> · <b>${ped(fueraR)} con pedido</b></div>`:''; })()}
+        <span style="color:var(--muted)">Total del GPS: ${ps.length} clientes · ${n} paradas · ${conV.length+(gg.ventasSinGps||[]).length} con pedido · ${pesoC(vt)} · ${k.kmAprox||0} km</span></div>`;
       setTimeout(()=>map.invalidateSize(),60); return;
     }
     if(capa==='zonas'){
