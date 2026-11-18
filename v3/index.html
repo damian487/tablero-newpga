@@ -174,6 +174,15 @@ tr.me td{background:var(--amber-soft);font-weight:700}
 .oroc b{display:block;font-size:12.5px}.oroc span{color:var(--muted);font-size:12px}
 .orobtn{margin-top:10px;width:100%;border:0;border-radius:11px;padding:11px;background:#0b7285;color:#fff;font-weight:800;font-size:14px;cursor:pointer}
 .orook{margin-top:10px;background:var(--good-soft);color:#14663a;border-radius:10px;padding:9px 10px;font-size:13px}
+.oroq{margin-top:12px;padding-top:10px;border-top:1px dashed #f0d9a4}
+.oroqt{font-size:13.5px;font-weight:800;color:#6b4700;display:flex;align-items:center;gap:7px;margin-bottom:4px}
+.oroqt span{display:inline-flex;width:20px;height:20px;border-radius:50%;background:#f0a91b;color:#fff;font-size:11.5px;align-items:center;justify-content:center;flex:0 0 auto}
+.oropr{margin-top:8px;background:#fff;border:1px solid #f3dfb0;border-radius:10px;padding:8px 10px;font-size:12.5px;line-height:1.4}
+.orocm{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:13px;font-weight:700;align-items:center;margin-top:4px}
+.orocm>div{display:flex;align-items:center;gap:8px}
+.stp{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
+.stp button{border:0;background:#eef2f6;width:32px;height:32px;font-size:18px;font-weight:800;cursor:pointer;color:var(--ink)}
+.stp b{min-width:34px;text-align:center;font-size:15px}
 @media (max-width:420px){.logo img.lp{height:66px;width:66px;margin-top:-18px}.logo .pill img{height:33px}.logo{gap:6px}}
 </style>
 </head>
@@ -406,7 +415,8 @@ function render(){
 
   bindTabs();
   document.getElementById('vsel').onchange = e=>{ S.vend=e.target.value; ls.set('v3vend',S.vend); render(); };
-  { const ob=document.getElementById('oroOk'); if(ob) ob.onclick=()=>{ ls.set('v3plan|'+v.cod+'|'+hoyStr(), new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',hour12:false})); reRender(); }; }
+  { const ob=document.getElementById('oroOk'); if(ob) ob.onclick=()=>{ const o=S.oro||{}; ls.set('v3plan|'+v.cod+'|'+hoyStr(), new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',hour12:false})+`: ${o.ped||0} pedidos y ${o.cli||0} clientes nuevos (${pesoC(v.hoy)})`); reRender(); };
+    document.querySelectorAll('[data-oro]').forEach(b=>b.onclick=()=>{ const f=b.dataset.oro; S.oro[f]=Math.max(0,(S.oro[f]||0)+(+b.dataset.d)); reRender(); }); }
   document.querySelectorAll('.days button').forEach(b=>b.onclick=()=>{ S.dia=b.dataset.d; render(); });
   document.querySelectorAll('#filt button').forEach(b=>b.onclick=()=>{ S.filtro=b.dataset.f; document.querySelectorAll('#filt button').forEach(x=>x.setAttribute('aria-pressed',x===b)); drawLista(); });
 }
@@ -708,40 +718,65 @@ function kafPar(cod){ const c=cliInfo(cod); if(!c||!esDupKaf(c)) return null;
 const kafTxt = k => `🔁 P&G se lo vende el KAF${k.vend?' ('+esc(k.vend)+(k.c?' · cód '+esc(k.c):'')+')':''}: acá va solo por Pepsico`;
 /* ===================== MI MINUTO DE ORO (maqueta fase 2) =====================
    Antes de salir: metas del dia, cuota PFP, foco del dia, combo y los clientes clave. Selectivo: solo lo necesario. */
+/* canasta exitosa (datos reales de coberturaMarcas): ticket segun cuantas marcas lleva el cliente, y con que marca se ata cada foco */
+function canastaInfo(cods){
+  const cm=DATA.coberturaMarcas||{}, mo=DATA.marcasOrden||[], cl=[];
+  Object.entries(cm).forEach(([v,x])=>{ if(!cods||cods.has(v)) (x.clientes||[]).forEach(c=>cl.push(c)); });
+  if(cl.length<20) return null;
+  const prom=f=>{ const a=cl.filter(f); return a.length?a.reduce((s,c)=>s+(c.venta||0),0)/a.length:0; };
+  /* con que marca se ata cada marca foco: la que mas aparece junto a ella (en todos los clientes de la empresa) */
+  const todos=[]; Object.values(cm).forEach(x=>(x.clientes||[]).forEach(c=>todos.push(c)));
+  const ata=(m,excl)=>{ const ix=mo.indexOf(m); if(ix<0) return null; const no=new Set((excl||[]).map(e=>mo.indexOf(e))); const cnt={}; let n=0; todos.forEach(c=>{ if((c.mk||[])[ix]>0){ n++; (c.mk||[]).forEach((x,j)=>{ if(j!==ix&&!no.has(j)&&x>0) cnt[j]=(cnt[j]||0)+1; }); } }); const best=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0]; return best&&n?{m:mo[best[0]],p:best[1]/n}:null; };
+  return { t1:prom(c=>c.nMarcas<=1), t3:prom(c=>c.nMarcas>=3), n3:cl.filter(c=>c.nMarcas>=3).length/cl.length, ata };
+}
+const MARCA = m => titulo(String(m||'').trim()).replace('Head And Shoulders','H&S').replace('Oral B','Oral-B');
 function minutoDeOro(v, conTags, fecha){
   const P=DATA.planDia, hoyR=conTags.filter(c=>!c.dup);
   if(!hoyR.length||!v.objetivo) return '';
-  /* metas del dia */
+  /* 1) metas del dia */
   const cliDia = v.objCli ? Math.max(0,Math.ceil((v.objCli-(v.cliMes||0))/Math.max(1,P.diasRestan))) : null;
-  /* pedidos que necesita hoy = venta de hoy / su ticket promedio por pedido del mes (en vez de cajas PFP: mas facil de entender) */
   let vt=0, pt=0; const desde=(DATA.kpis||{}).mesDesde||(P.mes+'-01');
   Object.entries(DATA.reporteDiario||{}).forEach(([f,r])=>{ if(f<desde||f>=fecha) return; const x=(r.porVendedor||[]).find(y=>y.cod===v.cod); if(x&&x.ccc>0){ vt+=x.venta||0; pt+=x.ccc; } });
   const ticket = pt?vt/pt:0, pedidos = ticket>0?Math.ceil((v.hoy||0)/ticket):null;
-  /* foco del dia: el foco con mas clientes para ofrecer en la ruta de hoy */
-  /* focos fijos del dia (Damian 17/11): PB2 + Venus (= UG2, la PB3 esta faltante), Sachets H&S y Pilas; con cuantos clientes de hoy para ofrecer */
-  const FOCOS_DIA=[['PB2 + Venus',t=>t==='Venus'||(/^(Filos|Combo Filos)/.test(t)&&/UG2/.test(t))],['Sachets H&S',t=>t==='Sachets H&S'],['Pilas',t=>t==='Pilas']];
-  const focos=FOCOS_DIA.map(([n,f])=>({n,c:hoyR.filter(c=>(window.FOCOS[k(c.c)]||[]).some(t=>f(t.t))).length}));
-  /* combo: vigente, del canal de mis clientes de hoy, el que vence antes */
-  const canales=new Set(hoyR.map(c=>/autoserv/i.test(c.canal||'')?'Autoservicios':'Almacenes'));
-  const combo=(((DATA.combos||{}).lista)||[]).filter(x=>x.hasta>=fecha&&x.desde<=fecha&&(!x.canal||[...canales].some(cn=>String(x.canal).startsWith(cn.slice(0,6))))).sort((a,b)=>a.diasParaVencer-b.diasParaVencer)[0];
-  /* clientes clave: los que mas pesan y todavia no compraron este mes, despues los que tienen foco */
+  const faltaObj=Math.max(0,(v.objetivo||0)-(v.mtd||0));
+  /* 2) que salgo a buscar: clientes clave */
   const clave=hoyR.filter(c=>!c.hoy&&!(c.mes>0)).map(c=>({c,sc:(c.m3||0)+((window.FOCOS[k(c.c)]||[]).length?50000:0)+(c.otras?30000:0)})).sort((a,b)=>b.sc-a.sc).slice(0,6).map(x=>x.c);
   const queOfrecer=c=>{ const f=(window.FOCOS[k(c.c)]||[])[0]; if(f) return f.t; if(c.falta&&c.falta.length) return 'Le falta: '+c.falta.slice(0,2).join(', '); if(c.otras) return 'Nos compra otras líneas: entrar con P&G'; return c.m3>0?'Reponer (compraba '+pesoC(c.m3)+'/mes)':'Presentar P&G'; };
-  /* compromiso (maqueta: queda guardado en este celular) */
+  /* 3) focos fijos (Damian 17/11): PB2 + Venus (= UG2, la PB3 esta faltante), Sachets H&S y Pilas */
+  const FOCOS_DIA=[['PB2 + Venus',t=>t==='Venus'||(/^(Filos|Combo Filos)/.test(t)&&/UG2/.test(t)),'VENUS',['GILLETTE']],['Sachets H&S',t=>t==='Sachets H&S','HEAD AND SHOULDERS',[]],['Pilas',t=>t==='Pilas','PHILCO',[]]];
+  const focos=FOCOS_DIA.map(([n,f,m,ex])=>({n,m,ex,c:hoyR.filter(c=>(window.FOCOS[k(c.c)]||[]).some(t=>f(t.t))).length}));
+  /* 4) herramientas: combos vigentes del canal, acciones de New PGA por familia, y lo que NO hay que ofrecer (quiebres) */
+  const canales=new Set(hoyR.map(c=>/autoserv/i.test(c.canal||'')?'Autoservicios':'Almacenes'));
+  const combos=(((DATA.combos||{}).lista)||[]).filter(x=>x.hasta>=fecha&&x.desde<=fecha&&(!x.canal||[...canales].some(cn=>String(x.canal).startsWith(cn.slice(0,6))))).sort((a,b)=>a.diasParaVencer-b.diasParaVencer).slice(0,2);
+  const acciones=(P.stock||[]).filter(x=>x.acciones).slice(0,2);
+  const quie=P.quiebres||[];
+  /* 5) canasta exitosa */
+  const cz=canastaInfo(new Set([v.cod])) || canastaInfo(null);
+  const atas=cz?focos.map(f=>({f:f.n,a:cz.ata(f.m,f.ex)})).filter(x=>x.a):[];
+  /* 6) compromiso: el vendedor ajusta clientes y pedidos con +/- (maqueta: queda en este celular) */
   const key='v3plan|'+v.cod+'|'+fecha, ok=ls.get(key);
+  S.oro=S.oro&&S.oro.k===key?S.oro:{k:key,cli:cliDia||0,ped:pedidos||0};
+  const paso=(id,val)=>`<span class="stp"><button data-oro="${id}" data-d="-1">−</button><b>${val}</b><button data-oro="${id}" data-d="1">+</button></span>`;
+  const Q=(n,t,body)=>`<div class="oroq"><div class="oroqt"><span>${n}</span>${t}</div>${body}</div>`;
   return `<div class="card oro">
     <div class="row"><div class="lab" style="color:#8a5a00;display:flex;align-items:center">Mi minuto de oro<svg width="34" height="14" viewBox="0 0 34 14" style="vertical-align:-2px;margin-left:6px"><defs><linearGradient id="lgo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe17a"/><stop offset=".55" stop-color="#f0a91b"/><stop offset="1" stop-color="#b87a00"/></linearGradient></defs><path d="M6 1h22l5 12H1z" fill="url(#lgo)" stroke="#9a6700" stroke-width="1"/><path d="M7.5 3h19l1.4 3.5H6.1z" fill="#fff3c4" opacity=".7"/></svg></div><span class="note" style="margin:0">antes de salir</span></div>
-    <div class="oro3">
+    ${Q(1,'¿Cuáles son mis metas de hoy?',`<div class="oro3">
       <div><span>Venta hoy</span><b>${pesoC(v.hoy)}</b></div>
+      ${pedidos?`<div><span>Pedidos</span><b>${pedidos}</b><small>de ${hoyR.length} en ruta</small></div>`:''}
       ${cliDia!=null?`<div><span>Clientes a sumar</span><b>${cliDia}</b></div>`:''}
-      ${pedidos?`<div><span>Pedidos hoy</span><b>${pedidos}</b><small>de ${hoyR.length} en ruta · ticket ${pesoC(ticket)}</small></div>`:''}
     </div>
-    <div class="oroln">🎯 <b>Focos del día</b><div class="orof">${focos.map(f=>`<span class="${f.c?'':'cero'}"><b>${f.n}</b>${f.c?` · ${f.c} cliente${f.c>1?'s':''} hoy`:' · sin pendientes hoy'}</span>`).join('')}</div></div>
-    ${combo?`<div class="oroln">🎁 <b>${esc(combo.nombre.replace(/^Combo\s*/i,'Combo '))}</b>${combo.diasParaVencer<=15?` · vence en ${combo.diasParaVencer} días`:''}</div>`:''}
-    ${clave.length?`<div class="lab" style="margin-top:10px">Clientes clave de hoy</div>
-      ${clave.map(c=>`<div class="oroc"><b>${esc(c.c)} · ${esc(titulo(limpio(c.rs)))}</b><span>${esc(queOfrecer(c))}</span></div>`).join('')}`:''}
-    ${ok?`<div class="orook">✅ Te comprometiste a las ${ok}: <b>${pesoC(v.hoy)}${cliDia?' y '+cliDia+' clientes más':''}</b>${focos.some(f=>f.c)?', con los focos del día':''}</div>`
-       :`<button class="orobtn" id="oroOk">✅ Me comprometo: ${pesoC(v.hoy)}${cliDia?' y '+cliDia+' clientes más':''}</button>`}
+    ${v.premio?`<div class="oropr">💰 <b>Premio ${pesoC(v.premio)}</b>${faltaObj>0?`: te faltan <b>${pesoC(faltaObj)}</b> para el objetivo (${pesoC(faltaObj/Math.max(1,P.diasRestan))} por día)`:': <b>¡objetivo cumplido!</b>'}${(DATA.cobertura&&DATA.cobertura.planes||[]).length?' · con sachets y pilas lo cobrás completo':''}</div>`:''}`)}
+    ${clave.length?Q(2,'¿Qué salgo a buscar?',clave.map(c=>`<div class="oroc"><b>${esc(c.c)} · ${esc(titulo(limpio(c.rs)))}</b><span>${esc(queOfrecer(c))}</span></div>`).join('')):''}
+    ${Q(3,'¿Qué productos tengo en foco?',`<div class="orof">${focos.map(f=>`<span class="${f.c?'':'cero'}"><b>${f.n}</b>${f.c?` · ${f.c} cliente${f.c>1?'s':''} hoy`:' · sin pendientes hoy'}</span>`).join('')}</div>`)}
+    ${Q(4,'¿Con qué herramientas cuento?',`${combos.map(c=>`<div class="oroln">🎁 <b>${esc(c.nombre)}</b>${c.diasParaVencer<=15?` · vence en ${c.diasParaVencer} días`:''}</div>`).join('')}
+      ${acciones.map(a=>`<div class="oroln">🏷️ <b>${esc(titulo(a.familia))}</b>: ${esc(a.acciones)}</div>`).join('')}
+      ${quie.length?`<div class="oroln" style="color:var(--bad)">⛔ <b>No ofrecer (sin stock):</b> ${quie.slice(0,3).map(x=>esc(x.desc)).join(' · ')}${quie.length>3?` y ${quie.length-3} más`:''}</div>`:''}
+      ${!combos.length&&!acciones.length&&!quie.length?'<div class="note">Sin combos ni acciones vigentes hoy.</div>':''}`)}
+    ${cz?Q(5,'¿Qué ato para la canasta exitosa?',`<div class="oroln">Los clientes que llevan <b>3 marcas o más</b> compran <b>${pesoC(cz.t3)}</b> al mes; los de 1 marca, <b>${pesoC(cz.t1)}</b>.</div>
+      ${atas.length?`<div class="orof">${atas.map(x=>`<span><b>${x.f}</b> → sumale <b>${esc(MARCA(x.a.m))}</b></span>`).join('')}</div><div class="note" style="margin-top:4px">La marca que más se lleva junto con cada foco.</div>`:''}`):''}
+    ${Q(6,'¿Cuántos clientes y pedidos voy a traer?', ok?`<div class="orook">✅ Te comprometiste a las ${esc(ok)}</div>`
+      :`<div class="orocm"><div>Pedidos ${paso('ped',S.oro.ped)}</div><div>Clientes nuevos ${paso('cli',S.oro.cli)}</div></div>
+       <button class="orobtn" id="oroOk">✅ Me comprometo</button>`)}
     <div class="note" style="margin-top:6px">Maqueta: el compromiso todavía queda solo en este celular.</div>
   </div>`;
 }
