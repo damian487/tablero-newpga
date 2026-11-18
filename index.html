@@ -185,6 +185,12 @@ tr.me td{background:var(--amber-soft);font-weight:700}
 .stp button{border:0;background:#eef2f6;width:32px;height:32px;font-size:18px;font-weight:800;cursor:pointer;color:var(--ink)}
 .stp b{min-width:34px;text-align:center;font-size:15px}
 .antlink{flex:1;display:flex;align-items:center;justify-content:center;border:1px dashed rgba(255,255,255,.4);border-radius:9px;padding:7px 8px;font-size:12px;font-weight:700;color:#e6eef5;text-decoration:none;white-space:nowrap}
+.grupos{display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 10px}
+.grupos button{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--line);background:var(--card);border-radius:20px;padding:5px 10px;font-size:12px;font-weight:700;color:var(--ink);cursor:pointer}
+.grupos button i{width:12px;height:12px;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.2)}
+.grupos button b{color:var(--muted);font-weight:700}
+.grupos button[aria-pressed=true]{border-color:#0b7285;background:#e9f6f8}
+.grupos button[aria-pressed=false]{opacity:.45;text-decoration:line-through}
 @media (max-width:360px){.tabs button{font-size:9px;letter-spacing:-.02em}.bottom{padding-left:10px;padding-right:10px}table{font-size:11.5px}td,th{padding:6px 2px}th{letter-spacing:0;font-size:9.5px}}
 @media (max-width:420px){.logo img.lp{height:66px;width:66px;margin-top:-18px}.logo .pill img{height:33px}.logo{gap:6px}}
 </style>
@@ -838,6 +844,8 @@ function renderMapa(){
   </header>
   <main class="sheet">
     <div class="filters" id="capas">${CAPAS.map(([k,n])=>`<button data-c="${k}" aria-pressed="${k===capa}">${n}</button>`).join('')}</div>
+    ${capa==='hueco'?(()=>{ const sv=vivos.filter(r=>!(r.mes>0)), g=v=>sv.filter(r=>(r.otras?3:(r.m3>0?2:1))===v).length; S.mapOff=S.mapOff||{};
+      return `<div class="grupos">${[[3,'#04163a','Otras líneas, P&G no'],[2,'#2f8fd8','Compraban P&G'],[1,'#9fd8ef','Sin P&G 3 meses']].map(([v,c,n])=>`<button data-gr="${v}" aria-pressed="${!S.mapOff[v]}"><i style="background:${c}"></i>${n}<b>${AR.format(g(v))}</b></button>`).join('')}</div>`; })():''}
     <div class="card" style="padding:0;overflow:hidden"><div id="mapa" style="height:62vh;min-height:360px;background:#e9edf2;display:flex;align-items:center;justify-content:center" class="note">Cargando mapa (requiere internet)…</div></div>
     <div class="card" id="leyenda"></div>
     <div class="grid2">
@@ -850,6 +858,7 @@ function renderMapa(){
   window.scrollTo({top:0}); bindTabs();
   document.querySelectorAll('.days button').forEach(b=>b.onclick=()=>{ S.mapEq=b.dataset.e; S.mapV=''; render(); });
   document.querySelectorAll('#capas button').forEach(b=>b.onclick=()=>{ S.mapCapa=b.dataset.c; render(); });
+  document.querySelectorAll('.grupos button').forEach(b=>b.onclick=()=>{ S.mapOff=S.mapOff||{}; const v=b.dataset.gr; S.mapOff[v]=!S.mapOff[v]; render(); });
   document.getElementById('mvsel').onchange=e=>{ S.mapV=e.target.value; render(); };
 
   const GRAD={0.15:'#fde9b3',0.4:'#f5b73b',0.65:'#ea7a2a',0.85:'#d6452b',1:'#9e1b1b'};   /* calor: una sola familia ámbar→rojo */
@@ -910,9 +919,9 @@ function renderMapa(){
       let datos, grad, titulo, expl;
       if(capa==='venta'){ datos=vivos.filter(r=>r.mes>0).map(r=>({r,v:r.mes})); grad=GRAD; titulo='Venta P&G de '+mesN+' por cliente'; expl='Cada punto es un cliente que compró este mes: más caliente (rojo) = compró más.'; }
       else if(capa==='prom'){ datos=vivos.filter(r=>r.m3>0).map(r=>({r,v:r.m3})); grad=GRAD; titulo='Venta habitual por cliente (promedio de 3 meses)'; expl='La venta "de siempre" de cada cliente, para comparar con este mes.'; }
-      else { datos=vivos.filter(r=>!(r.mes>0)).map(r=>({r,v:r.otras?3:(r.m3>0?2:1)})); grad=FRIO; titulo='Dónde no vendemos P&G este mes';
-        { const dO=datos.filter(d=>d.v===3).length, dA=datos.filter(d=>d.v===2).length, dN=datos.filter(d=>d.v===1).length;
-          expl=`<b>Contra qué mide:</b> clientes de las rutas (sin los que P&G atiende el KAF) que <b>no compraron P&G en ${mesN}</b> (desde el ${fdate((DATA.kpis||{}).mesDesde||'')}). Son <b>${AR.format(datos.length)}</b> de ${AR.format(vivos.length)} con ubicación en el mapa.
+      else { datos=vivos.filter(r=>!(r.mes>0)).map(r=>({r,v:r.otras?3:(r.m3>0?2:1)})); const datosTodos=datos; datos=datos.filter(d=>!(S.mapOff||{})[d.v]); grad=FRIO; titulo='Dónde no vendemos P&G este mes';
+        { const dO=datosTodos.filter(d=>d.v===3).length, dA=datosTodos.filter(d=>d.v===2).length, dN=datosTodos.filter(d=>d.v===1).length;
+          expl=`<b>Contra qué mide:</b> clientes de las rutas (sin los que P&G atiende el KAF) que <b>no compraron P&G en ${mesN}</b> (desde el ${fdate((DATA.kpis||{}).mesDesde||'')}). Son <b>${AR.format(datosTodos.length)}</b> de ${AR.format(vivos.length)} con ubicación en el mapa. Tocá los botones de arriba del mapa para prender o apagar cada grupo.
             <div style="margin-top:6px;line-height:1.7"><span style="color:#04163a;font-weight:800">●</span> <b>${AR.format(dO)}</b> nos compraron <b>otras líneas</b> este mes (cualquier empresa), pero P&G no: los más fáciles.<br>
             <span style="color:#2f8fd8;font-weight:800">●</span> <b>${AR.format(dA)}</b> <b>compraban P&G</b> (tienen compra en los últimos 3 meses) y este mes todavía no.<br>
             <span style="color:#9fd8ef;font-weight:800">●</span> <b>${AR.format(dN)}</b> <b>sin P&G en los últimos 3 meses</b> y sin compras de otras líneas este mes.</div>`; } }
