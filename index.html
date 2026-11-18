@@ -822,6 +822,20 @@ function hull(pts){ if(pts.length<3) return pts; const p=pts.slice().sort((a,b)=
   const lo=[]; for(const x of p){ while(lo.length>=2&&cr(lo[lo.length-2],lo[lo.length-1],x)<=0) lo.pop(); lo.push(x); }
   const up=[]; for(const x of p.slice().reverse()){ while(up.length>=2&&cr(up[up.length-2],up[up.length-1],x)<=0) up.pop(); up.push(x); }
   return lo.slice(0,-1).concat(up.slice(0,-1)); }
+/* botones para prender/apagar grupos de color en las capas de calor del mapa (Damian 18/11) */
+function nivelCalor(qs,v,n){ const p=qs.findIndex(x=>x>=v)/Math.max(1,qs.length-1); return Math.min(n-1, Math.floor(p*n)); }
+function gruposMapa(capa,vivos){
+  S.mapOff=S.mapOff||{};
+  let g=[];
+  if(capa==='hueco'){ const sv=vivos.filter(r=>!(r.mes>0)), cnt=v=>sv.filter(r=>(r.otras?3:(r.m3>0?2:1))===v).length;
+    g=[[3,'#04163a','Otras líneas, P&G no'],[2,'#2f8fd8','Compraban P&G'],[1,'#bfe6f7','Sin P&G 3 meses']].map(([v,c,n])=>({k:'hueco:'+v,c,n,cnt:cnt(v)})); }
+  else if(capa==='venta'||capa==='prom'){
+    const f=capa==='venta'?(r=>r.mes):(r=>r.m3), vals=vivos.filter(r=>f(r)>0).map(f), qs=vals.slice().sort((a,b)=>a-b);
+    const cols=['#fde9b3','#f5b73b','#ea7a2a','#d6452b','#9e1b1b'];
+    g=cols.map((c,i)=>{ const it=vals.filter(v=>nivelCalor(qs,v,5)===i); return it.length?{k:capa+':'+i,c,n:pesoC(Math.min(...it))+' a '+pesoC(Math.max(...it)),cnt:it.length}:null; }).filter(Boolean).reverse();
+  } else return '';
+  return `<div class="grupos">${g.map(x=>`<button data-gr="${x.k}" aria-pressed="${!S.mapOff[x.k]}"><i style="background:${x.c}"></i>${x.n}<b>${AR.format(x.cnt)}</b></button>`).join('')}</div>`;
+}
 function renderMapa(){
   const P=DATA.planDia, app=document.getElementById('app'), mesN=MESES[+P.mes.slice(5,7)-1];
   const capa=S.mapCapa||'zonas', eq=S.mapEq||'Todos';
@@ -844,8 +858,7 @@ function renderMapa(){
   </header>
   <main class="sheet">
     <div class="filters" id="capas">${CAPAS.map(([k,n])=>`<button data-c="${k}" aria-pressed="${k===capa}">${n}</button>`).join('')}</div>
-    ${capa==='hueco'?(()=>{ const sv=vivos.filter(r=>!(r.mes>0)), g=v=>sv.filter(r=>(r.otras?3:(r.m3>0?2:1))===v).length; S.mapOff=S.mapOff||{};
-      return `<div class="grupos">${[[3,'#04163a','Otras líneas, P&G no'],[2,'#2f8fd8','Compraban P&G'],[1,'#9fd8ef','Sin P&G 3 meses']].map(([v,c,n])=>`<button data-gr="${v}" aria-pressed="${!S.mapOff[v]}"><i style="background:${c}"></i>${n}<b>${AR.format(g(v))}</b></button>`).join('')}</div>`; })():''}
+    ${gruposMapa(capa,vivos)}
     <div class="card" style="padding:0;overflow:hidden"><div id="mapa" style="height:62vh;min-height:360px;background:#e9edf2;display:flex;align-items:center;justify-content:center" class="note">Cargando mapa (requiere internet)…</div></div>
     <div class="card" id="leyenda"></div>
     <div class="grid2">
@@ -919,7 +932,7 @@ function renderMapa(){
       let datos, grad, titulo, expl;
       if(capa==='venta'){ datos=vivos.filter(r=>r.mes>0).map(r=>({r,v:r.mes})); grad=GRAD; titulo='Venta P&G de '+mesN+' por cliente'; expl='Cada punto es un cliente que compró este mes: más caliente (rojo) = compró más.'; }
       else if(capa==='prom'){ datos=vivos.filter(r=>r.m3>0).map(r=>({r,v:r.m3})); grad=GRAD; titulo='Venta habitual por cliente (promedio de 3 meses)'; expl='La venta "de siempre" de cada cliente, para comparar con este mes.'; }
-      else { datos=vivos.filter(r=>!(r.mes>0)).map(r=>({r,v:r.otras?3:(r.m3>0?2:1)})); const datosTodos=datos; datos=datos.filter(d=>!(S.mapOff||{})[d.v]); grad=FRIO; titulo='Dónde no vendemos P&G este mes';
+      else { datos=vivos.filter(r=>!(r.mes>0)).map(r=>({r,v:r.otras?3:(r.m3>0?2:1)})); const datosTodos=datos; datos=datos.filter(d=>!(S.mapOff||{})['hueco:'+d.v]); grad=FRIO; titulo='Dónde no vendemos P&G este mes';
         { const dO=datosTodos.filter(d=>d.v===3).length, dA=datosTodos.filter(d=>d.v===2).length, dN=datosTodos.filter(d=>d.v===1).length;
           expl=`<b>Contra qué mide:</b> clientes de las rutas (sin los que P&G atiende el KAF) que <b>no compraron P&G en ${mesN}</b> (desde el ${fdate((DATA.kpis||{}).mesDesde||'')}). Son <b>${AR.format(datosTodos.length)}</b> de ${AR.format(vivos.length)} con ubicación en el mapa. Tocá los botones de arriba del mapa para prender o apagar cada grupo.
             <div style="margin-top:6px;line-height:1.7"><span style="color:#04163a;font-weight:800">●</span> <b>${AR.format(dO)}</b> nos compraron <b>otras líneas</b> este mes (cualquier empresa), pero P&G no: los más fáciles.<br>
@@ -927,8 +940,9 @@ function renderMapa(){
             <span style="color:#9fd8ef;font-weight:800">●</span> <b>${AR.format(dN)}</b> <b>sin P&G en los últimos 3 meses</b> y sin compras de otras líneas este mes.</div>`; } }
       const cols=Object.entries(grad).sort((a,b)=>+a[0]-+b[0]).map(e=>e[1]) /* JS pone la clave '1' primero: ordenar por numero */, qs=datos.map(d=>d.v).sort((a,b)=>a-b);
       /* escala por cuantiles: cada color agrupa una parte parecida de clientes (si no, 3 clientes grandes pintan todo de claro) */
-      const nivel = v => { if(capa==='hueco') return v-1; const p=qs.findIndex(x=>x>=v)/Math.max(1,qs.length-1); return Math.min(cols.length-1, Math.floor(p*cols.length)); };
+      const nivel = v => capa==='hueco' ? v-1 : nivelCalor(qs,v,cols.length);
       datos.sort((a,b)=>capa==='hueco'?({3:0,1:1,2:2}[a.v]-{3:0,1:1,2:2}[b.v]):a.v-b.v).forEach(({r,v})=>{ const i=Math.min(cols.length-1,Math.max(0,nivel(v))), col=cols[i], rad=3+i*1.1;
+        if(capa!=='hueco'&&(S.mapOff||{})[capa+':'+i]) return;
         L.circleMarker([r.lat,r.lon],{radius:rad*2.4,stroke:false,fillColor:col,fillOpacity:0.13,interactive:false}).addTo(map);   /* halo de calor */
         L.circleMarker([r.lat,r.lon],{radius:rad,color:'#fff',weight:1,fillColor:col,fillOpacity:0.95})
           .bindTooltip(`<b>${esc(r.cod)}</b> · ${esc(limpio(r.nombre))}<br>${esc(r.vn)}<br>${fichaPDV(r.cod)}<br>${capa==='hueco'?(r.otras?'Compra otras líneas, P&G no':(r.m3>0?'Compraba P&G hasta hace poco ('+pesoC(r.m3)+'/mes promedio)':'Sin P&G en los últimos 3 meses')):(capa==='venta'?'Venta '+mesN+': <b>'+pesoC(r.mes)+'</b>':'Promedio: <b>'+pesoC(r.m3)+'</b>/mes')+(capa==='venta'&&r.m3>0?'<br>promedio '+pesoC(r.m3)+'/mes':'')}`,{direction:'top'}).addTo(map); });
