@@ -237,7 +237,7 @@ const k = c => String(c==null?'':c).trim();
 const S = { vend:null, dia:null, filtro:'todos', modo:'vend', sup:'Juan' };
 const eqDe = g => (g==='KAF'||g==='Lucy') ? 'Lucy' : g;   /* KAF 24-27 + 28 = equipo Lucy */
 const SUP = { Juan:{grupo:'Juan', nombre:'JUAN ARMANDOLA'}, Lucy:{grupo:'KAF', nombre:'LUCY CEJAS'} };
-const TABS = [['vend','👤','Vendedor'],['sup','👥','Supervisor'],['foc','🎯','Focos'],['dia','📅','Mi día'],['map','🗺️','Mapa'],['ger','🏢','Gerencia']];
+const TABS = [['vend','👤','Vendedor'],['sup','👥','Supervisor'],['foc','🎯','Focos'],['dia','📅','Mi día'],['ger','🏢','Gerencia'],['map','🗺️','Mapa']];
 /* colores por equipo (paleta categórica validada: slot 1 azul, slot 2 naranja) */
 const COL_EQ = {Lucy:'#2a78d6', Juan:'#eb6834', Mayorista:'#6b7a8c'};
 const navTabs = () => MODO_VEND ? '' : `<div class="tabs">${TABS.map(([m,i,n])=>`<button data-m="${m}" aria-pressed="${S.modo===m||(m==='ger'&&['his','pfp','gra','alc'].includes(S.modo))}"><span style="display:block;font-size:16px;line-height:1.1">${i}</span>${n}</button>`).join('')}</div>`;
