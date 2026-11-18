@@ -408,7 +408,7 @@ function render(){
     ${detalleFamilias(v,P)}
     ${detalleStock(P)}
     ${detalleRanking(v,P)}
-    <div class="note" style="margin:10px 2px 18px">Versión de prueba del Tablero 3.0. Datos al ${fdate(DATA.meta&&DATA.meta.ultimaFecha||'')}. El tablero actual sigue funcionando igual.</div>
+    <div class="note" style="margin:10px 2px 18px">Datos al ${fdate(DATA.meta&&DATA.meta.ultimaFecha||'')}. La venta se actualiza a las 11:30 y cada hora hasta las 15:30; el GPS, cada hora.</div>
   </main>
   <nav class="bottom"><div class="in">
     <div class="t"><span>${unaLista?'Hoy':'Ruta '+diaN.toLowerCase()}: ${compraronHoy}/${conTags.length} compraron</span><span>${conTags.length?Math.round(compraronHoy/conTags.length*100):0}%</span></div>
