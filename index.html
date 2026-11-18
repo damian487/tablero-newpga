@@ -204,8 +204,13 @@ tr.me td{background:var(--amber-soft);font-weight:700}
 <script>
 /* ===== Tablero 3.0 · piloto "Mi día" del vendedor (16/11/2026) =====
    Version de PRUEBA: no reemplaza al tablero actual. Lee los mismos datos del Worker. */
-const WORKER_URL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname)
-  ? '/api/data' : 'https://tablero-newpga-worker.damian-8ad.workers.dev/api/data';
+/* Vista solo-vendedor (18/11, link para Faro 360): ?vendedor en la URL -> solo la pantalla Vendedor, con la clave de vendedores
+   y datos recortados por el Worker (/api/vendedor: sin PFP, sin margenes ni gerencia) */
+const MODO_VEND = new URLSearchParams(location.search).has('vendedor');
+const PW_KEY = MODO_VEND ? 'gpwv' : 'gpw';
+const pwHeaders = p => MODO_VEND ? {'X-Vendedor-Password':p,'X-Dashboard-Password':p} : {'X-Dashboard-Password':p};
+const WORKER_URL = (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)
+  ? '/api/data' : 'https://tablero-newpga-worker.damian-8ad.workers.dev/api/data').replace('/api/data', MODO_VEND?'/api/vendedor':'/api/data');
 let DATA = null;
 
 /* ---------- helpers ---------- */
@@ -235,7 +240,7 @@ const SUP = { Juan:{grupo:'Juan', nombre:'JUAN ARMANDOLA'}, Lucy:{grupo:'KAF', n
 const TABS = [['vend','👤','Vendedor'],['sup','👥','Supervisor'],['foc','🎯','Focos'],['dia','📅','Mi día'],['map','🗺️','Mapa'],['ger','🏢','Gerencia']];
 /* colores por equipo (paleta categórica validada: slot 1 azul, slot 2 naranja) */
 const COL_EQ = {Lucy:'#2a78d6', Juan:'#eb6834', Mayorista:'#6b7a8c'};
-const navTabs = () => `<div class="tabs">${TABS.map(([m,i,n])=>`<button data-m="${m}" aria-pressed="${S.modo===m||(m==='ger'&&['his','pfp','gra','alc'].includes(S.modo))}"><span style="display:block;font-size:16px;line-height:1.1">${i}</span>${n}</button>`).join('')}</div>`;
+const navTabs = () => MODO_VEND ? '' : `<div class="tabs">${TABS.map(([m,i,n])=>`<button data-m="${m}" aria-pressed="${S.modo===m||(m==='ger'&&['his','pfp','gra','alc'].includes(S.modo))}"><span style="display:block;font-size:16px;line-height:1.1">${i}</span>${n}</button>`).join('')}</div>`;
 /* logo del encabezado: tocarlo cambia de opcion para probar (texto / New PGA / LP / ambos) */
 const LOGOS=['texto','newpga','lp','ambos'];
 function LOGO(){ const m=ls.get('v3logo')||'ambos'; const beta='<span class="beta">Tablero 3.0</span>';
@@ -275,14 +280,15 @@ function start(){
   S.vend = (P.vendedores.find(v=>v.cod===guardado)||P.vendedores[0]).cod;
   const dow = new Date(hoyStr()+'T12:00:00').getDay();
   S.dia = DIAS[(dow>=1&&dow<=5?dow:1)-1][0];
-  S.modo = 'dia'; /* al ingresar siempre arranca en "Mi día" (pedido de Damián 17/11) */
+  S.modo = MODO_VEND ? 'vend' : 'dia'; /* al ingresar siempre arranca en "Mi día" (pedido de Damián 17/11) */
   /* historial de meses cerrados (julio en adelante), servido por el Worker con la clave; el mes en curso sale en vivo de DATA */
-  gpsFetch('/api/historial').then(h=>{ window.HIST=h; if(['ger','his','gra'].includes(S.modo)) render(); }).catch(()=>{});
+  if(!MODO_VEND) gpsFetch('/api/historial').then(h=>{ window.HIST=h; if(['ger','his','gra'].includes(S.modo)) render(); }).catch(()=>{});
   S.sup = ls.get('v3sup')==='Lucy' ? 'Lucy' : 'Juan';
   render();
 }
 
 function render(){
+  if(MODO_VEND) S.modo='vend';
   /* si había un mapa abierto, se desarma antes de redibujar (evita errores de la capa de calor sobre un mapa que ya no está) */
   if(window.__map){ try{ window.__map.stop(); window.__map.off(); window.__map.remove(); }catch(_){} window.__map=null; }
   if(S.modo==='sup') return renderSup();
@@ -700,8 +706,8 @@ function renderFocos(){
    El recorrido lo sube la PC de Damián cada hora (Axum bloquea a Cloudflare) y el Worker lo cruza con la venta
    del día por cliente. Parada >= 3 min = ENTRÓ (criterio de "Disciplina de ruta"); menos = DE LARGO. */
 const GPS = { v:{}, eq:{}, pend:{} };
-const RR_BASE = WORKER_URL.replace('/api/data','');
-function gpsFetch(path){ let pw=''; try{pw=sessionStorage.getItem('gpw')||'';}catch(_){} return fetch(RR_BASE+path,{headers:{'X-Dashboard-Password':pw}}).then(r=>r.ok?r.json():null).catch(()=>null); }
+const RR_BASE = WORKER_URL.replace('/api/data','').replace('/api/vendedor','');
+function gpsFetch(path){ let pw=''; try{pw=sessionStorage.getItem(PW_KEY)||'';}catch(_){} return fetch(RR_BASE.replace('/api/vendedor','')+path,{headers:pwHeaders(pw)}).then(r=>r.ok?r.json():null).catch(()=>null); }
 /* pide una sola vez por vendedor+fecha y vuelve a dibujar cuando llega */
 /* ficha corta del PDV para los carteles del mapa: canal, dias de visita y frecuencia (de la ruta en Gescom) */
 const DIAN={Lu:'Lunes',Ma:'Martes',Mi:'Miércoles',Ju:'Jueves',Vi:'Viernes',Sa:'Sábado'};
@@ -1625,19 +1631,20 @@ function detalleRanking(v,P){
   async function abrir(p,silent){
     if(!silent){ err.textContent=''; go.disabled=true; go.textContent='Cargando…'; }
     try{
-      const r=await fetch(WORKER_URL,{headers:{'X-Dashboard-Password':p}});
+      const r=await fetch(WORKER_URL,{headers:pwHeaders(p)});
       if(!r.ok) throw new Error('HTTP '+r.status);
       DATA=await r.json();
-      try{sessionStorage.setItem('gpw',p);}catch(_){}
+      try{sessionStorage.setItem(PW_KEY,p);}catch(_){}
       gate.remove(); start();
     }catch(e){
-      try{sessionStorage.removeItem('gpw');}catch(_){}
+      try{sessionStorage.removeItem(PW_KEY);}catch(_){}
       gate.style.visibility='visible'; go.disabled=false; go.textContent='Entrar';
       if(!silent) err.textContent='Clave incorrecta o sin conexión'; console.error(e);
     }
   }
   go.onclick=()=>abrir(pw.value); pw.onkeydown=e=>{ if(e.key==='Enter') abrir(pw.value); };
-  let sv=null; try{sv=sessionStorage.getItem('gpw');}catch(_){}
+  let sv=null; try{sv=sessionStorage.getItem(PW_KEY);}catch(_){}
+  if(MODO_VEND){ const lb=document.querySelector('label[for=pw]'); if(lb) lb.textContent='Clave de vendedores'; }
   if(sv){ gate.style.visibility='hidden'; abrir(sv,true); } else pw.focus();
 })();
 </script>
