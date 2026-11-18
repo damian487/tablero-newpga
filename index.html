@@ -1157,7 +1157,7 @@ function renderAlcance(){
 }
 
 /* sub-navegación de Gerencia: Cómo vamos · Historial · PFP y MSU */
-const gerNav = () => `<div class="days" style="flex-wrap:wrap">${[['ger','Cómo vamos'],['gra','📊 Gráficos'],['alc','🎯 Alcance'],['his','📚 Historial'],['pfp','💰 PFP y MSU']].map(([m,n])=>`<button data-g="${m}" aria-pressed="${S.modo===m}">${n}</button>`).join('')}<a class="antlink" href="${location.pathname.replace(/v3\/(index\.html)?$/,'').replace(/index\.html$/,'')}anterior/" target="_blank" rel="noopener">🗂️ Tablero anterior</a></div>`;
+const gerNav = () => `<div class="days" style="flex-wrap:wrap">${[['ger','Cómo vamos'],['gra','📊 Gráficos'],['alc','🎯 Alcance'],['his','📚 Historial'],['pfp','💰 PFP y MSU']].map(([m,n])=>`<button data-g="${m}" aria-pressed="${S.modo===m}">${n}</button>`).join('')}</div>`;
 function bindGerNav(){ document.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{ S.modo=b.dataset.g; if(S.modo!=='pfp') ls.set('v3modo',S.modo); render(); }); }
 const MESC = m => titulo(MESES[+m.slice(5,7)-1]);
 const RUB = {'AFEITADO Y CUIDADO DE LA BARBA':'Afeitado','CUIDADO DE LA ROPA':'Ropa','CUIDADO DEL BEBE':'Pañales','CUIDADO DEL CABELLO':'Cabello','CUIDADO FEMENINO':'Femenino','CUIDADO ORAL':'Bucal','DESODORANTES':'Desodorantes','PILAS Y BATERIAS':'Pilas'};
