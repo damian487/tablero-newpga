@@ -191,6 +191,8 @@ tr.me td{background:var(--amber-soft);font-weight:700}
 .grupos button b{color:var(--muted);font-weight:700}
 .grupos button[aria-pressed=true]{border-color:#0b7285;background:#e9f6f8}
 .grupos button[aria-pressed=false]{opacity:.45;text-decoration:line-through}
+.oropr summary{cursor:pointer;list-style:none}.oropr summary::-webkit-details-marker{display:none}.oropr summary u{color:#0b7285;text-decoration:underline;white-space:nowrap}
+.premio{margin-top:8px;font-size:12.5px;line-height:1.5}.premio table{width:auto;min-width:200px;margin:6px 0;font-size:12.5px}.premio td,.premio th{padding:4px 10px 4px 0}.premio tr.cien td{font-weight:800;color:#14663a}
 @media (max-width:360px){.tabs button{font-size:9px;letter-spacing:-.02em}.bottom{padding-left:10px;padding-right:10px}table{font-size:11.5px}td,th{padding:6px 2px}th{letter-spacing:0;font-size:9.5px}}
 @media (max-width:420px){.logo img.lp{height:66px;width:66px;margin-top:-18px}.logo .pill img{height:33px}.logo{gap:6px}}
 </style>
@@ -745,6 +747,22 @@ function canastaInfo(cods){
   return { t1:prom(c=>c.nMarcas<=1), t3:prom(c=>c.nMarcas>=3), n3:cl.filter(c=>c.nMarcas>=3).length/cl.length, ata };
 }
 const MARCA = m => titulo(String(m||'').trim()).replace('Head And Shoulders','H&S').replace('Oral B','Oral-B');
+/* detalle del premio del vendedor (Damian 18/11): escala + su situacion + condicion de cobertura.
+   Sin "cobrarias $X" (no suma) y sin el tope del 1% (regla interna). La meta de clientes de Juan es solo guia. */
+function premioDetalle(v,P,faltaObj){
+  const esc=[]; const re=/(\d+)(?:-(\d+))?%(?: o más)? = \$([\d.]+)/g; let m; const txt=P.reglas||'';
+  while((m=re.exec(txt))){ esc.push({de:m[1],a:m[2],o:/o más/.test(m[0]),p:+m[3].replace(/\./g,'')}); }
+  const filas=(esc.length?esc:[{de:'90',a:'99',p:32000},{de:'100',p:64000},{de:'105',p:90000},{de:'110',o:true,p:100000}]).filter(e=>e.p>0);
+  const pct=v.objetivo?v.mtd/v.objetivo:0;
+  const cob=(DATA.cobertura&&DATA.cobertura.planes||[]).map(pl=>{ const x=(pl.porVendedor||[]).find(y=>y.cod===v.cod); if(!x||!x.objetivo) return null; const val=(x.meses||{})[P.mes]||0; return {n:pl.id==='pilas'?'Pilas Philco':'Sachets H&S',val,obj:x.objetivo}; }).filter(Boolean);
+  return `<details class="oropr"><summary>💰 <b>Premio ${pesoC(v.premio)}</b>: te faltan <b>${pesoC(faltaObj)}</b> para tu objetivo (${pesoC(faltaObj/Math.max(1,P.diasRestan))} por día) · <u>cómo se gana</u></summary>
+    <div class="premio">
+      <div>Se gana según <b>cuánto de tu objetivo de venta P&G</b> (con IVA) cumplís en el mes.</div>
+      <table><tr><th>Si llegás al…</th><th>Cobrás</th></tr>${filas.map(e=>`<tr class="${+e.de===100?'cien':''}"><td>${e.a?e.de+'% a '+e.a+'%':e.de+'%'+(e.o?' o más':'')}</td><td><b>$${AR.format(e.p)}</b></td></tr>`).join('')}</table>
+      <div><b>Hoy:</b> objetivo ${pesoC(v.objetivo)} · llevás ${pesoC(v.mtd)} (<b>${Math.round(pct*100)}%</b>)${faltaObj>0?` · te faltan ${pesoC(faltaObj)}`:' · <b>¡objetivo cumplido!</b>'}</div>
+      ${cob.length?`<div style="margin-top:4px"><b>Condición:</b> cumplir tu cobertura de clientes. Si no la cumplís, cobrás la mitad.<br>${cob.map(c=>`${c.val>=c.obj?'✅':'⚠️'} ${c.n}: <b>${c.val} de ${c.obj}</b> clientes`).join(' · ')}</div>`:''}
+    </div></details>`;
+}
 function minutoDeOro(v, conTags, fecha){
   const P=DATA.planDia, hoyR=conTags.filter(c=>!c.dup);
   if(!hoyR.length||!v.objetivo) return '';
@@ -780,7 +798,7 @@ function minutoDeOro(v, conTags, fecha){
       ${pedidos?`<div><span>Pedidos</span><b>${pedidos}</b><small>de ${hoyR.length} en ruta</small></div>`:''}
       ${cliDia!=null?`<div><span>Clientes a sumar</span><b>${cliDia}</b></div>`:''}
     </div>
-    ${v.premio?`<div class="oropr">💰 <b>Premio ${pesoC(v.premio)}</b>${faltaObj>0?`: te faltan <b>${pesoC(faltaObj)}</b> para el objetivo (${pesoC(faltaObj/Math.max(1,P.diasRestan))} por día)`:': <b>¡objetivo cumplido!</b>'}${(DATA.cobertura&&DATA.cobertura.planes||[]).length?' · con sachets y pilas lo cobrás completo':''}</div>`:''}`)}
+    ${v.premio?premioDetalle(v,P,faltaObj):''}`)}
     ${clave.length?Q(2,'¿Qué salgo a buscar?',clave.map(c=>`<div class="oroc"><b>${esc(c.c)} · ${esc(titulo(limpio(c.rs)))}</b><span>${esc(queOfrecer(c))}</span></div>`).join('')):''}
     ${Q(3,'¿Qué productos tengo en foco?',`<div class="orof">${focos.map(f=>`<span class="${f.c?'':'cero'}"><b>${f.n}</b>${f.c?` · ${f.c} cliente${f.c>1?'s':''} hoy`:' · sin pendientes hoy'}</span>`).join('')}</div>`)}
     ${Q(4,'¿Con qué herramientas cuento?',`${combos.map(c=>`<div class="oroln">🎁 <b>${esc(c.nombre)}</b>${c.diasParaVencer<=15?` · vence en ${c.diasParaVencer} días`:''}</div>`).join('')}
