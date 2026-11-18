@@ -282,7 +282,7 @@ function start(){
 
 function render(){
   /* si había un mapa abierto, se desarma antes de redibujar (evita errores de la capa de calor sobre un mapa que ya no está) */
-  if(window.__map){ try{ window.__map.remove(); }catch(_){} window.__map=null; }
+  if(window.__map){ try{ window.__map.stop(); window.__map.off(); window.__map.remove(); }catch(_){} window.__map=null; }
   if(S.modo==='sup') return renderSup();
   if(S.modo==='dia') return renderDia();
   if(S.modo==='ger') return renderGer();
