@@ -1310,7 +1310,7 @@ function renderPFPMSU(){
       </div>
     </div>
     ${M?`<div class="card">
-      <div class="row"><div class="lab">${M.vigenciaDesde>='2026-10-01'&&M.vigenciaDesde<'2027-01-01'?'Q2':'Trimestre'} en curso · ${fdate(M.vigenciaDesde)} al ${fdate(M.vigenciaHasta)}</div><span class="pill ${M.estado==='FUERA_DE_ALCANCE'?'t-red':'t-amber'}">${M.pctAvance}%</span></div>
+      <div class="row"><div class="lab" style="font-weight:800;color:var(--ink,#0f172a)">${M.vigenciaDesde>='2026-10-01'&&M.vigenciaDesde<'2027-01-01'?'Q2':'Trimestre'} en curso · ${fdate(M.vigenciaDesde)} al ${fdate(M.vigenciaHasta)}</div><span class="pill ${M.estado==='FUERA_DE_ALCANCE'?'t-red':'t-amber'}">${M.pctAvance}%</span></div>
       <div class="big">${n2(M.real)} <small>de ${n2(M.meta)} MSU</small></div>
       ${barH((M.pctAvance||0)/100,sem((M.pctAvance||0)/100/(M.diasTotales?M.diasTranscurridos/M.diasTotales:1)),M.diasTotales?M.diasTranscurridos/M.diasTotales:null,'')}
       ${(()=>{ const t=tendMSU(M.real,M), r=M.meta?t/M.meta:0; return `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:10px;padding:8px 10px;border-radius:10px;background:var(--bg)"><span class="lab" style="margin:0">Tendencia de cierre</span><span style="font-size:18px;font-weight:800" class="c-${sem(r)}">${n2(t)} MSU <small style="font-size:13px">(${Math.round(r*100)}%)</small></span></div><div class="note" style="margin:4px 2px 0">Si sigue el ritmo de lo que va del trimestre (${M.diasTranscurridos} de ${M.diasTotales} días hábiles). Faltan ${n2(Math.max(0,M.meta-t))} MSU para llegar a la meta.</div>`; })()}
