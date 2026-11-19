@@ -659,7 +659,9 @@ function renderFocos(){
     const cl=(PO.clientes||[]).filter(x=>x.mes===m.mes&&(eq==='Todos'||vEq.has(String(x.v))));
     const combos = eq==='Todos'?m.combos:cl.reduce((s,x)=>s+(x.combosUG2||0)+(x.combosPB3||0),0);
     focos.push({ic:'🎁', n:'Combo Filos (UG2/PB3 + Venus)', regla:`Del ${fdate(PO.vigencia.desde)} al ${fdate(PO.vigencia.hasta)}. Autoservicios 2 UG2 (o 1 PB3) + 1 Venus; Almacenes y Kioscos 1 + 1.`,
-      v:combos, o:null, fmt:AR.format, unidad:'combos', sub:`${AR.format(eq==='Todos'?m.clientes:cl.filter(x=>(x.combosUG2||0)+(x.combosPB3||0)>0).length)} clientes con combo`,
+      v:combos, o:null, fmt:AR.format, unidad:'combos', sub:`${AR.format(eq==='Todos'?m.clientes:cl.filter(x=>(x.combosUG2||0)+(x.combosPB3||0)>0).length)} clientes con combo`
+        + (eq==='Todos'&&m.facturado!=null?`<br>💵 <b>${pesoC(m.facturado)} facturados</b> en el mes (c/IVA): UG2 ${pesoC(m.facturadoUG2)} · PB3 ${pesoC(m.facturadoPB3)} · Venus ${pesoC(m.facturadoVenus)}`:'')
+        + (eq==='Todos'&&DATA.pfp&&DATA.pfp.poa&&(DATA.pfp.poa.porMes||[]).length?`<br>🔒 Reintegro P&G a reclamar: <b>${pesoC((DATA.pfp.poa.porMes.find(x=>x.mes===m.mes)||{}).reclamable||0)}</b> (sin IVA)`:''),
       aUnPaso: eq==='Todos'?m.aUnPaso:cl.filter(x=>x.falta).length, aUnPasoTxt:'a un paso de armar el combo' }); }
 
   /* 7) Combos de Gescom (promos vigentes) */
