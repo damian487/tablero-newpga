@@ -1281,6 +1281,8 @@ function renderHist(){
 }
 
 /* ===================== PFP y MSU (registro del cálculo) ===================== */
+/* 19/11: tendencia de cierre del trimestre en MSU = lo hecho, al mismo ritmo, por los días hábiles totales */
+const tendMSU=(real,M)=>M&&M.diasTranscurridos?real/M.diasTranscurridos*M.diasTotales:real;
 function renderPFPMSU(){
   const app=document.getElementById('app'), M=DATA.msu, F=DATA.pfp, H=window.HIST;
   const q3=H&&H.meses?(H.meses.find(m=>m.mes==='2026-09')||{}).msu:null;
@@ -1311,6 +1313,7 @@ function renderPFPMSU(){
       <div class="row"><div class="lab">${M.vigenciaDesde>='2026-10-01'&&M.vigenciaDesde<'2027-01-01'?'Q2':'Trimestre'} en curso · ${fdate(M.vigenciaDesde)} al ${fdate(M.vigenciaHasta)}</div><span class="pill ${M.estado==='FUERA_DE_ALCANCE'?'t-red':'t-amber'}">${M.pctAvance}%</span></div>
       <div class="big">${n2(M.real)} <small>de ${n2(M.meta)} MSU</small></div>
       ${barH((M.pctAvance||0)/100,sem((M.pctAvance||0)/100/(M.diasTotales?M.diasTranscurridos/M.diasTotales:1)),M.diasTotales?M.diasTranscurridos/M.diasTotales:null,'')}
+      ${(()=>{ const t=tendMSU(M.real,M), r=M.meta?t/M.meta:0; return `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:10px;padding:8px 10px;border-radius:10px;background:var(--bg)"><span class="lab" style="margin:0">Tendencia de cierre</span><span style="font-size:18px;font-weight:800" class="c-${sem(r)}">${n2(t)} MSU <small style="font-size:13px">(${Math.round(r*100)}%)</small></span></div><div class="note" style="margin:4px 2px 0">Si sigue el ritmo de lo que va del trimestre (${M.diasTranscurridos} de ${M.diasTotales} días hábiles). Faltan ${n2(Math.max(0,M.meta-t))} MSU para llegar a la meta.</div>`; })()}
       <div class="grid2" style="margin-top:12px">
         <div style="background:var(--bg);border-radius:10px;padding:8px 10px"><div class="lab">Meta en $</div><div style="font-weight:800;font-size:16px">${pesoC(M.metaPesos)}</div><div class="note" style="margin:0">${pesoMeta?pesoC(pesoMeta)+' por MSU':''}</div></div>
         <div style="background:var(--bg);border-radius:10px;padding:8px 10px"><div class="lab">Vendido</div><div style="font-weight:800;font-size:16px">${pesoC(M.importeReal)}</div><div class="note" style="margin:0">${pesoC(M.pesoPorMSU)} por MSU real</div></div>
@@ -1320,10 +1323,10 @@ function renderPFPMSU(){
       ${M.alcanceSinMayorista?`<div class="note">Sin mayoristas: ${n2(M.alcanceSinMayorista.real)} MSU (${M.alcanceSinMayorista.pctAvance}%).</div>`:''}
     </div>
     <details class="card" open><summary>MSU por categoría <span class="sm">Q2 en curso</span></summary><div class="in">${tablaRubro(M)}</div></details>
-    <details class="card"><summary>MSU por equipo y vendedor <span class="sm">meta cascadeada</span></summary><div class="in"><table>
-      <thead><tr><th>Equipo / vendedor</th><th class="n">Meta</th><th class="n">Real</th><th class="n">%</th></tr></thead><tbody>
-      ${(M.porEquipo||[]).map(e=>`<tr class="me"><td>Equipo ${esc(titulo(e.supervisor.split(' ')[0]))}</td><td class="n">${n2(e.metaEquipo)}</td><td class="n">${n2(e.real)}</td><td class="n">${e.pctAvance}%</td></tr>
-        ${(M.porVendedor||[]).filter(v=>v.supervisor===e.supervisor).sort((a,b)=>b.real-a.real).map(v=>`<tr><td>${esc(nombreV(v.nombre))}</td><td class="n">${n2(v.metaVen)}</td><td class="n">${n2(v.real)}</td><td class="n c-${sem(v.pctAvance/100/(M.diasTotales?M.diasTranscurridos/M.diasTotales:1))}">${v.pctAvance}%</td></tr>`).join('')}`).join('')}
+    <details class="card"><summary>MSU por equipo y vendedor <span class="sm">meta cascadeada · cierre = tendencia</span></summary><div class="in"><table>
+      <thead><tr><th>Equipo / vendedor</th><th class="n">Meta</th><th class="n">Real</th><th class="n">%</th><th class="n">Cierre</th></tr></thead><tbody>
+      ${(M.porEquipo||[]).map(e=>`<tr class="me"><td>Equipo ${esc(titulo(e.supervisor.split(' ')[0]))}</td><td class="n">${n2(e.metaEquipo)}</td><td class="n">${n2(e.real)}</td><td class="n">${e.pctAvance}%</td><td class="n c-${sem(e.metaEquipo?tendMSU(e.real,M)/e.metaEquipo:0)}"><b>${n2(tendMSU(e.real,M))}</b></td></tr>
+        ${(M.porVendedor||[]).filter(v=>v.supervisor===e.supervisor).sort((a,b)=>b.real-a.real).map(v=>`<tr><td>${esc(nombreV(v.nombre))}</td><td class="n">${n2(v.metaVen)}</td><td class="n">${n2(v.real)}</td><td class="n c-${sem(v.pctAvance/100/(M.diasTotales?M.diasTranscurridos/M.diasTotales:1))}">${v.pctAvance}%</td><td class="n c-${sem(v.metaVen?tendMSU(v.real,M)/v.metaVen:0)}">${n2(tendMSU(v.real,M))}</td></tr>`).join('')}`).join('')}
     </tbody></table><div class="note">La meta de cada equipo es fija y se reparte entre sus vendedores según su universo de clientes.</div></div></details>`:''}
     ${q3&&q3.porRubro?`<details class="card"><summary>Registro: Q1 (jul-sep) <span class="sm">${n2(q3.real)} de ${n2(q3.meta)} MSU</span></summary><div class="in">
       <div class="note" style="margin:0 0 8px">Cierre del Concurso Nubi "Acelera 2026": ${q3.pctAvance}% de la meta · ${AR.format(q3.cajasReal||0)} cajas · ${pesoC(q3.importeReal)}.</div>${tablaRubro(q3)}</div></details>`:''}
@@ -1490,7 +1493,7 @@ function renderGer(){
         ${e.cov.map(c=>`${c.n} <b class="${c.v>=c.o?'c-good':'c-bad'}">${c.v}/${c.o}</b>`).join(' · ')}<br>
         <span class="${e.dvSin?'c-bad':'c-good'}">${e.dvSin?'⛔':'✓'} ${e.dvSin} ${e.dvSin===1?'día':'días'}-vend. sin venta</span><br>
         Vendedores en rojo <b>${e.rojos}/${e.n}</b>
-        ${e.msuE?`<br>Trimestre <b>${e.msuE.pctAvance}%</b>`:''}
+        ${e.msuE?`<br>MSU trimestre <b>${e.msuE.pctAvance}%</b> · cierre <b class="c-${sem(e.msuE.metaEquipo?tendMSU(e.msuE.real,M)/e.msuE.metaEquipo:0)}">${n2(tendMSU(e.msuE.real,M))}</b> de ${n2(e.msuE.metaEquipo)}`:''}
       </div>
       <button class="go" data-sup="${e.k}">Ver equipo →</button></div>`).join('')}</div>
 
