@@ -408,7 +408,7 @@ function render(){
     ${detalleFamilias(v,P)}
     ${detalleStock(P)}
     ${detalleRanking(v,P)}
-    <div class="note" style="margin:10px 2px 18px">Datos al ${fdate(DATA.meta&&DATA.meta.ultimaFecha||'')}. La venta se actualiza a las 11:30 y cada hora hasta las 15:30; el GPS, cada hora.</div>
+    <div class="note" style="margin:10px 2px 18px">Datos al ${fdate(DATA.meta&&DATA.meta.ultimaFecha||'')}${DATA.intradia&&DATA.intradia.fecha===(DATA.meta&&DATA.meta.ultimaFecha)?` · actualizado ${DATA.intradia.hhmm}hs`:''}. La venta se actualiza a las 11:30 y cada hora hasta las 15:30; el GPS, cada hora.</div>
   </main>
   <nav class="bottom"><div class="in">
     <div class="t"><span>${unaLista?'Hoy':'Ruta '+diaN.toLowerCase()}: ${compraronHoy}/${conTags.length} compraron</span><span>${conTags.length?Math.round(compraronHoy/conTags.length*100):0}%</span></div>
@@ -1703,12 +1703,28 @@ function detalleRanking(v,P){
       if(!r.ok) throw new Error('HTTP '+r.status);
       DATA=await r.json();
       try{sessionStorage.setItem(PW_KEY,p);}catch(_){}
-      gate.remove(); start();
+      gate.remove(); start(); autoRefresco(p);
     }catch(e){
       try{sessionStorage.removeItem(PW_KEY);}catch(_){}
       gate.style.visibility='visible'; go.disabled=false; go.textContent='Entrar';
       if(!silent) err.textContent='Clave incorrecta o sin conexión'; console.error(e);
     }
+  }
+  /* 19/11: la página traía los datos una sola vez al abrir; si quedaba abierta no veía las corridas
+     siguientes. Ahora vuelve a pedirlos cada 10 min y al volver a la pestaña (el Worker los cachea 90s,
+     casi no suma lecturas de KV) y solo redibuja si cambiaron, sin pisar algo que se esté escribiendo. */
+  function autoRefresco(p){
+    let ultimo=Date.now(), pendiente=false;
+    const firma=d=>JSON.stringify([d.meta&&d.meta.generado,d.intradia&&d.intradia.hhmm,d.intradia&&d.intradia.venta,d.planDia&&d.planDia.generado]);
+    const redibujar=()=>{ const a=document.activeElement; if(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)){ pendiente=true; return; } pendiente=false; window.FOCOS=indexarFocos(); render(); };
+    async function traer(){
+      ultimo=Date.now();
+      try{ const r=await fetch(WORKER_URL,{headers:pwHeaders(p),cache:'no-store'}); if(!r.ok) return; const d=await r.json();
+        if(firma(d)!==firma(DATA)){ DATA=d; redibujar(); } }catch(_){}
+    }
+    setInterval(()=>{ if(!document.hidden) traer(); else if(pendiente) redibujar(); }, 10*60000);
+    document.addEventListener('visibilitychange',()=>{ if(!document.hidden && Date.now()-ultimo>3*60000) traer(); });
+    document.addEventListener('focusout',()=>{ if(pendiente) setTimeout(redibujar,300); });
   }
   go.onclick=()=>abrir(pw.value); pw.onkeydown=e=>{ if(e.key==='Enter') abrir(pw.value); };
   let sv=null; try{sv=sessionStorage.getItem(PW_KEY);}catch(_){}
