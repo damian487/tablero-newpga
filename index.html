@@ -1717,7 +1717,9 @@ function detalleRanking(v,P){
      siguientes. Ahora vuelve a pedirlos cada 10 min y al volver a la pestaña (el Worker los cachea 90s,
      casi no suma lecturas de KV) y solo redibuja si cambiaron, sin pisar algo que se esté escribiendo. */
   function autoRefresco(p){
-    let ultimo=Date.now(), pendiente=false;
+    let ultimo=Date.now(), pendiente=false, dia0=hoyStr();
+    /* 20/11: si la pagina quedo abierta de un dia para el otro, pasar sola al dia de hoy (el Minuto de oro solo se arma para hoy) */
+    const cambioDeDia=()=>{ if(hoyStr()===dia0) return false; dia0=hoyStr(); const dow=new Date(dia0+'T12:00:00').getDay(); S.dia=DIAS[(dow>=1&&dow<=5?dow:1)-1][0]; S.oro=null; redibujar(); traer(); return true; };
     const firma=d=>JSON.stringify([d.meta&&d.meta.generado,d.intradia&&d.intradia.hhmm,d.intradia&&d.intradia.venta,d.planDia&&d.planDia.generado]);
     const redibujar=()=>{ const a=document.activeElement; if(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)){ pendiente=true; return; } pendiente=false; window.FOCOS=indexarFocos(); render(); };
     async function traer(){
@@ -1726,7 +1728,9 @@ function detalleRanking(v,P){
         if(firma(d)!==firma(DATA)){ DATA=d; redibujar(); } }catch(_){}
     }
     setInterval(()=>{ if(!document.hidden) traer(); else if(pendiente) redibujar(); }, 10*60000);
-    document.addEventListener('visibilitychange',()=>{ if(!document.hidden && Date.now()-ultimo>3*60000) traer(); });
+    setInterval(()=>{ if(!document.hidden) cambioDeDia(); }, 60000);
+    const alVolver=()=>{ if(document.hidden) return; if(!cambioDeDia() && Date.now()-ultimo>3*60000) traer(); };
+    document.addEventListener('visibilitychange',alVolver); window.addEventListener('focus',alVolver); window.addEventListener('pageshow',alVolver);
     document.addEventListener('focusout',()=>{ if(pendiente) setTimeout(redibujar,300); });
   }
   go.onclick=()=>abrir(pw.value); pw.onkeydown=e=>{ if(e.key==='Enter') abrir(pw.value); };
