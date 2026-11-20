@@ -231,6 +231,20 @@ const DIAS = [['Lu','Lunes'],['Ma','Martes'],['Mi','Miércoles'],['Ju','Jueves']
 const DOW = {Lu:1,Ma:2,Mi:3,Ju:4,Vi:5};
 const ls = { get:k=>{try{return localStorage.getItem(k)}catch(_){return null}}, set:(k,v)=>{try{localStorage.setItem(k,v)}catch(_){}} };
 function hoyStr(){ const n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); }
+/* 20/11 (pedido de los vendedores): despues del cierre del dia el tablero ya planifica el proximo dia habil,
+   asi a la tarde/noche pueden ver su Minuto de oro de manana y dejar el compromiso cargado. */
+const CIERRE_HH = 16;                                  /* hora ART desde la que se muestra el plan de manana (ultima venta: 15:30) */
+const NO_LABORA = ['2026-12-08','2026-12-25'];         /* dias sin salida a la calle (para saltear al buscar el proximo) */
+const FERIADOS_SRV = ['2026-11-20','2026-12-08','2026-12-25']; /* los mismos que usa el Worker para contar dias habiles */
+function sumaDia(f,n){ const d=new Date(f+'T12:00:00Z'); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); }
+function proxHabil(f){ let d=f; do{ d=sumaDia(d,1); }while([0,6].includes(new Date(d+'T12:00:00Z').getUTCDay())||NO_LABORA.includes(d)); return d; }
+/* dia que se esta planificando: hoy hasta las 16; despues del cierre (o fin de semana), el proximo dia habil */
+function diaPlan(){ const h=hoyStr(), w=new Date(h+'T12:00:00').getDay(); return (w===0||w===6||NO_LABORA.includes(h)||new Date().getHours()>=CIERRE_HH)?proxHabil(h):h; }
+function codDia(f){ const w=new Date(f+'T12:00:00').getDay(); return DIAS[(w>=1&&w<=5?w:1)-1][0]; }
+/* venta que hay que traer en la fecha f: lo que falta del objetivo repartido en los dias habiles que quedan desde f
+   (el Worker lo calcula para el dia de su corrida; si f es posterior se descuentan los dias del medio) */
+function restanDesde(f){ const P=DATA.planDia; let n=P.diasRestan; for(let d=P.hoy; d && d<f; d=sumaDia(d,1)){ const w=new Date(d+'T12:00:00Z').getUTCDay(); if(w!==0&&w!==6&&!FERIADOS_SRV.includes(d)) n--; } return Math.max(1,n); }
+function metaDia(v,f){ const P=DATA.planDia; if(!P.hoy||f<=P.hoy) return v.hoy; return Math.round(Math.max(0,(v.objetivo||0)-(v.mtd||0))/restanDesde(f)); }
 function fechaDeDia(ref,dia){ const d=new Date(ref+'T00:00:00Z'); const iso=d.getUTCDay()||7; d.setUTCDate(d.getUTCDate()-(iso-1)+(DOW[dia]-1)); return d.toISOString().slice(0,10); }
 function esVisita(fr,pv,fecha){ if(fr!=='Quincenal'&&fr!=='Mensual') return true; if(!pv) return true; const per=fr==='Quincenal'?14:28; const dd=Math.round((new Date(fecha+'T00:00:00Z')-new Date(pv+'T00:00:00Z'))/864e5); return ((dd%per)+per)%per===0; }
 const titulo = s => String(s||'').toLowerCase().replace(/(^|\s)\S/g,m=>m.toUpperCase());
@@ -286,8 +300,7 @@ function start(){
   window.FOCOS = indexarFocos();
   const guardado = ls.get('v3vend');
   S.vend = (P.vendedores.find(v=>v.cod===guardado)||P.vendedores[0]).cod;
-  const dow = new Date(hoyStr()+'T12:00:00').getDay();
-  S.dia = DIAS[(dow>=1&&dow<=5?dow:1)-1][0];
+  S.dia = codDia(diaPlan());
   S.modo = MODO_VEND ? 'vend' : 'dia'; /* al ingresar siempre arranca en "Mi día" (pedido de Damián 17/11) */
   /* historial de meses cerrados (julio en adelante), servido por el Worker con la clave; el mes en curso sale en vivo de DATA */
   if(!MODO_VEND) gpsFetch('/api/historial').then(h=>{ window.HIST=h; if(['ger','his','gra'].includes(S.modo)) render(); }).catch(()=>{});
@@ -310,8 +323,9 @@ function render(){
   if(S.modo==='alc') return renderAlcance();
   const P = DATA.planDia, app = document.getElementById('app');
   const v = P.vendedores.find(x=>x.cod===S.vend);
-  const hoy = hoyStr(), fecha = fechaDeDia(hoy,S.dia), diaN = DIAS.find(d=>d[0]===S.dia)[1];
-  const dowHoy = new Date(hoy+'T12:00:00').getDay();
+  const hoy = hoyStr(), base = diaPlan(), fecha = fechaDeDia(base,S.dia), diaN = DIAS.find(d=>d[0]===S.dia)[1];
+  const dowHoy = new Date(base+'T12:00:00').getDay(), maniana = base!==hoy, metaBase = metaDia(v,base);
+  const diaBaseN = DIAS.find(d=>d[0]===codDia(base))[1].toLowerCase();
   const transc = Math.max(0,(P.diasMes-P.diasRestan)), esperado = P.diasMes? transc/P.diasMes : 0;
   const mesN = MESES[+P.mes.slice(5,7)-1];
 
@@ -371,7 +385,7 @@ function render(){
     <div class="days" style="${unaLista?'display:none':''}">${DIAS.map(([c,n],i)=>`<button data-d="${c}" aria-pressed="${c===S.dia}" class="${i+1===dowHoy?'today':''}">${n.slice(0,3)}</button>`).join('')}</div>
   </header>
   <main class="sheet">
-    ${fecha===hoy&&!unaLista?minutoDeOro(v,conTags,fecha):''}
+    ${fecha===base&&!unaLista?(base.slice(0,7)===P.mes?minutoDeOro(v,conTags,fecha):`<div class="card note">🗓️ El Minuto de oro del ${diaN.toLowerCase()} ${fdate(fecha)} empieza mes nuevo: se arma con la primera actualización del mes.</div>`):''}
     ${!v.objetivo?`<div class="card"><div class="lab">Vendido P&G en ${mesN}</div><div class="big">${pesoC(v.mtd)}</div><div class="note">Sin objetivo asignado este mes.</div></div>`:`
     <div class="card">
       <div class="row"><div class="lab">Objetivo de ${mesN}</div><div class="faltan">te falta <b>${pesoC(falta)}</b></div></div>
@@ -382,7 +396,7 @@ function render(){
     </div>`}
 
     <div class="grid2">
-      ${v.objetivo?`<div class="card"><div class="lab">Hoy tenés que traer</div><div class="mid">${pesoC(v.hoy)}</div><div class="note">ritmo normal ${pesoC(v.ritmoNecesario)}/día</div></div>`:''}
+      ${v.objetivo?`<div class="card"><div class="lab">${maniana?'El '+diaBaseN+' tenés que traer':'Hoy tenés que traer'}</div><div class="mid">${pesoC(metaBase)}</div><div class="note">ritmo normal ${pesoC(v.ritmoNecesario)}/día</div></div>`:''}
       <div class="card"><div class="lab">Clientes que compraron</div><div class="mid">${compradores} <small style="font-size:13px;color:var(--muted);font-weight:600">de ${cartera.length}</small></div><div class="note">de tu cartera, en ${mesN}${(()=>{ const cd=cobDoble(x=>x.cod===v.cod); if(!cd.activos||v.grupo==='Mayorista') return ''; return cd.pC!=null?` · <b>${cd.otras}</b> te compraron otras líneas y P&G no`:` · <b>${Math.round(cd.pA*100)}%</b> de los ${cd.activos} que compran P&G`; })()}</div></div>
     </div>
     ${cartelesNoVenta(ventaDiaria(new Set([v.cod])),true)}
@@ -432,7 +446,7 @@ function render(){
 
   bindTabs();
   document.getElementById('vsel').onchange = e=>{ S.vend=e.target.value; ls.set('v3vend',S.vend); render(); };
-  { const ob=document.getElementById('oroOk'); if(ob) ob.onclick=()=>{ const o=S.oro||{}; ls.set('v3plan|'+v.cod+'|'+hoyStr(), new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',hour12:false})+`: ${o.ped||0} pedidos y ${o.cli||0} clientes nuevos (${pesoC(v.hoy)})`); reRender(); };
+  { const ob=document.getElementById('oroOk'); if(ob) ob.onclick=()=>{ const o=S.oro||{}; ls.set('v3plan|'+v.cod+'|'+fecha, new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',hour12:false})+(maniana?' del '+fdate(hoy):'')+`: ${o.ped||0} pedidos y ${o.cli||0} clientes nuevos (${pesoC(metaBase)})`); reRender(); };
     document.querySelectorAll('[data-oro]').forEach(b=>b.onclick=()=>{ const f=b.dataset.oro; S.oro[f]=Math.max(0,(S.oro[f]||0)+(+b.dataset.d)); reRender(); }); }
   document.querySelectorAll('.days button').forEach(b=>b.onclick=()=>{ S.dia=b.dataset.d; render(); });
   document.querySelectorAll('#filt button').forEach(b=>b.onclick=()=>{ S.filtro=b.dataset.f; document.querySelectorAll('#filt button').forEach(x=>x.setAttribute('aria-pressed',x===b)); drawLista(); });
@@ -769,10 +783,12 @@ function minutoDeOro(v, conTags, fecha){
   const P=DATA.planDia, hoyR=conTags.filter(c=>!c.dup);
   if(!hoyR.length||!v.objetivo) return '';
   /* 1) metas del dia */
-  const cliDia = v.objCli ? Math.max(0,Math.ceil((v.objCli-(v.cliMes||0))/Math.max(1,P.diasRestan))) : null;
+  const esHoy = fecha===hoyStr(), metaV = metaDia(v,fecha), restan = restanDesde(fecha);
+  const diaTxt = esHoy ? 'hoy' : 'del '+DIAS.find(d=>d[0]===codDia(fecha))[1].toLowerCase();
+  const cliDia = v.objCli ? Math.max(0,Math.ceil((v.objCli-(v.cliMes||0))/restan)) : null;
   let vt=0, pt=0; const desde=(DATA.kpis||{}).mesDesde||(P.mes+'-01');
   Object.entries(DATA.reporteDiario||{}).forEach(([f,r])=>{ if(f<desde||f>=fecha) return; const x=(r.porVendedor||[]).find(y=>y.cod===v.cod); if(x&&x.ccc>0){ vt+=x.venta||0; pt+=x.ccc; } });
-  const ticket = pt?vt/pt:0, pedidos = ticket>0?Math.ceil((v.hoy||0)/ticket):null;
+  const ticket = pt?vt/pt:0, pedidos = ticket>0?Math.ceil((metaV||0)/ticket):null;
   const faltaObj=Math.max(0,(v.objetivo||0)-(v.mtd||0));
   /* 2) que salgo a buscar: clientes clave */
   const clave=hoyR.filter(c=>!c.hoy&&!(c.mes>0)).map(c=>({c,sc:(c.m3||0)+((window.FOCOS[k(c.c)]||[]).length?50000:0)+(c.otras?30000:0)})).sort((a,b)=>b.sc-a.sc).slice(0,6).map(x=>x.c);
@@ -794,19 +810,20 @@ function minutoDeOro(v, conTags, fecha){
   const paso=(id,val)=>`<span class="stp"><button data-oro="${id}" data-d="-1">−</button><b>${val}</b><button data-oro="${id}" data-d="1">+</button></span>`;
   const Q=(n,t,body)=>`<div class="oroq"><div class="oroqt"><span>${n}</span>${t}</div>${body}</div>`;
   return `<div class="card oro">
-    <div class="row"><div class="lab" style="color:#8a5a00;display:flex;align-items:center">Mi minuto de oro<svg width="34" height="14" viewBox="0 0 34 14" style="vertical-align:-2px;margin-left:6px"><defs><linearGradient id="lgo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe17a"/><stop offset=".55" stop-color="#f0a91b"/><stop offset="1" stop-color="#b87a00"/></linearGradient></defs><path d="M6 1h22l5 12H1z" fill="url(#lgo)" stroke="#9a6700" stroke-width="1"/><path d="M7.5 3h19l1.4 3.5H6.1z" fill="#fff3c4" opacity=".7"/></svg></div><span class="note" style="margin:0">antes de salir</span></div>
-    ${Q(1,'¿Cuáles son mis metas de hoy?',`<div class="oro3">
-      <div><span>Venta hoy</span><b>${pesoC(v.hoy)}</b></div>
+    <div class="row"><div class="lab" style="color:#8a5a00;display:flex;align-items:center">Mi minuto de oro<svg width="34" height="14" viewBox="0 0 34 14" style="vertical-align:-2px;margin-left:6px"><defs><linearGradient id="lgo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe17a"/><stop offset=".55" stop-color="#f0a91b"/><stop offset="1" stop-color="#b87a00"/></linearGradient></defs><path d="M6 1h22l5 12H1z" fill="url(#lgo)" stroke="#9a6700" stroke-width="1"/><path d="M7.5 3h19l1.4 3.5H6.1z" fill="#fff3c4" opacity=".7"/></svg></div><span class="note" style="margin:0">${esHoy?'antes de salir':'para '+fdate(fecha)}</span></div>
+    ${esHoy?'':`<div class="note" style="margin:2px 0 6px">📅 Plan del ${DIAS.find(d=>d[0]===codDia(fecha))[1].toLowerCase()} ${fdate(fecha)}, armado con la venta al cierre de hoy. Dejá tu compromiso cargado desde ahora.</div>`}
+    ${Q(1,`¿Cuáles son mis metas ${esHoy?'de hoy':diaTxt}?`,`<div class="oro3">
+      <div><span>Venta ${esHoy?'hoy':'del día'}</span><b>${pesoC(metaV)}</b></div>
       ${pedidos?`<div><span>Pedidos</span><b>${pedidos}</b><small>de ${hoyR.length} en ruta</small></div>`:''}
       ${cliDia!=null?`<div><span>Clientes a sumar</span><b>${cliDia}</b></div>`:''}
     </div>
     ${v.premio?premioDetalle(v,P,faltaObj):''}`)}
     ${clave.length?Q(2,'¿Qué salgo a buscar?',clave.map(c=>`<div class="oroc"><b>${esc(c.c)} · ${esc(titulo(limpio(c.rs)))}</b><span>${esc(queOfrecer(c))}</span></div>`).join('')):''}
-    ${Q(3,'¿Qué productos tengo en foco?',`<div class="orof">${focos.map(f=>`<span class="${f.c?'':'cero'}"><b>${f.n}</b>${f.c?` · ${f.c} cliente${f.c>1?'s':''} hoy`:' · sin pendientes hoy'}</span>`).join('')}</div>`)}
+    ${Q(3,'¿Qué productos tengo en foco?',`<div class="orof">${focos.map(f=>`<span class="${f.c?'':'cero'}"><b>${f.n}</b>${f.c?` · ${f.c} cliente${f.c>1?'s':''} ${diaTxt}`:' · sin pendientes '+diaTxt}</span>`).join('')}</div>`)}
     ${Q(4,'¿Con qué herramientas cuento?',`${combos.map(c=>`<div class="oroln">🎁 <b>${esc(c.nombre)}</b>${c.diasParaVencer<=15?` · vence en ${c.diasParaVencer} días`:''}</div>`).join('')}
       ${acciones.map(a=>`<div class="oroln">🏷️ <b>${esc(titulo(a.familia))}</b>: ${esc(a.acciones)}</div>`).join('')}
       ${quie.length?`<div class="oroln" style="color:var(--bad)">⛔ <b>No ofrecer (sin stock):</b> ${quie.slice(0,3).map(x=>esc(x.desc)).join(' · ')}${quie.length>3?` y ${quie.length-3} más`:''}</div>`:''}
-      ${!combos.length&&!acciones.length&&!quie.length?'<div class="note">Sin combos ni acciones vigentes hoy.</div>':''}`)}
+      ${!combos.length&&!acciones.length&&!quie.length?`<div class="note">Sin combos ni acciones vigentes ${diaTxt}.</div>`:''}`)}
     ${cz?Q(5,'¿Qué ato para la canasta exitosa?',`<div class="oroln">Los clientes que llevan <b>3 marcas o más</b> compran <b>${pesoC(cz.t3)}</b> al mes; los de 1 marca, <b>${pesoC(cz.t1)}</b>.</div>
       ${atas.length?`<div class="orof">${atas.map(x=>`<span><b>${x.f}</b> → sumale <b>${esc(MARCA(x.a.m))}</b></span>`).join('')}</div><div class="note" style="margin-top:4px">La marca que más se lleva junto con cada foco.</div>`:''}`):''}
     ${Q(6,'¿Cuántos clientes y pedidos voy a traer?', ok?`<div class="orook">✅ Te comprometiste a las ${esc(ok)}</div>`
@@ -1717,9 +1734,9 @@ function detalleRanking(v,P){
      siguientes. Ahora vuelve a pedirlos cada 10 min y al volver a la pestaña (el Worker los cachea 90s,
      casi no suma lecturas de KV) y solo redibuja si cambiaron, sin pisar algo que se esté escribiendo. */
   function autoRefresco(p){
-    let ultimo=Date.now(), pendiente=false, dia0=hoyStr();
+    let ultimo=Date.now(), pendiente=false, dia0=diaPlan();
     /* 20/11: si la pagina quedo abierta de un dia para el otro, pasar sola al dia de hoy (el Minuto de oro solo se arma para hoy) */
-    const cambioDeDia=()=>{ if(hoyStr()===dia0) return false; dia0=hoyStr(); const dow=new Date(dia0+'T12:00:00').getDay(); S.dia=DIAS[(dow>=1&&dow<=5?dow:1)-1][0]; S.oro=null; redibujar(); traer(); return true; };
+    const cambioDeDia=()=>{ if(diaPlan()===dia0) return false; dia0=diaPlan(); S.dia=codDia(dia0); S.oro=null; redibujar(); traer(); return true; };
     const firma=d=>JSON.stringify([d.meta&&d.meta.generado,d.intradia&&d.intradia.hhmm,d.intradia&&d.intradia.venta,d.planDia&&d.planDia.generado]);
     const redibujar=()=>{ const a=document.activeElement; if(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)){ pendiente=true; return; } pendiente=false; window.FOCOS=indexarFocos(); render(); };
     async function traer(){
