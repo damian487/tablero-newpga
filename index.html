@@ -233,13 +233,13 @@ const ls = { get:k=>{try{return localStorage.getItem(k)}catch(_){return null}}, 
 function hoyStr(){ const n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); }
 /* 20/11 (pedido de los vendedores): despues del cierre del dia el tablero ya planifica el proximo dia habil,
    asi a la tarde/noche pueden ver su Minuto de oro de manana y dejar el compromiso cargado. */
-const CIERRE_HH = 16;                                  /* hora ART desde la que se muestra el plan de manana (ultima venta: 15:30) */
+const CIERRE_MIN = 15*60+45;                           /* 15:45 ART: desde ahi se muestra el plan de manana (ultima venta: 15:30) */
 const NO_LABORA = ['2026-12-08','2026-12-25'];         /* dias sin salida a la calle (para saltear al buscar el proximo) */
 const FERIADOS_SRV = ['2026-11-20','2026-12-08','2026-12-25']; /* los mismos que usa el Worker para contar dias habiles */
 function sumaDia(f,n){ const d=new Date(f+'T12:00:00Z'); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); }
 function proxHabil(f){ let d=f; do{ d=sumaDia(d,1); }while([0,6].includes(new Date(d+'T12:00:00Z').getUTCDay())||NO_LABORA.includes(d)); return d; }
-/* dia que se esta planificando: hoy hasta las 16; despues del cierre (o fin de semana), el proximo dia habil */
-function diaPlan(){ const h=hoyStr(), w=new Date(h+'T12:00:00').getDay(); return (w===0||w===6||NO_LABORA.includes(h)||new Date().getHours()>=CIERRE_HH)?proxHabil(h):h; }
+/* dia que se esta planificando: hoy hasta las 15:45; despues del cierre (o fin de semana), el proximo dia habil */
+function diaPlan(){ const h=hoyStr(), w=new Date(h+'T12:00:00').getDay(); return (w===0||w===6||NO_LABORA.includes(h)||(()=>{ const n=new Date(); return n.getHours()*60+n.getMinutes()>=CIERRE_MIN; })())?proxHabil(h):h; }
 function codDia(f){ const w=new Date(f+'T12:00:00').getDay(); return DIAS[(w>=1&&w<=5?w:1)-1][0]; }
 /* venta que hay que traer en la fecha f: lo que falta del objetivo repartido en los dias habiles que quedan desde f
    (el Worker lo calcula para el dia de su corrida; si f es posterior se descuentan los dias del medio) */
