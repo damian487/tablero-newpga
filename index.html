@@ -195,6 +195,26 @@ tr.me td{background:var(--amber-soft);font-weight:700}
 .premio{margin-top:8px;font-size:12.5px;line-height:1.5}.premio table{width:auto;min-width:200px;margin:6px 0;font-size:12.5px}.premio td,.premio th{padding:4px 10px 4px 0}.premio tr.cien td{font-weight:800;color:#14663a}
 @media (max-width:360px){.tabs button{font-size:9px;letter-spacing:-.02em}.bottom{padding-left:10px;padding-right:10px}table{font-size:11.5px}td,th{padding:6px 2px}th{letter-spacing:0;font-size:9.5px}}
 @media (max-width:420px){.logo img.lp{height:66px;width:66px;margin-top:-18px}.logo .pill img{height:33px}.logo{gap:6px}}
+/* PDF del mapa para compartir con el vendedor (Damian 23/11) */
+.pdfbtn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin:0 0 10px;padding:10px;border-radius:12px;border:1.5px solid #0d5c6b;background:#fff;color:#0d5c6b;font:700 14px system-ui;cursor:pointer}
+#mprint{display:none}
+@media print{
+  @page{size:A4;margin:9mm}
+  body.mprint{background:#fff!important}
+  body.mprint nav.bottom,body.mprint .tabs,body.mprint #capas,body.mprint .grupos,body.mprint .days,body.mprint #mvsel,body.mprint #mpdf,body.mprint .grid2,body.mprint .sheet>.note,body.mprint .leaflet-control-zoom,body.mprint .leaflet-control-attribution{display:none!important}
+  body.mprint header.top{background:none!important;padding:0 0 6px!important;box-shadow:none!important}
+  body.mprint header.top .hello,body.mprint header.top .sub{color:#14202f!important}
+  body.mprint .sheet{margin:0!important;padding:0!important;background:#fff!important;border-radius:0!important}
+  body.mprint .card{box-shadow:none!important;border:1px solid #dde3ea;break-inside:avoid}
+  body.mprint #mprint{display:block}
+  #mprint table{width:100%;border-collapse:collapse;font:10px/1.35 system-ui}
+  #mprint th{text-align:left;background:#eef2f6!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:4px 5px;border-bottom:1px solid #c9d3de}
+  #mprint td{padding:3.5px 5px;border-bottom:1px solid #edf0f3;vertical-align:top}
+  #mprint tr{break-inside:avoid}
+  #mprint h3{font:800 12.5px system-ui;margin:10px 0 4px}
+  #mprint .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body.mprint .leaflet-container *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
 </style>
 </head>
 <body>
@@ -908,13 +928,45 @@ function gruposMapa(capa,vivos){
   } else return '';
   return `<div class="grupos">${g.map(x=>`<button data-gr="${x.k}" aria-pressed="${!S.mapOff[x.k]}"><i style="background:${x.c}"></i>${x.n}<b>${AR.format(x.cnt)}</b></button>`).join('')}</div>`;
 }
+/* Damian 23/11: PDF del mapa para mandarle al vendedor. Usa la impresion del navegador ("Guardar como PDF"):
+   mapa tal cual se ve (capa y grupos prendidos) + la lista de esos mismos clientes, ordenada por dia de visita. */
+function mapaPDF(capa, vivos, mesN){
+  const off=S.mapOff||{}, DORD={Lu:1,Ma:2,Mi:3,Ju:4,Vi:5,Sa:6}, conV=!S.mapV;
+  const vn=S.mapV?((vivos.find(r=>r.vendCod===S.mapV)||{}).vn||''):(S.mapEq&&S.mapEq!=='Todos'?'Equipo '+S.mapEq:'Toda la empresa');
+  const est=r=>r.otras?3:(r.m3>0?2:1);
+  let grupos;
+  if(capa==='hueco') grupos=[[3,'#04163a','Nos compran otras líneas, P&G no (los más fáciles)'],[2,'#2f8fd8','Compraban P&G y este mes todavía no'],[1,'#bfe6f7','Sin P&G en los últimos 3 meses']]
+      .filter(([v])=>!off['hueco:'+v]).map(([v,c,t])=>({c,t,rs:vivos.filter(r=>!(r.mes>0)&&est(r)===v)}));
+  else if(capa==='venta') grupos=[{c:'#d6452b',t:'Compraron P&G en '+mesN,rs:vivos.filter(r=>r.mes>0)}];
+  else if(capa==='prom') grupos=[{c:'#ea7a2a',t:'Venta habitual (promedio 3 meses)',rs:vivos.filter(r=>r.m3>0)}];
+  else grupos=[{c:'#1f9d55',t:'Compraron P&G en '+mesN,rs:vivos.filter(r=>r.mes>0)},{c:'#9fb0c4',t:'Todavía no compraron P&G en '+mesN,rs:vivos.filter(r=>!(r.mes>0))}];
+  const ord=(a,b)=>((DORD[(a.dia||'').slice(0,2)]||9)-(DORD[(b.dia||'').slice(0,2)]||9)) || (capa==='venta'?b.mes-a.mes:b.m3-a.m3);
+  const tot=grupos.reduce((s,g)=>s+g.rs.length,0);
+  if(tot>600 && !confirm(`El PDF va a tener ${AR.format(tot)} clientes (muchas páginas). Para mandarle a un vendedor conviene elegirlo arriba primero. ¿Seguir igual?`)) return;
+  const titulos={hueco:'Dónde no vendemos P&G en '+mesN, venta:'Venta P&G de '+mesN, prom:'Venta habitual por cliente', zonas:'Clientes de la zona'};
+  const fila=r=>`<tr><td>${esc(r.cod)}</td><td><b>${esc(limpio(r.nombre))}</b>${r.sub?`<br><span style="color:#6b7a8c">${esc(r.sub)}</span>`:''}</td><td>${esc(limpio(r.dir||''))}</td><td>${esc(r.dia||'')}${r.frecuencia?' · '+esc(r.frecuencia):''}</td>${conV?`<td>${esc((r.vn||'').split(' ').slice(0,2).join(' '))}</td>`:''}<td style="text-align:right">${r.m3>0?pesoC(r.m3):'—'}</td>${capa==='hueco'?'':`<td style="text-align:right">${r.mes>0?pesoC(r.mes):'—'}</td>`}<td>${r.u?fdate(r.u):'+90 días'}</td></tr>`;
+  const hoyTxt=new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
+  document.getElementById('mprint').innerHTML=`<div class="card" style="margin-top:8px"><div style="font:800 14px system-ui">${esc(titulos[capa]||'Mapa')} · ${esc(vn)}</div>
+    <div style="font:11px system-ui;color:#4a5868;margin-top:2px">${AR.format(tot)} clientes · generado el ${hoyTxt}. Ordenados por día de visita y, dentro del día, por venta habitual.</div></div>
+    ${grupos.filter(g=>g.rs.length).map(g=>`<h3><span class="dot" style="background:${g.c}"></span>${esc(g.t)} · ${AR.format(g.rs.length)}</h3>
+    <table><thead><tr><th>Cód.</th><th>Cliente</th><th>Dirección</th><th>Visita</th>${conV?'<th>Vendedor</th>':''}<th style="text-align:right">Prom. 3 m</th>${capa==='hueco'?'':`<th style="text-align:right">${esc(mesN.slice(0,3))}.</th>`}<th>Últ. compra P&G</th></tr></thead>
+    <tbody>${g.rs.slice().sort(ord).map(fila).join('')}</tbody></table>`).join('')}`;
+  /* el mapa se agranda para la hoja, se esperan los mosaicos y recien ahi se abre la impresion */
+  const box=document.getElementById('mapa'), map=window.__map, h0=box.style.height, t0=document.title;
+  const fin=()=>{ document.body.classList.remove('mprint'); box.style.height=h0; document.title=t0; if(map) setTimeout(()=>map.invalidateSize(),50); window.removeEventListener('afterprint',fin); };
+  document.body.classList.add('mprint'); box.style.height='600px'; document.title=(titulos[capa]||'Mapa')+' - '+vn+' - '+hoyTxt.replace(/\//g,'-');
+  window.addEventListener('afterprint',fin);
+  let listo=false; const go=()=>{ if(listo) return; listo=true; setTimeout(()=>window.print(),300); };
+  if(map){ map.invalidateSize(); setTimeout(go,2500); map.eachLayer(l=>{ if(l._url&&l.once) l.once('load',go); }); }
+  else go();
+}
 function renderMapa(){
   const P=DATA.planDia, app=document.getElementById('app'), mesN=MESES[+P.mes.slice(5,7)-1];
   const capa=S.mapCapa||'zonas', eq=S.mapEq||'Todos';
   const vInfo={}; P.vendedores.forEach(v=>vInfo[v.cod]={n:nombreV(v.nombre), eq:eqDe(v.grupo)});
   const cliP={}; P.clientes.forEach(c=>{ (cliP[c.c]=cliP[c.c]||[]).push(c); });
   const rows=(DATA.mapaClientes||[]).filter(r=>r.lat&&r.lon).map(r=>{ const cs=(cliP[r.cod]||[]).filter(c=>c.v===r.vendCod); const c=cs[0]||(cliP[r.cod]||[])[0]||{};
-      return {...r, eq:(vInfo[r.vendCod]||{}).eq||'Otro', vn:(vInfo[r.vendCod]||{}).n||r.vendedor, mes:c.mes||0, m3:c.m3||0, dup:esDupKaf({c:r.cod,v:r.vendCod}), otras:!(c.mes>0)&&compraAlgo({c:r.cod})}; })
+      return {...r, eq:(vInfo[r.vendCod]||{}).eq||'Otro', vn:(vInfo[r.vendCod]||{}).n||r.vendedor, mes:c.mes||0, m3:c.m3||0, u:c.u||'', dup:esDupKaf({c:r.cod,v:r.vendCod}), otras:!(c.mes>0)&&compraAlgo({c:r.cod})}; })
     .filter(r=>(eq==='Todos'||r.eq===eq) && (!S.mapV||r.vendCod===S.mapV));
   const vendsEq=[...new Map(rows.map(r=>[r.vendCod,r.vn])).entries()].sort((a,b)=>a[1].localeCompare(b[1]));
   const vivos=rows.filter(r=>!r.dup);
@@ -931,6 +983,7 @@ function renderMapa(){
   <main class="sheet">
     <div class="filters" id="capas">${CAPAS.map(([k,n])=>`<button data-c="${k}" aria-pressed="${k===capa}">${n}</button>`).join('')}</div>
     ${gruposMapa(capa,vivos)}
+    ${capa==='gps'?'':`<button class="pdfbtn" id="mpdf">📄 Bajar PDF${S.mapV?' para '+esc(((vendsEq.find(x=>x[0]===S.mapV)||[])[1]||'').split(' ')[0]):''} · mapa + lista de clientes</button>`}
     <div class="card" style="padding:0;overflow:hidden"><div id="mapa" style="height:62vh;min-height:360px;background:#e9edf2;display:flex;align-items:center;justify-content:center" class="note">Cargando mapa (requiere internet)…</div></div>
     <div class="card" id="leyenda"></div>
     <div class="grid2">
@@ -939,8 +992,10 @@ function renderMapa(){
     </div>
     <div class="note" style="margin:10px 2px 18px">El calor suma la venta de los clientes cercanos: rojo intenso = donde se concentra la venta; zonas frías o vacías = donde no llegamos. Los clientes que son el mismo negocio que uno KAF (otro código) no se cuentan en Juan.</div>
   </main>
+  <div id="mprint"></div>
   <nav class="bottom"><div class="in">${navTabs()}</div></nav>`;
   window.scrollTo({top:0}); bindTabs();
+  { const pb=document.getElementById('mpdf'); if(pb) pb.onclick=()=>mapaPDF(capa, vivos, mesN); }
   document.querySelectorAll('.days button').forEach(b=>b.onclick=()=>{ S.mapEq=b.dataset.e; S.mapV=''; render(); });
   document.querySelectorAll('#capas button').forEach(b=>b.onclick=()=>{ S.mapCapa=b.dataset.c; render(); });
   document.querySelectorAll('.grupos button').forEach(b=>b.onclick=()=>{ S.mapOff=S.mapOff||{}; const v=b.dataset.gr; S.mapOff[v]=!S.mapOff[v]; render(); });
