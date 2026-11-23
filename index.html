@@ -230,6 +230,21 @@ const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto'
 const DIAS = [['Lu','Lunes'],['Ma','Martes'],['Mi','Miércoles'],['Ju','Jueves'],['Vi','Viernes']];
 const DOW = {Lu:1,Ma:2,Mi:3,Ju:4,Vi:5};
 const ls = { get:k=>{try{return localStorage.getItem(k)}catch(_){return null}}, set:(k,v)=>{try{localStorage.setItem(k,v)}catch(_){}} };
+/* Damian 23/11: el compromiso del Minuto de oro ahora se guarda en el Worker (/api/compromiso), no solo en el celular:
+   antes se perdia si el vendedor abria desde otra app/navegador y el supervisor nunca lo veia. */
+const COMP = {}; /* fecha -> {cod:{ped,cli,meta,hora,ts}} | 'cargando' */
+const compUrl = () => WORKER_URL.replace(/\/api\/(data|vendedor)$/,'/api/compromiso');
+const compPw = () => { try{ return sessionStorage.getItem(PW_KEY)||''; }catch(_){ return ''; } };
+const compTxt = o => `${o.hora}: ${o.ped||0} pedidos y ${o.cli||0} clientes nuevos${o.meta?` (${pesoC(o.meta)})`:''}`;
+function compCargar(f, force){
+  if(!f || (COMP[f] && !force)) return; if(!COMP[f]) COMP[f]='cargando';
+  fetch(compUrl()+'?fecha='+f+(force?'&t='+Date.now():''),{headers:pwHeaders(compPw()),cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{ COMP[f]=(j&&j.items)||{}; if(DATA) reRender(); }).catch(()=>{ if(COMP[f]==='cargando') delete COMP[f]; });
+}
+function compGuardar(cod, f, o){
+  return fetch(compUrl(),{method:'POST',headers:{...pwHeaders(compPw()),'Content-Type':'application/json'},body:JSON.stringify({cod,fecha:f,...o})})
+    .then(r=>r.ok?r.json():null).then(j=>{ if(!j||!j.ok) throw 0; if(typeof COMP[f]!=='object') COMP[f]={}; COMP[f][cod]=j.item; return true; });
+}
+function compDe(cod, f){ const m=COMP[f]; return m&&typeof m==='object'? m[cod]||null : null; }
 function hoyStr(){ const n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); }
 /* 20/11 (pedido de los vendedores): despues del cierre del dia el tablero ya planifica el proximo dia habil,
    asi a la tarde/noche pueden ver su Minuto de oro de manana y dejar el compromiso cargado. */
@@ -446,7 +461,9 @@ function render(){
 
   bindTabs();
   document.getElementById('vsel').onchange = e=>{ S.vend=e.target.value; ls.set('v3vend',S.vend); render(); };
-  { const ob=document.getElementById('oroOk'); if(ob) ob.onclick=()=>{ const o=S.oro||{}; ls.set('v3plan|'+v.cod+'|'+fecha, new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',hour12:false})+(maniana?' del '+fdate(hoy):'')+`: ${o.ped||0} pedidos y ${o.cli||0} clientes nuevos (${pesoC(metaBase)})`); reRender(); };
+  { const ob=document.getElementById('oroOk'); if(ob) ob.onclick=()=>{ const o=S.oro||{}, item={ped:o.ped||0, cli:o.cli||0, meta:metaBase||0, hora:new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',hour12:false})+(maniana?' del '+fdate(hoy):'')};
+      const key='v3plan|'+v.cod+'|'+fecha; ls.set(key, compTxt(item)); S.compEstado='enviando'; reRender();
+      compGuardar(v.cod, fecha, item).then(()=>{ S.compEstado='ok'; reRender(); }).catch(()=>{ S.compEstado='error'; reRender(); }); };
     document.querySelectorAll('[data-oro]').forEach(b=>b.onclick=()=>{ const f=b.dataset.oro; S.oro[f]=Math.max(0,(S.oro[f]||0)+(+b.dataset.d)); reRender(); }); }
   document.querySelectorAll('.days button').forEach(b=>b.onclick=()=>{ S.dia=b.dataset.d; render(); });
   document.querySelectorAll('#filt button').forEach(b=>b.onclick=()=>{ S.filtro=b.dataset.f; document.querySelectorAll('#filt button').forEach(x=>x.setAttribute('aria-pressed',x===b)); drawLista(); });
@@ -805,7 +822,12 @@ function minutoDeOro(v, conTags, fecha){
   const cz=canastaInfo(new Set([v.cod])) || canastaInfo(null);
   const atas=cz?focos.map(f=>({f:f.n,a:cz.ata(f.m,f.ex)})).filter(x=>x.a):[];
   /* 6) compromiso: el vendedor ajusta clientes y pedidos con +/- (maqueta: queda en este celular) */
-  const key='v3plan|'+v.cod+'|'+fecha, ok=ls.get(key);
+  const key='v3plan|'+v.cod+'|'+fecha, srv=compDe(v.cod,fecha), loc=ls.get(key), ok=srv?compTxt(srv):loc;
+  compCargar(fecha);
+  /* compromiso que quedo solo en el celular (antes del 23/11 o sin señal): se sube solo una vez que cargo la lista del servidor */
+  if(loc && !srv && typeof COMP[fecha]==='object' && S.compSync!==key){ S.compSync=key; const m=loc.match(/^(.*?): (\d+) pedidos y (\d+) clientes/);
+    if(m) compGuardar(v.cod, fecha, {hora:m[1], ped:+m[2], cli:+m[3], meta:metaV||0}).then(()=>reRender()).catch(()=>{ S.compSync=null; }); }
+  const compNota = ok ? (srv ? '✔️ Guardado: lo ve tu supervisor.' : (S.compEstado==='error' ? '⚠️ No se pudo enviar (¿sin señal?). Queda en este celular y se reintenta solo al volver a abrir.' : 'Enviando…')) : 'Al tocar el botón queda guardado y lo ve tu supervisor.';
   S.oro=S.oro&&S.oro.k===key?S.oro:{k:key,cli:cliDia||0,ped:pedidos||0};
   const paso=(id,val)=>`<span class="stp"><button data-oro="${id}" data-d="-1">−</button><b>${val}</b><button data-oro="${id}" data-d="1">+</button></span>`;
   const Q=(n,t,body)=>`<div class="oroq"><div class="oroqt"><span>${n}</span>${t}</div>${body}</div>`;
@@ -829,7 +851,7 @@ function minutoDeOro(v, conTags, fecha){
     ${Q(6,'¿Cuántos clientes y pedidos voy a traer?', ok?`<div class="orook">✅ Te comprometiste a las ${esc(ok)}</div>`
       :`<div class="orocm"><div>Pedidos ${paso('ped',S.oro.ped)}</div><div>Clientes nuevos ${paso('cli',S.oro.cli)}</div></div>
        <button class="orobtn" id="oroOk">✅ Me comprometo</button>`)}
-    <div class="note" style="margin-top:6px">Maqueta: el compromiso todavía queda solo en este celular.</div>
+    <div class="note" style="margin-top:6px">${compNota}</div>
   </div>`;
 }
 /* Damian 18/11: separar la RUTA DEL DIA (dia de visita + frecuencia) de lo que el GPS registra fuera de esa ruta.
@@ -1590,6 +1612,9 @@ function renderSup(){
 
   const rG = G.objetivo ? (G.tend||0)/G.objetivo : 0, pG = G.objetivo ? G.mtd/G.objetivo : 0;
   const mini = (k,v,cls)=>`<div><div class="k">${k}</div><div class="v ${cls||''}">${v}</div></div>`;
+  /* compromisos del Minuto de oro (23/11): del dia que se esta planificando (despues de las 15:45, el proximo habil) */
+  const fComp = diaPlan(); compCargar(fComp); const compOk = typeof COMP[fComp]==='object';
+  const nComp = compOk ? vends.filter(v=>compDe(v.cod,fComp)).length : 0;
 
   app.innerHTML = `
   <header class="top">
@@ -1637,6 +1662,7 @@ function renderSup(){
         <div class="note" style="margin-top:6px">Por vendedor: ${top}</div>
         <div class="note" style="margin-top:4px">No cuentan en la cobertura P&G del 3.0. En el mapa y en la ruta aparecen en violeta.</div></div>`; })()}
     <div class="sec"><h2>Mi equipo</h2><span class="upd">primero los que más necesitan ayuda</span></div>
+    <div class="card note" style="margin:0 0 10px">🤝 Compromisos para el ${fComp===hoyStr()?'día de hoy':DIAS.find(d=>d[0]===codDia(fComp))[1].toLowerCase()+' '+fdate(fComp)}: ${compOk?`<b>${nComp} de ${vends.length}</b> vendedores lo cargaron.${nComp<vends.length?' Falta: '+vends.filter(v=>!compDe(v.cod,fComp)).map(v=>esc(nombreV(v.nombre).split(' ')[0])).join(', ')+'.':''}`:'buscando…'}</div>
     ${filas.map(f=>{ const v=f.v, h=f.hoy, s=sem(f.r);
       const efm = f.ef&&f.ef.efectividad!=null ? Math.round(f.ef.efectividad)+'%' : '—';
       const gv = gpsEq ? (gpsEq.porVendedor||[]).find(x=>String(x.cod)===String(v.cod)) : null;
@@ -1644,6 +1670,7 @@ function renderSup(){
         <div class="top2"><div class="nm">${esc(nombreV(v.nombre))}</div>${v.objetivo?`<span class="pill t-${s==='good'?'green':s==='warn'?'amber':'red'}">proy. ${Math.round(f.r*100)}%</span>`:''}</div>
         <div class="ln"><b>${pesoC(v.mtd)}</b>${v.objetivo?` de ${pesoC(v.objetivo)}`:''} · hoy <b>${h?pesoC(h.venta):'—'}</b>${h?` (${h.efectivos}/${h.planificados} compraron)`:''}</div>
         ${v.objetivo?barH(f.pct,s,esperado,''):''}
+        ${compOk?(()=>{ const c=compDe(v.cod,fComp); return `<div class="note" style="margin-top:10px;border-radius:9px;padding:7px 9px;background:${c?'#eaf6ec':'#fdf0e6'}">${c?`🤝 Se comprometió (${esc(c.hora)}): <b>${c.ped} pedidos</b> y <b>${c.cli} clientes nuevos</b>${c.meta?' para traer '+pesoC(c.meta):''}`:'🤝 Todavía no cargó su compromiso del Minuto de oro'}</div>`; })():''}
         ${(()=>{ const cs=new Map(); DATA.planDia.clientes.forEach(c=>{ if(c.v===v.cod&&esDupKaf(c)) cs.set(c.c,c); }); const au=[...cs.values()].filter(c=>/autoservicio/i.test(c.canal||'')).length;
           return cs.size?`<div class="note" style="margin-top:10px;background:#f1ebfb;color:#5b3596;border-radius:9px;padding:7px 9px">🔁 <b>${cs.size}</b> clientes de su ruta (${au} autoservicios) los atiende el KAF en P&G: los visita solo por Pepsico</div>`:''; })()}
         ${gv?(()=>{ const gg=gpsVend(v.cod,hoyStr()), x=gg?rutaSplit(v.cod,gg):null;
