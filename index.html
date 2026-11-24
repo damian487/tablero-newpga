@@ -585,7 +585,8 @@ function renderDia(){
   const fm=fechas.filter(x=>x>=desde);
   const ventaDe = x => { const r=RD[x]||{}; if(x===I.fecha) return todo?I.venta:iGrupo().reduce((s,y)=>s+(y.venta||0),0); return todo?((r.kpis||{}).venta||0):(r.porVendedor||[]).filter(enEq).reduce((s,y)=>s+(y.venta||0),0); };
   const serieMes=fm.map(x=>({f:x, v:ventaDe(x)}));
-  const promMes=serieMes.length?serieMes.reduce((s,d)=>s+d.v,0)/serieMes.length:0;
+  const acumMes=serieMes.reduce((s,d)=>s+d.v,0);
+  const promMes=serieMes.length?acumMes/serieMes.length:0;
   const G = vSel ? (vObj&&vObj.objetivo?{objetivo:vObj.objetivo, mtd:vObj.mtd||0}:null) : eq==='Todos' ? {objetivo:P.llave.meta, mtd:P.llave.mtd} : P.grupos[eq==='Lucy'?'KAF':'Juan'];
   const necesario = G ? Math.max(0,G.objetivo-G.mtd)/Math.max(1,P.diasRestan) : 0;
   const rN = necesario? venta/necesario : 0;
@@ -620,6 +621,7 @@ function renderDia(){
       ${necesario?barH(Math.min(1,rN),sem(rN),null):''}
       <div class="msg">${necesario?(rN>=1?`<span class="c-good">Por encima de lo que hace falta por día (${Math.round(rN*100)}%)</span>`:`<span class="c-${sem(rN)==='warn'?'warn':'bad'}">Al ${Math.round(rN*100)}% de lo que hace falta por día para llegar al objetivo</span>`):''}</div>
       <div class="note">${vsAyer?`vs. ${fdate(vsAyer.fecha)} a la misma hora: <b class="${vsAyer.diff>=0?'c-good':'c-bad'}">${vsAyer.diff>=0?'+':''}${pesoC(vsAyer.diff)} (${vsAyer.diffPct>=0?'+':''}${Math.round(vsAyer.diffPct)}%)</b> · `:''}promedio del mes <b>${pesoC(promMes)}</b>/día</div>
+      <div class="row" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line)"><div class="lab">Acumulado del mes</div><div style="text-align:right"><b style="font-size:18px">${pesoC(acumMes)}</b>${G&&G.objetivo?`<div class="note" style="margin:0">de ${pesoC(G.objetivo)} de objetivo (${Math.round(acumMes/G.objetivo*100)}%)</div>`:''}</div></div>
     </div>
     <div class="grid2">
       <div class="card"><div class="lab">Compraron</div><div class="mid">${AR.format(ccc||0)}</div><div class="note">${pl?`${ef} de ${pl} de la ruta (${Math.round(ef/pl*100)}%)`:'clientes'}</div></div>
@@ -638,9 +640,9 @@ function renderDia(){
         <div class="note">${xs.filter(x=>x.ventaH<20000).length} de ${xs.length} sin venta este día</div></div>`; }).join('')}
 
     <div class="sec"><h2>Ver detalle</h2></div>
-    <details class="card"${serieMes.length?'':' hidden'}><summary>El mes, día por día <span class="sm">${serieMes.length} días</span></summary><div class="in">
+    <details class="card"${serieMes.length?'':' hidden'}><summary>El mes, día por día <span class="sm">${serieMes.length} días · ${pesoC(acumMes)}</span></summary><div class="in">
       ${svgBarras(serieMes,f)}
-      <div class="note">Rojo = día con venta menor a $20.000 · Oscuro = día elegido · Promedio ${pesoC(promMes)}/día</div>
+      <div class="note">Rojo = día con venta menor a $20.000 · Oscuro = día elegido · Acumulado ${pesoC(acumMes)} · Promedio ${pesoC(promMes)}/día</div>
       <table style="margin-top:8px"><thead><tr><th>Día</th><th class="n">Venta</th><th class="n">Compraron</th></tr></thead><tbody>
       ${serieMes.slice().reverse().map(d=>{ const r=RD[d.f]||{}; const c=todo?((r.kpis||{}).ccc||0):(r.porVendedor||[]).filter(enEq).reduce((s,y)=>s+(y.ccc||0),0); return `<tr${d.f===f?' class="me"':''}><td>${(r.dia||'').slice(0,3)} ${fdate(d.f)}</td><td class="n ${d.v<20000?'c-bad':''}">${pesoC(d.v)}</td><td class="n">${c}</td></tr>`; }).join('')}
       </tbody></table></div></details>
