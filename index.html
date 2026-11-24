@@ -563,26 +563,33 @@ function renderDia(){
   const esHoyI = I.fecha===f;                 /* para el día de hoy, la venta intradía es la más fresca */
   const supN = {Juan:'JUAN ARMANDOLA', Lucy:'LUCY CEJAS'};
   const eq = S.eqDia||'Todos';
-  const enEq = x => eq==='Todos' || x.supervisor===supN[eq];
+  const grpEq = {Juan:['Juan'], Lucy:['KAF','Lucy']};
+  const vendsEq = (P.vendedores||[]).filter(v=>eq==='Todos'?(grpEq.Juan.includes(v.grupo)||grpEq.Lucy.includes(v.grupo)):grpEq[eq].includes(v.grupo));
+  if(S.vDia && !vendsEq.some(v=>String(v.cod)===String(S.vDia))) S.vDia='';
+  const vSel = S.vDia||'';
+  const vObj = vSel ? (P.vendedores||[]).find(v=>String(v.cod)===String(vSel)) : null;
+  const enEq = x => vSel ? String(x.cod)===String(vSel) : (eq==='Todos' || x.supervisor===supN[eq]);
+  const todo = eq==='Todos' && !vSel;
+  const iGrupo = () => vSel ? (I.porVendedor||[]).filter(enEq) : (I.porSupervisor||[]).filter(enEq);
 
   /* totales del día (empresa o equipo) */
   const rdVs=(R.porVendedor||[]).filter(enEq), iVs=esHoyI?(I.porVendedor||[]).filter(enEq):null;
-  const venta = esHoyI ? (eq==='Todos'?I.venta:(I.porSupervisor||[]).filter(enEq).reduce((s,x)=>s+x.venta,0))
-                       : (eq==='Todos'?K.venta:rdVs.reduce((s,x)=>s+(x.venta||0),0));
-  const ccc = esHoyI ? (eq==='Todos'?I.ccc:(I.porSupervisor||[]).filter(enEq).reduce((s,x)=>s+x.ccc,0)) : (eq==='Todos'?K.ccc:rdVs.reduce((s,x)=>s+(x.ccc||0),0));
+  const venta = esHoyI ? (todo?I.venta:iGrupo().reduce((s,x)=>s+(x.venta||0),0))
+                       : (todo?K.venta:rdVs.reduce((s,x)=>s+(x.venta||0),0));
+  const ccc = esHoyI ? (todo?I.ccc:iGrupo().reduce((s,x)=>s+(x.ccc||0),0)) : (todo?K.ccc:rdVs.reduce((s,x)=>s+(x.ccc||0),0));
   const pl = rdVs.reduce((s,x)=>s+(x.planificados||0),0), ef = rdVs.reduce((s,x)=>s+(x.efectivos||0),0);
-  const dev = eq==='Todos' ? (esHoyI?I.devoluciones:K.devoluciones) : rdVs.reduce((s,x)=>s+(x.devNC||0),0);
+  const dev = todo ? (esHoyI?I.devoluciones:K.devoluciones) : rdVs.reduce((s,x)=>s+(x.devNC||0),0);
 
   /* mes: promedio diario y necesario por día (llave de la empresa o del equipo) */
   const desde=(DATA.kpis&&DATA.kpis.mesDesde)||(P.mes+'-01');
   const fm=fechas.filter(x=>x>=desde);
-  const ventaDe = x => { const r=RD[x]||{}; if(x===I.fecha) return eq==='Todos'?I.venta:(I.porSupervisor||[]).filter(enEq).reduce((s,y)=>s+y.venta,0); return eq==='Todos'?((r.kpis||{}).venta||0):(r.porVendedor||[]).filter(enEq).reduce((s,y)=>s+(y.venta||0),0); };
+  const ventaDe = x => { const r=RD[x]||{}; if(x===I.fecha) return todo?I.venta:iGrupo().reduce((s,y)=>s+(y.venta||0),0); return todo?((r.kpis||{}).venta||0):(r.porVendedor||[]).filter(enEq).reduce((s,y)=>s+(y.venta||0),0); };
   const serieMes=fm.map(x=>({f:x, v:ventaDe(x)}));
   const promMes=serieMes.length?serieMes.reduce((s,d)=>s+d.v,0)/serieMes.length:0;
-  const G = eq==='Todos' ? {objetivo:P.llave.meta, mtd:P.llave.mtd} : P.grupos[eq==='Lucy'?'KAF':'Juan'];
+  const G = vSel ? (vObj&&vObj.objetivo?{objetivo:vObj.objetivo, mtd:vObj.mtd||0}:null) : eq==='Todos' ? {objetivo:P.llave.meta, mtd:P.llave.mtd} : P.grupos[eq==='Lucy'?'KAF':'Juan'];
   const necesario = G ? Math.max(0,G.objetivo-G.mtd)/Math.max(1,P.diasRestan) : 0;
   const rN = necesario? venta/necesario : 0;
-  const vsAyer = esHoyI&&eq==='Todos' ? I.vsAyerMismaHora : null;
+  const vsAyer = esHoyI&&todo ? I.vsAyerMismaHora : null;
 
   /* tabla por equipo y vendedor */
   const vRows = (R.porVendedor||[]).filter(x=>enEq(x)&&x.supervisor&&!/^N\/A/.test(x.supervisor)).map(x=>{ const iv=iVs&&iVs.find(y=>String(y.cod)===String(x.cod)); return {...x, ventaH: iv?iv.venta:(x.venta||0), cccH: iv?iv.ccc:(x.ccc||0)}; });
@@ -604,6 +611,7 @@ function renderDia(){
     <div class="hello">Mi día</div>
     <div class="sub">${R.dia||''} ${fdate(f)}${esHoyI?` · actualizado ${I.hhmm}hs (se actualiza cada hora hasta las 15:30)`:''}</div>
     <div class="days">${['Todos','Juan','Lucy'].map(k=>`<button data-e="${k}" aria-pressed="${k===eq}">${k==='Todos'?'Toda la empresa':'Equipo '+k}</button>`).join('')}</div>
+    <select class="vsel" id="vdia" style="margin-top:8px;max-width:100%;width:100%"><option value="">${eq==='Todos'?'Todos los vendedores':'Todo el equipo '+eq}</option>${vendsEq.slice().sort((a,b)=>nombreV(a.nombre).localeCompare(nombreV(b.nombre))).map(v=>`<option value="${v.cod}"${String(v.cod)===String(vSel)?' selected':''}>${esc(nombreV(v.nombre))}</option>`).join('')}</select>
   </header>
   <main class="sheet">
     <div class="card">
@@ -618,9 +626,9 @@ function renderDia(){
       <div class="card"><div class="lab">Ticket promedio</div><div class="mid">${pesoC(ccc?venta/ccc:0)}</div><div class="note">devoluciones ${pesoC(dev||0)}</div></div>
     </div>
     ${esHoyI&&(I.hoy||[]).length>1?`<div class="card" style="margin-top:10px"><div class="row"><div class="lab">Cómo viene la venta durante el día</div></div>
-      ${svgLinea([ ...(I.ayer&&I.ayer.rows&&I.ayer.rows.length&&eq==='Todos'?[{pts:I.ayer.rows.map(r=>[+r.hhmm.slice(0,2)*60+ +r.hhmm.slice(3),r.venta]),color:'#9fb0c4',dash:true}]:[]),
+      ${svgLinea([ ...(I.ayer&&I.ayer.rows&&I.ayer.rows.length&&todo?[{pts:I.ayer.rows.map(r=>[+r.hhmm.slice(0,2)*60+ +r.hhmm.slice(3),r.venta]),color:'#9fb0c4',dash:true}]:[]),
                     {pts:I.hoy.map(r=>[+r.hhmm.slice(0,2)*60+ +r.hhmm.slice(3),r.venta]),color:'var(--amber)'} ])}
-      <div class="note">${eq==='Todos'?`<span style="color:var(--amber);font-weight:800">━</span> hoy · <span style="color:#9fb0c4;font-weight:800">┄</span> ${I.ayer?fdate(I.ayer.fecha):'día anterior'}`:'Curva de toda la empresa'}</div></div>`:''}
+      <div class="note">${todo?`<span style="color:var(--amber);font-weight:800">━</span> hoy · <span style="color:#9fb0c4;font-weight:800">┄</span> ${I.ayer?fdate(I.ayer.fecha):'día anterior'}`:'Curva de toda la empresa'}</div></div>`:''}
 
     <div class="sec"><h2>Por equipo y vendedor</h2><span class="upd">⛔ = menos de $20.000</span></div>
     ${grupos.map(g=>{ const xs=vRows.filter(x=>x.supervisor===g).sort((a,b)=>b.ventaH-a.ventaH); const tv=xs.reduce((s,x)=>s+x.ventaH,0); const sp=(R.porSupervisor||[]).find(s=>s.supervisor===g)||{};
@@ -634,7 +642,7 @@ function renderDia(){
       ${svgBarras(serieMes,f)}
       <div class="note">Rojo = día con venta menor a $20.000 · Oscuro = día elegido · Promedio ${pesoC(promMes)}/día</div>
       <table style="margin-top:8px"><thead><tr><th>Día</th><th class="n">Venta</th><th class="n">Compraron</th></tr></thead><tbody>
-      ${serieMes.slice().reverse().map(d=>{ const r=RD[d.f]||{}; const c=eq==='Todos'?((r.kpis||{}).ccc||0):(r.porVendedor||[]).filter(enEq).reduce((s,y)=>s+(y.ccc||0),0); return `<tr${d.f===f?' class="me"':''}><td>${(r.dia||'').slice(0,3)} ${fdate(d.f)}</td><td class="n ${d.v<20000?'c-bad':''}">${pesoC(d.v)}</td><td class="n">${c}</td></tr>`; }).join('')}
+      ${serieMes.slice().reverse().map(d=>{ const r=RD[d.f]||{}; const c=todo?((r.kpis||{}).ccc||0):(r.porVendedor||[]).filter(enEq).reduce((s,y)=>s+(y.ccc||0),0); return `<tr${d.f===f?' class="me"':''}><td>${(r.dia||'').slice(0,3)} ${fdate(d.f)}</td><td class="n ${d.v<20000?'c-bad':''}">${pesoC(d.v)}</td><td class="n">${c}</td></tr>`; }).join('')}
       </tbody></table></div></details>
     <details class="card"><summary>Canales del día <span class="sm">toda la empresa</span></summary><div class="in"><div class="lst">
       ${(R.porCanal||[]).map(c=>`<div class="li"><div class="t"><span>${esc(c.canal)} <span class="note">· ${c.ccc} de ${AR.format(c.universo)} clientes (${c.cobertura}%)</span></span><b>${pesoC(c.venta)}</b></div>${barH(c.venta/Math.max(...(R.porCanal||[]).map(x=>x.venta),1),'warn',null)}</div>`).join('')}
@@ -653,7 +661,8 @@ function renderDia(){
   window.scrollTo({top:0});
   bindTabs();
   document.getElementById('fsel').onchange=e=>{ S.fDia=e.target.value; render(); };
-  document.querySelectorAll('.days button').forEach(b=>b.onclick=()=>{ S.eqDia=b.dataset.e; render(); });
+  document.querySelectorAll('.days button').forEach(b=>b.onclick=()=>{ S.eqDia=b.dataset.e; S.vDia=''; render(); });
+  document.getElementById('vdia').onchange=e=>{ S.vDia=e.target.value; render(); };
 }
 
 /* ===== Dos coberturas (Damián 16/11) =====
