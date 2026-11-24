@@ -934,7 +934,7 @@ function mapaPDF(capa, vivos, mesN){
   const off=S.mapOff||{}, DORD={Lu:1,Ma:2,Mi:3,Ju:4,Vi:5,Sa:6}, conV=!S.mapV;
   const vn=S.mapV?((vivos.find(r=>r.vendCod===S.mapV)||{}).vn||''):(S.mapEq&&S.mapEq!=='Todos'?'Equipo '+S.mapEq:'Toda la empresa');
   const est=r=>r.otras?3:(r.m3>0?2:1);
-  const DLARGO={Lu:'lunes',Ma:'martes',Mi:'miércoles',Ju:'jueves',Vi:'viernes'}, rutaTxt=(S.mapDia?' · ruta del '+DLARGO[S.mapDia]:'')+(S.mapFr?' · '+S.mapFr.toLowerCase()+'es':'');
+  const DLARGO={Lu:'lunes',Ma:'martes',Mi:'miércoles',Ju:'jueves',Vi:'viernes'}, rutaTxt=(S.mapDia?' · ruta del '+DLARGO[S.mapDia]+' '+fdate(fechaDeDia(diaPlan(),S.mapDia)):'')+(S.mapFr?' · '+S.mapFr.toLowerCase()+'es':'');
   let grupos;
   if(capa==='hueco') grupos=[[3,'#04163a','Nos compran otras líneas, P&G no (los más fáciles)'],[2,'#2f8fd8','Compraban P&G y este mes todavía no'],[1,'#bfe6f7','Sin P&G en los últimos 3 meses']]
       .filter(([v])=>!off['hueco:'+v]).map(([v,c,t])=>({c,t,rs:vivos.filter(r=>!(r.mes>0)&&est(r)===v)}));
@@ -967,12 +967,13 @@ function renderMapa(){
   const vInfo={}; P.vendedores.forEach(v=>vInfo[v.cod]={n:nombreV(v.nombre), eq:eqDe(v.grupo)});
   const cliP={}; P.clientes.forEach(c=>{ (cliP[c.c]=cliP[c.c]||[]).push(c); });
   let rows=(DATA.mapaClientes||[]).filter(r=>r.lat&&r.lon).map(r=>{ const cs=(cliP[r.cod]||[]).filter(c=>c.v===r.vendCod); const c=cs[0]||(cliP[r.cod]||[])[0]||{};
-      return {...r, eq:(vInfo[r.vendCod]||{}).eq||'Otro', vn:(vInfo[r.vendCod]||{}).n||r.vendedor, mes:c.mes||0, m3:c.m3||0, u:c.u||'', sg:c.sg||'', frecuencia:c.fr||r.frecuencia||'', dup:esDupKaf({c:r.cod,v:r.vendCod}), otras:!(c.mes>0)&&compraAlgo({c:r.cod})}; })
+      return {...r, eq:(vInfo[r.vendCod]||{}).eq||'Otro', vn:(vInfo[r.vendCod]||{}).n||r.vendedor, mes:c.mes||0, m3:c.m3||0, u:c.u||'', sg:c.sg||'', frecuencia:c.fr||r.frecuencia||'', pv:c.pv||'', dup:esDupKaf({c:r.cod,v:r.vendCod}), otras:!(c.mes>0)&&compraAlgo({c:r.cod})}; })
     .filter(r=>(eq==='Todos'||r.eq===eq) && (!S.mapV||r.vendCod===S.mapV));
   /* Damian 24/11 (pedido del supervisor): filtrar por dia de ruta, o toda la semana */
   const rowsSem=rows, DIAS_R=[['','Semana'],['Lu','Lun'],['Ma','Mar'],['Mi','Mié'],['Ju','Jue'],['Vi','Vie']];
   const FRECS=[['','Todas'],['Semanal','Semanal'],['Quincenal','Quincenal'],['Mensual','Mensual']];
-  const okD=(r,d)=>!d||r.dia===d, okF=(r,f)=>!f||r.frecuencia===f;
+  /* 24/11: con un dia elegido, quincenales y mensuales solo si les toca visita ESA semana (la del dia que se planifica) */
+  const fSem=d=>fechaDeDia(diaPlan(),d), okD=(r,d)=>!d||(r.dia===d&&esVisita(r.frecuencia,r.pv,fSem(d))), okF=(r,f)=>!f||r.frecuencia===f;
   const cntDia=d=>rowsSem.filter(r=>!r.dup&&okD(r,d)&&okF(r,S.mapFr)).length, cntFr=f=>rowsSem.filter(r=>!r.dup&&okF(r,f)&&okD(r,S.mapDia)).length;
   rows=rows.filter(r=>okD(r,S.mapDia)&&okF(r,S.mapFr));
   const vendsEq=[...new Map(rowsSem.map(r=>[r.vendCod,r.vn])).entries()].sort((a,b)=>a[1].localeCompare(b[1]));
@@ -988,8 +989,9 @@ function renderMapa(){
     <div class="days">${['Todos','Juan','Lucy'].map(k=>`<button data-e="${k}" aria-pressed="${k===eq}">${k==='Todos'?'Toda la empresa':'Equipo '+k}</button>`).join('')}</div>
   </header>
   <main class="sheet">
-    <div class="filters" id="mdias" style="margin-bottom:8px"><span class="note" style="margin:0 4px 0 2px;align-self:center">Ruta:</span>${DIAS_R.map(([k,n])=>`<button data-dr="${k}" aria-pressed="${(S.mapDia||'')===k}">${n} <b style="opacity:.6;font-weight:600">${AR.format(cntDia(k))}</b></button>`).join('')}</div>
+    <div class="filters" id="mdias" style="margin-bottom:8px"><span class="note" style="margin:0 4px 0 2px;align-self:center">Ruta:</span>${DIAS_R.map(([k,n])=>`<button data-dr="${k}" aria-pressed="${(S.mapDia||'')===k}">${n}${k?' '+fdate(fSem(k)):''} <b style="opacity:.6;font-weight:600">${AR.format(cntDia(k))}</b></button>`).join('')}</div>
     <div class="filters" id="mfrec" style="margin-bottom:8px"><span class="note" style="margin:0 4px 0 2px;align-self:center">Frecuencia:</span>${FRECS.map(([k,n])=>`<button data-fq="${k}" aria-pressed="${(S.mapFr||'')===k}">${n} <b style="opacity:.6;font-weight:600">${AR.format(cntFr(k))}</b></button>`).join('')}</div>
+    ${S.mapDia?`<div class="note" style="margin:-2px 4px 8px">Ruta del ${fdate(fSem(S.mapDia))}: los quincenales y mensuales aparecen solo si les toca visita esa semana.</div>`:''}
     <div class="filters" id="capas">${CAPAS.map(([k,n])=>`<button data-c="${k}" aria-pressed="${k===capa}">${n}</button>`).join('')}</div>
     ${gruposMapa(capa,vivos)}
     ${capa==='gps'?'':`<button class="pdfbtn" id="mpdf">📄 Bajar PDF${S.mapV?' para '+esc(((vendsEq.find(x=>x[0]===S.mapV)||[])[1]||'').split(' ')[0]):''} · mapa + lista de clientes</button>`}
