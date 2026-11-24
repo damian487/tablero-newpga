@@ -254,7 +254,10 @@ const ls = { get:k=>{try{return localStorage.getItem(k)}catch(_){return null}}, 
    antes se perdia si el vendedor abria desde otra app/navegador y el supervisor nunca lo veia. */
 const COMP = {}; /* fecha -> {cod:{ped,cli,meta,hora,ts}} | 'cargando' */
 const compUrl = () => WORKER_URL.replace(/\/api\/(data|vendedor)$/,'/api/compromiso');
-const compPw = () => { try{ return sessionStorage.getItem(PW_KEY)||''; }catch(_){ return ''; } };
+/* 24/11: el navegador interno de Faro (Android WebView) puede tener sessionStorage/localStorage apagados: la clave
+   tambien queda en memoria al entrar, y todo lo que pega al Worker despues (compromiso, GPS) usa esa. */
+let PW_MEM = '';
+const compPw = () => { if(PW_MEM) return PW_MEM; try{ return sessionStorage.getItem(PW_KEY)||''; }catch(_){ return ''; } };
 const compTxt = o => `${o.hora}: ${o.ped||0} pedidos y ${o.cli||0} clientes nuevos${o.meta?` (${pesoC(o.meta)})`:''}`;
 function compCargar(f, force){
   if(!f || (COMP[f] && !force)) return; if(!COMP[f]) COMP[f]='cargando';
@@ -768,7 +771,7 @@ function renderFocos(){
    del día por cliente. Parada >= 3 min = ENTRÓ (criterio de "Disciplina de ruta"); menos = DE LARGO. */
 const GPS = { v:{}, eq:{}, pend:{} };
 const RR_BASE = WORKER_URL.replace('/api/data','').replace('/api/vendedor','');
-function gpsFetch(path){ let pw=''; try{pw=sessionStorage.getItem(PW_KEY)||'';}catch(_){} return fetch(RR_BASE.replace('/api/vendedor','')+path,{headers:pwHeaders(pw)}).then(r=>r.ok?r.json():null).catch(()=>null); }
+function gpsFetch(path){ const pw=compPw(); return fetch(RR_BASE.replace('/api/vendedor','')+path,{headers:pwHeaders(pw)}).then(r=>r.ok?r.json():null).catch(()=>null); }
 /* pide una sola vez por vendedor+fecha y vuelve a dibujar cuando llega */
 /* ficha corta del PDV para los carteles del mapa: canal, dias de visita y frecuencia (de la ruta en Gescom) */
 const DIAN={Lu:'Lunes',Ma:'Martes',Mi:'Miércoles',Ju:'Jueves',Vi:'Viernes',Sa:'Sábado'};
@@ -1822,7 +1825,7 @@ function detalleRanking(v,P){
     try{
       const r=await fetch(WORKER_URL,{headers:pwHeaders(p)});
       if(!r.ok) throw new Error('HTTP '+r.status);
-      DATA=await r.json();
+      DATA=await r.json(); PW_MEM=p;
       try{sessionStorage.setItem(PW_KEY,p);}catch(_){}
       gate.remove(); start(); autoRefresco(p);
     }catch(e){
