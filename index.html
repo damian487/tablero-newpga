@@ -948,13 +948,19 @@ function mapaPDF(capa, vivos, mesN){
   const fila=r=>`<tr><td>${esc(r.cod)}</td><td><b>${esc(limpio(r.nombre))}</b>${r.sub?`<br><span style="color:#6b7a8c">${esc(r.sub)}</span>`:''}</td><td>${esc(limpio(r.dir||''))}</td><td>${esc(r.dia||'')}${r.frecuencia?' · '+esc(r.frecuencia):''}</td><td style="text-align:center"><b>${esc(r.sg||'—')}</b></td>${conV?`<td>${esc((r.vn||'').split(' ').slice(0,2).join(' '))}</td>`:''}<td style="text-align:right">${r.m3>0?pesoC(r.m3):'—'}</td>${capa==='hueco'?'':`<td style="text-align:right">${r.mes>0?pesoC(r.mes):'—'}</td>`}<td>${r.u?fdate(r.u):'+90 días'}</td></tr>`;
   const hoyTxt=new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
   document.getElementById('mprint').innerHTML=`<div class="card" style="margin-top:8px"><div style="font:800 14px system-ui">${esc(titulos[capa]||'Mapa')} · ${esc(vn)}${rutaTxt}</div>
-    <div style="font:11px system-ui;color:#4a5868;margin-top:2px">${AR.format(tot)} clientes · generado el ${hoyTxt}. ${S.mapDia?'Ordenados':'Ordenados por día de visita y, dentro del día,'} por venta habitual.</div></div>
+    <div style="font:11px system-ui;color:#4a5868;margin-top:2px">${AR.format(tot)} clientes · generado el ${hoyTxt}. ${S.mapDia?'Ordenados':'Ordenados por día de visita y, dentro del día,'} por venta habitual. En el mapa, la letra al lado de cada punto es la categoría del cliente (A, B, C o D).</div></div>
     ${grupos.filter(g=>g.rs.length).map(g=>`<h3><span class="dot" style="background:${g.c}"></span>${esc(g.t)} · ${AR.format(g.rs.length)}</h3>
     <table><thead><tr><th>Cód.</th><th>Cliente</th><th>Dirección</th><th>Visita</th><th style="text-align:center">Cat.</th>${conV?'<th>Vendedor</th>':''}<th style="text-align:right">Prom. 3 m</th>${capa==='hueco'?'':`<th style="text-align:right">${esc(mesN.slice(0,3))}.</th>`}<th>Últ. compra P&G</th></tr></thead>
     <tbody>${g.rs.slice().sort(ord).map(fila).join('')}</tbody></table>`).join('')}`;
   /* el mapa se agranda para la hoja, se esperan los mosaicos y recien ahi se abre la impresion */
   const box=document.getElementById('mapa'), map=window.__map, h0=box.style.height, t0=document.title;
-  const fin=()=>{ document.body.classList.remove('mprint'); box.style.height=h0; document.title=t0; if(map) setTimeout(()=>map.invalidateSize(),50); window.removeEventListener('afterprint',fin); };
+  /* 24/11: en el PDF, la letra de la categoria (A/B/C/D) al lado de cada punto del mapa */
+  let capaCat=null;
+  if(map&&window.L){ const CC={A:'#1f9d55',B:'#2f6fd8',C:'#c98a00',D:'#c0392b'}; capaCat=L.layerGroup();
+    grupos.forEach(g=>g.rs.forEach(r=>{ if(!r.sg||!r.lat) return; capaCat.addLayer(L.marker([r.lat,r.lon],{interactive:false,keyboard:false,icon:L.divIcon({className:'',iconSize:[0,0],
+      html:`<div style="transform:translate(5px,-15px);display:inline-block;background:#fff;border:1.5px solid ${CC[r.sg]||'#6b7a8c'};color:${CC[r.sg]||'#6b7a8c'};border-radius:5px;padding:0 3px;font:800 10px/13px system-ui;-webkit-print-color-adjust:exact;print-color-adjust:exact">${esc(r.sg)}</div>`})})); }));
+    capaCat.addTo(map); }
+  const fin=()=>{ if(capaCat&&map) map.removeLayer(capaCat); document.body.classList.remove('mprint'); box.style.height=h0; document.title=t0; if(map) setTimeout(()=>map.invalidateSize(),50); window.removeEventListener('afterprint',fin); };
   document.body.classList.add('mprint'); box.style.height='600px'; document.title=(titulos[capa]||'Mapa')+' - '+vn+(S.mapDia?' - '+DLARGO[S.mapDia]:'')+(S.mapFr?' - '+S.mapFr.toLowerCase()+'es':'')+' - '+hoyTxt.replace(/\//g,'-');
   window.addEventListener('afterprint',fin);
   let listo=false; const go=()=>{ if(listo) return; listo=true; setTimeout(()=>window.print(),300); };
