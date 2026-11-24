@@ -267,6 +267,12 @@ function compGuardar(cod, f, o){
   return fetch(compUrl(),{method:'POST',headers:{...pwHeaders(compPw()),'Content-Type':'application/json'},body:JSON.stringify({cod,fecha:f,...o})})
     .then(r=>r.ok?r.json():null).then(j=>{ if(!j||!j.ok) throw 0; if(typeof COMP[f]!=='object') COMP[f]={}; COMP[f][cod]=j.item; return true; });
 }
+/* 24/11: sin señal en la calle -> el compromiso queda en cola (en memoria) y se reintenta solo al volver la conexion y cada 2 min */
+const COMP_COLA = {};
+function compEncolar(cod, f, o){ COMP_COLA[cod+'|'+f]={cod,f,o}; }
+function compReintentar(){ Object.entries(COMP_COLA).forEach(([k,x])=>compGuardar(x.cod,x.f,x.o).then(()=>{ delete COMP_COLA[k]; S.compEstado='ok'; if(DATA) reRender(); }).catch(()=>{})); }
+window.addEventListener('online', compReintentar);
+setInterval(()=>{ if(Object.keys(COMP_COLA).length) compReintentar(); }, 120000);
 function compDe(cod, f){ const m=COMP[f]; return m&&typeof m==='object'? m[cod]||null : null; }
 function hoyStr(){ const n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); }
 /* 20/11 (pedido de los vendedores): despues del cierre del dia el tablero ya planifica el proximo dia habil,
@@ -486,7 +492,7 @@ function render(){
   document.getElementById('vsel').onchange = e=>{ S.vend=e.target.value; ls.set('v3vend',S.vend); render(); };
   { const ob=document.getElementById('oroOk'); if(ob) ob.onclick=()=>{ const o=S.oro||{}, item={ped:o.ped||0, cli:o.cli||0, meta:metaBase||0, hora:new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',hour12:false})+(maniana?' del '+fdate(hoy):'')};
       const key='v3plan|'+v.cod+'|'+fecha; ls.set(key, compTxt(item)); S.compEstado='enviando'; reRender();
-      compGuardar(v.cod, fecha, item).then(()=>{ S.compEstado='ok'; reRender(); }).catch(()=>{ S.compEstado='error'; reRender(); }); };
+      compGuardar(v.cod, fecha, item).then(()=>{ S.compEstado='ok'; reRender(); }).catch(()=>{ S.compEstado='error'; compEncolar(v.cod, fecha, item); reRender(); }); };
     document.querySelectorAll('[data-oro]').forEach(b=>b.onclick=()=>{ const f=b.dataset.oro; S.oro[f]=Math.max(0,(S.oro[f]||0)+(+b.dataset.d)); reRender(); }); }
   document.querySelectorAll('.days button').forEach(b=>b.onclick=()=>{ S.dia=b.dataset.d; render(); });
   document.querySelectorAll('#filt button').forEach(b=>b.onclick=()=>{ S.filtro=b.dataset.f; document.querySelectorAll('#filt button').forEach(x=>x.setAttribute('aria-pressed',x===b)); drawLista(); });
@@ -850,7 +856,7 @@ function minutoDeOro(v, conTags, fecha){
   /* compromiso que quedo solo en el celular (antes del 23/11 o sin señal): se sube solo una vez que cargo la lista del servidor */
   if(loc && !srv && typeof COMP[fecha]==='object' && S.compSync!==key){ S.compSync=key; const m=loc.match(/^(.*?): (\d+) pedidos y (\d+) clientes/);
     if(m) compGuardar(v.cod, fecha, {hora:m[1], ped:+m[2], cli:+m[3], meta:metaV||0}).then(()=>reRender()).catch(()=>{ S.compSync=null; }); }
-  const compNota = ok ? (srv ? '✔️ Guardado: lo ve tu supervisor.' : (S.compEstado==='error' ? '⚠️ No se pudo enviar (¿sin señal?). Queda en este celular y se reintenta solo al volver a abrir.' : 'Enviando…')) : 'Al tocar el botón queda guardado y lo ve tu supervisor.';
+  const compNota = ok ? (srv ? '✔️ Guardado: lo ve tu supervisor.' : (S.compEstado==='error' ? '⚠️ No se pudo enviar (¿sin señal?). Se reintenta solo cuando vuelva la señal. Dejá el tablero abierto o volvé a abrirlo más tarde.' : 'Enviando…')) : 'Al tocar el botón queda guardado y lo ve tu supervisor.';
   S.oro=S.oro&&S.oro.k===key?S.oro:{k:key,cli:cliDia||0,ped:pedidos||0};
   const paso=(id,val)=>`<span class="stp"><button data-oro="${id}" data-d="-1">−</button><b>${val}</b><button data-oro="${id}" data-d="1">+</button></span>`;
   const Q=(n,t,body)=>`<div class="oroq"><div class="oroqt"><span>${n}</span>${t}</div>${body}</div>`;
