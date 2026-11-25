@@ -263,9 +263,12 @@ function compCargar(f, force){
   if(!f || (COMP[f] && !force)) return; if(!COMP[f]) COMP[f]='cargando';
   fetch(compUrl()+'?fecha='+f+(force?'&t='+Date.now():''),{headers:pwHeaders(compPw()),cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{ COMP[f]=(j&&j.items)||{}; if(DATA) reRender(); }).catch(()=>{ if(COMP[f]==='cargando') delete COMP[f]; });
 }
+/* 25/11: "Guardado" solo si el servidor lo devuelve al volver a leer (antes se confiaba en la respuesta del POST) */
 function compGuardar(cod, f, o){
-  return fetch(compUrl(),{method:'POST',headers:{...pwHeaders(compPw()),'Content-Type':'application/json'},body:JSON.stringify({cod,fecha:f,...o})})
-    .then(r=>r.ok?r.json():null).then(j=>{ if(!j||!j.ok) throw 0; if(typeof COMP[f]!=='object') COMP[f]={}; COMP[f][cod]=j.item; return true; });
+  return fetch(compUrl()+'?t='+Date.now(),{method:'POST',cache:'no-store',headers:{...pwHeaders(compPw()),'Content-Type':'application/json'},body:JSON.stringify({cod,fecha:f,...o})})
+    .then(r=>r.ok?r.json():null).then(j=>{ if(!j||!j.ok) throw 0;
+      return fetch(compUrl()+'?fecha='+f+'&cod='+encodeURIComponent(cod)+'&t='+Date.now(),{headers:pwHeaders(compPw()),cache:'no-store'}).then(r=>r.ok?r.json():null); })
+    .then(g=>{ const it=g&&g.items&&g.items[String(cod)]; if(!it) throw 0; if(typeof COMP[f]!=='object') COMP[f]={}; Object.assign(COMP[f],g.items); return true; });
 }
 /* 24/11: sin señal en la calle -> el compromiso queda en cola (en memoria) y se reintenta solo al volver la conexion y cada 2 min */
 const COMP_COLA = {};
