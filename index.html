@@ -252,6 +252,7 @@ const DOW = {Lu:1,Ma:2,Mi:3,Ju:4,Vi:5};
 const ls = { get:k=>{try{return localStorage.getItem(k)}catch(_){return null}}, set:(k,v)=>{try{localStorage.setItem(k,v)}catch(_){}} };
 /* Damian 23/11: el compromiso del Minuto de oro ahora se guarda en el Worker (/api/compromiso), no solo en el celular:
    antes se perdia si el vendedor abria desde otra app/navegador y el supervisor nunca lo veia. */
+const COMP_FARO = {}; /* fecha -> 'ok' si el Worker pudo leer los compromisos guardados en Faro 360 */
 const COMP = {}; /* fecha -> {cod:{ped,cli,meta,hora,ts}} | 'cargando' */
 const compUrl = () => WORKER_URL.replace(/\/api\/(data|vendedor)$/,'/api/compromiso');
 /* 24/11: el navegador interno de Faro (Android WebView) puede tener sessionStorage/localStorage apagados: la clave
@@ -261,7 +262,7 @@ const compPw = () => { if(PW_MEM) return PW_MEM; try{ return sessionStorage.getI
 const compTxt = o => `${o.hora}: ${o.ped||0} pedidos y ${o.cli||0} clientes nuevos${o.meta?` (${pesoC(o.meta)})`:''}`;
 function compCargar(f, force){
   if(!f || (COMP[f] && !force)) return; if(!COMP[f]) COMP[f]='cargando';
-  fetch(compUrl()+'?fecha='+f+(force?'&t='+Date.now():''),{headers:pwHeaders(compPw()),cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{ COMP[f]=(j&&j.items)||{}; if(DATA) reRender(); }).catch(()=>{ if(COMP[f]==='cargando') delete COMP[f]; });
+  fetch(compUrl()+'?fecha='+f+(force?'&t='+Date.now():''),{headers:pwHeaders(compPw()),cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{ COMP[f]=(j&&j.items)||{}; COMP_FARO[f]=j&&j.faro; if(DATA) reRender(); }).catch(()=>{ if(COMP[f]==='cargando') delete COMP[f]; });
 }
 /* 25/11: "Guardado" solo si el servidor lo devuelve al volver a leer (antes se confiaba en la respuesta del POST) */
 function compGuardar(cod, f, o){
@@ -277,7 +278,7 @@ function compReintentar(){ Object.entries(COMP_COLA).forEach(([k,x])=>compGuarda
 window.addEventListener('online', compReintentar);
 setInterval(()=>{ if(Object.keys(COMP_COLA).length) compReintentar(); }, 120000);
 /* 25/11: Faro 360 intercepta /api/compromiso y lo guarda en Faro (no llega al Worker): avisar al supervisor */
-function compFallaNota(f){ return `<div class="note" style="margin-top:8px;background:#fff6dc;border-radius:9px;padding:7px 9px">ℹ️ Los compromisos que los vendedores cargan desde <b>Faro 360</b> quedan guardados en Faro (no llegan a este tablero). Para esos, el dato válido es el reporte de Faro. "Sin registro" acá no significa que no lo haya cargado.</div>`; }
+function compFallaNota(f){ if(COMP_FARO[f]==='ok') return `<div class="note" style="margin-top:6px">Incluye los compromisos cargados desde Faro 360.</div>`; if(typeof COMP[f]!=='object') return ''; return `<div class="note" style="margin-top:8px;background:#fff6dc;border-radius:9px;padding:7px 9px">ℹ️ Los compromisos que los vendedores cargan desde <b>Faro 360</b> quedan guardados en Faro y ahora no se pudieron leer. Para esos, el dato válido es el reporte de Faro. "Sin registro" acá no significa que no lo haya cargado.</div>`; }
 function compDe(cod, f){ const m=COMP[f]; return m&&typeof m==='object'? m[cod]||null : null; }
 function hoyStr(){ const n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); }
 /* 20/11 (pedido de los vendedores): despues del cierre del dia el tablero ya planifica el proximo dia habil,
