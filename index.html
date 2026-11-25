@@ -322,17 +322,18 @@ function bindTabs(){ document.querySelectorAll('.tabs button').forEach(b=>b.oncl
 const barH = (p,s,mark,markLbl)=>`<div class="bar"><div class="fill b-${s}" style="width:${Math.min(100,Math.max(0,p*100)).toFixed(1)}%"></div>${mark!=null?`<div class="mark" style="left:${Math.min(100,mark*100).toFixed(1)}%"><span>${markLbl||''}</span></div>`:''}</div>`;
 
 /* ---------- índices de oportunidades por cliente (de los distintos focos) ---------- */
-function indexarFocos(){
+function indexarFocos(D){
+  D = D||DATA;
   const I = {}; const add=(c,t)=>{ c=k(c); if(!c) return; (I[c]=I[c]||[]).push(t); };
-  const cov = DATA.cobertura;
+  const cov = D.cobertura;
   if(cov&&cov.planes) cov.planes.forEach(pl=>(pl.pendientes||[]).forEach(x=>add(x.cliente,{t:pl.id==='pilas'?'Pilas':'Sachets H&S',c:'t-blue',o:3})));
-  const ven = DATA.venus;
+  const ven = D.venus;
   if(ven&&ven.pendientes) ven.pendientes.forEach(x=>{ if(x.comproAntes) add(x.cliente,{t:'Venus',c:'t-pink',o:3}); });
-  const fil = DATA.filos;
+  const fil = D.filos;
   if(fil&&fil.pendientes) fil.pendientes.forEach(x=>{ if(x.aUnPaso){ const f=[x.faltaPB3?x.faltaPB3+' PB3':'',x.faltaUG2?x.faltaUG2+' UG2':''].filter(Boolean).join(' + '); add(x.cliente,{t:'Filos: falta '+f,c:'t-amber',o:2}); } });
-  const poa = DATA.poa;
+  const poa = D.poa;
   if(poa&&poa.clientes&&poa.porMes&&poa.porMes.length){ const mAct=poa.porMes[poa.porMes.length-1].mes; poa.clientes.forEach(x=>{ if(x.mes===mAct&&x.falta) add(x.c,{t:'Combo Filos: falta '+x.falta,c:'t-amber',o:1}); }); }
-  const pfp = DATA.pfp&&DATA.pfp.listas;
+  const pfp = D.pfp&&D.pfp.listas;
   if(pfp&&pfp.surtido){
     const CAT={'AFEITADO Y CUIDADO DE LA BARBA':'Afeitado','CUIDADO DE LA ROPA':'Ropa','CUIDADO DEL BEBE':'Bebé','CUIDADO DEL CABELLO':'Cabello','CUIDADO FEMENINO':'Femenino','CUIDADO ORAL':'Bucal','DESODORANTES':'Desodorantes','PILAS Y BATERIAS':'Pilas'};
     pfp.surtido.forEach(x=>{ if(x.falta&&x.falta.length) add(x.c,{t:'Surtido: '+x.falta.map(f=>CAT[f]||f).join(', '),c:'t-green',o:2}); });
@@ -1663,6 +1664,81 @@ function renderGer(){
 }
 
 /* ===================== VISTA SUPERVISOR ===================== */
+/* ===================== CIERRE DEL DIA (25/11) =====================
+   El Worker guarda en cada corrida una foto chica del plan (plansnap:fecha). La ultima foto del dia habil
+   anterior = como arranco el dia: con ella se rearma lo que cada vendedor tenia que ir a buscar (mismo
+   criterio que el Minuto de oro) y se compara contra lo que trajo hoy. Vale para todo el equipo, haya o no
+   cargado el compromiso. */
+const SNAP = {};
+const FOCOS_CIERRE=[['PB2 + Venus',t=>t==='Venus'||(/^(Filos|Combo Filos)/.test(t)&&/UG2/.test(t))],['Sachets H&S',t=>t==='Sachets H&S'],['Pilas',t=>t==='Pilas']];
+function snapCargar(f){
+  if(f in SNAP) return; SNAP[f]='cargando';
+  fetch(WORKER_URL.replace(/\/api\/(data|vendedor)$/,'/api/plansnap')+'?antes='+f,{headers:pwHeaders(compPw())})
+    .then(r=>r.ok?r.json():null).catch(()=>null).then(j=>{
+      if(j&&j.planDia){ j._idx={}; (j.planDia.clientes||[]).forEach(c=>{ j._idx[c.c+'|'+c.v]=c; }); j._focos=indexarFocos(j);
+        j._cm=new Set((j.planDia.compraMes||[]).map(String)); j._dup=new Set((j.planDia.dupKaf||[]).map(String)); SNAP[f]=j; }
+      else SNAP[f]=null;
+      reRender(); });
+}
+function cierreVend(v, f, SN){
+  const P=DATA.planDia, dc=['Do','Lu','Ma','Mi','Ju','Vi','Sa'][new Date(f+'T12:00:00').getDay()];
+  const mios=P.clientes.filter(c=>c.v===v.cod), compro=c=>c.u===f;
+  const vistos=new Set(), compraronHoy=mios.filter(c=>compro(c)&&!vistos.has(c.c)&&vistos.add(c.c));
+  const cmV=(DATA.coberturaMarcas||{})[v.cod], nm={}; ((cmV&&cmV.clientes)||[]).forEach(x=>{ nm[String(x.cod)]=x.nMarcas; });
+  const canasta=compraronHoy.filter(c=>(nm[String(c.c)]||0)>=3).length;
+  if(!SN||typeof SN!=='object') return {compraronHoy, canasta};
+  const s0=c=>SN._idx[c.c+'|'+c.v]||{mes:0};
+  const ruta=mios.filter(c=>(c.d||'').split(' ').includes(dc)&&esVisita(c.fr,c.pv,f)&&!(v.grupo==='Juan'&&SN._dup.has(String(c.c))));
+  const clave=ruta.filter(c=>!(s0(c).mes>0)).map(c=>({c,sc:(c.m3||0)+((SN._focos[k(c.c)]||[]).length?50000:0)+(SN._cm.has(String(c.c))?30000:0)})).sort((a,b)=>b.sc-a.sc).slice(0,6).map(x=>x.c);
+  const focos=FOCOS_CIERRE.map(([n,fn])=>{ const cs=ruta.filter(c=>(SN._focos[k(c.c)]||[]).some(t=>fn(t.t))); return {n, cs, tr:cs.filter(c=>compro(c)&&!(window.FOCOS[k(c.c)]||[]).some(t=>fn(t.t)))}; });
+  const nuevos=compraronHoy.filter(c=>!(s0(c).mes>0));
+  return {ruta, clave, focos, nuevos, compraronHoy, canasta};
+}
+function cierreSeccion(vends, fC){
+  snapCargar(fC); compCargar(fC);
+  const SN=SNAP[fC], I=DATA.intradia||{}, RD=(DATA.reporteDiario||{})[fC]||{};
+  const ventaV=cod=>{ const x=(I.fecha===fC?(I.porVendedor||[]):(RD.porVendedor||[])).find(y=>String(y.cod)===String(cod)); return x?{venta:x.venta||0,ccc:x.ccc||0}:{venta:0,ccc:0}; };
+  const conSnap=SN&&typeof SN==='object';
+  const ahoraM=+new Date(Date.now()-3*3600e3).toISOString().slice(11,13)*60+ +new Date(Date.now()-3*3600e3).toISOString().slice(14,16);
+  const parcial=fC===hoyStr()&&ahoraM<15*60+45;
+  const nombreC=c=>`${esc(c.c)} · ${esc(titulo(limpio(c.rs||'')))}`;
+  const rows=vends.map(v=>{ const x=cierreVend(v,fC,SN), vv=ventaV(v.cod), cp=compDe(v.cod,fC); return {v,x,vv,cp}; });
+  const T=rows.reduce((a,r)=>{ a.comp+=r.cp?1:0; a.pedC+=r.cp?(+r.cp.ped||0):0; a.pedL+=r.cp?r.vv.ccc:0; a.cliC+=r.cp?(+r.cp.cli||0):0; a.cliL+=r.cp?(r.x.nuevos||[]).length:0;
+    a.clv+=(r.x.clave||[]).length; a.clvT+=(r.x.clave||[]).filter(c=>c.u===fC).length; a.nue+=(r.x.nuevos||[]).length; a.cmp+=r.x.compraronHoy.length; a.can+=r.x.canasta; return a; },
+    {comp:0,pedC:0,pedL:0,cliC:0,cliL:0,clv:0,clvT:0,nue:0,cmp:0,can:0});
+  const fT=FOCOS_CIERRE.map(([n],i)=>({n, cs:rows.reduce((s,r)=>s+(r.x.focos?r.x.focos[i].cs.length:0),0), tr:rows.reduce((s,r)=>s+(r.x.focos?r.x.focos[i].tr.length:0),0)}));
+  const ok=(l,c)=>c>0?(l>=c?'c-good':l>=c*0.7?'c-warn':'c-bad'):'';
+  const vRow=r=>{ const {v,x,vv,cp}=r, nL=(x.nuevos||[]).length;
+    const cumplio=cp?((vv.ccc>=(+cp.ped||0))&&(nL>=(+cp.cli||0))):null;
+    return `<details class="card" style="margin-top:8px"><summary><span>${cp?(cumplio?'✅':'🟠'):'⚪'} <b>${esc(nombreV(v.nombre))}</b></span><span class="sm">${cp?`${vv.ccc}/${cp.ped} ped · ${nL}/${cp.cli} nuevos`:'sin compromiso'}</span></summary><div class="in">
+      <div class="note" style="margin:0 0 6px">${cp?`🤝 Comprometió (${esc(cp.hora)}): <b>${cp.ped} pedidos</b> y <b>${cp.cli} clientes nuevos</b>${cp.meta?` · meta ${pesoC(cp.meta)}`:''}`:'⚪ No cargó compromiso para este día.'}</div>
+      <table><thead><tr><th></th><th class="n">${cp?'Comprometido':''}</th><th class="n">Logrado</th></tr></thead><tbody>
+        <tr><td>Venta</td><td class="n">${cp&&cp.meta?pesoC(cp.meta):''}</td><td class="n ${cp&&cp.meta?ok(vv.venta,cp.meta):''}"><b>${pesoC(vv.venta)}</b></td></tr>
+        <tr><td>Pedidos (clientes que compraron)</td><td class="n">${cp?cp.ped:''}</td><td class="n ${cp?ok(vv.ccc,+cp.ped):''}"><b>${vv.ccc}</b></td></tr>
+        <tr><td>Clientes nuevos del mes</td><td class="n">${cp?cp.cli:''}</td><td class="n ${cp?ok(nL,+cp.cli):''}"><b>${x.nuevos?nL:'—'}</b></td></tr>
+        <tr><td>Canasta: 3+ marcas en el mes</td><td class="n"></td><td class="n"><b>${x.canasta}</b> de ${x.compraronHoy.length}</td></tr>
+      </tbody></table>
+      ${x.clave?`<div class="lab" style="margin-top:10px">Clientes a buscar · trajo ${x.clave.filter(c=>c.u===fC).length} de ${x.clave.length}</div>
+        ${x.clave.map(c=>`<div class="note" style="margin:3px 0">${c.u===fC?'✅':'❌'} ${nombreC(c)}</div>`).join('')||'<div class="note">Sin clientes pendientes en su ruta.</div>'}
+        <div class="lab" style="margin-top:10px">Focos del día</div>
+        ${x.focos.map(fo=>`<div class="note" style="margin:3px 0"><b>${fo.n}</b>: trajo <b>${fo.tr.length}</b> de ${fo.cs.length}${fo.tr.length?' · '+fo.tr.map(c=>esc(titulo(limpio(c.rs||c.c)))).join(', '):''}</div>`).join('')}`:''}
+    </div></details>`; };
+  return `<div class="sec"><h2>🏁 Cierre del día</h2><span class="upd">${DIAS.find(d=>d[0]===codDia(fC))[1]} ${fdate(fC)}${parcial?' · parcial':''}</span></div>
+    <div class="card">
+      <div class="note" style="margin:0 0 8px">${parcial?'Se va completando con cada actualización (cada hora hasta las 15:30). ':''}Lo que el equipo salió a buscar en el Minuto de oro contra lo que trajo.</div>
+      <div class="grid2">
+        <div><div class="lab">Compromisos</div><div class="mid">${T.comp} <small style="font-size:13px;color:var(--muted);font-weight:600">de ${vends.length}</small></div><div class="note" style="margin:0">vendedores lo cargaron</div></div>
+        <div><div class="lab">Pedidos</div><div class="mid ${ok(T.pedL,T.pedC)}">${T.pedL} <small style="font-size:13px;color:var(--muted);font-weight:600">de ${T.pedC}</small></div><div class="note" style="margin:0">logrados / comprometidos</div></div>
+        <div><div class="lab">Clientes nuevos</div><div class="mid ${ok(T.cliL,T.cliC)}">${conSnap?T.cliL:'—'} <small style="font-size:13px;color:var(--muted);font-weight:600">de ${T.cliC}</small></div><div class="note" style="margin:0">${conSnap?`todo el equipo: ${T.nue}`:'logrados / comprometidos'}</div></div>
+        <div><div class="lab">Canasta 3+ marcas</div><div class="mid">${T.can} <small style="font-size:13px;color:var(--muted);font-weight:600">de ${T.cmp}</small></div><div class="note" style="margin:0">de los que compraron hoy, llevan 3 marcas o más en el mes</div></div>
+      </div>
+      ${conSnap?`<div class="lab" style="margin-top:12px">Clientes a buscar</div><div class="note" style="margin:2px 0 0">El equipo trajo <b class="${ok(T.clvT,T.clv)}">${T.clvT} de ${T.clv}</b> clientes clave.</div>
+        <div class="lab" style="margin-top:10px">Focos del día</div><div class="note" style="margin:2px 0 0">${fT.map(fo=>`<b>${fo.n}</b>: ${fo.tr} de ${fo.cs}`).join(' · ')}</div>`
+        :(SN==='cargando'?'<div class="note" style="margin-top:10px">Buscando el plan con el que arrancó el día…</div>':'<div class="note" style="margin-top:10px">El detalle de clientes a buscar, focos y clientes nuevos arranca desde el jueves 26/11 (necesita la foto del plan del día anterior).</div>')}
+      <div class="note" style="margin-top:10px">✅ cumplió su compromiso · 🟠 no llegó · ⚪ no cargó compromiso. Tocá cada vendedor para ver el detalle.</div>
+    </div>
+    ${rows.map(vRow).join('')}`;
+}
 function renderSup(){
   const P = DATA.planDia, app = document.getElementById('app');
   const sup = SUP[S.sup], G = P.grupos[sup.grupo] || {objetivo:0,mtd:0,tend:0};
@@ -1759,6 +1835,7 @@ function renderSup(){
         <div class="note">${au} son autoservicios. En P&G los atiende el KAF, así que el equipo los visita <b>solo por Pepsico</b>: son unas <b>${AR.format(Math.round(vis))} visitas al mes</b> que no pueden sumar venta P&G.</div>
         <div class="note" style="margin-top:6px">Por vendedor: ${top}</div>
         <div class="note" style="margin-top:4px">No cuentan en la cobertura P&G del 3.0. En el mapa y en la ruta aparecen en violeta.</div></div>`; })()}
+    ${cierreSeccion(vends, (DATA.intradia&&DATA.intradia.fecha)||fHoy)}
     <div class="sec"><h2>Mi equipo</h2><span class="upd">primero los que más necesitan ayuda</span></div>
     <div class="card note" style="margin:0 0 10px">🤝 Compromisos para el ${fComp===hoyStr()?'día de hoy':DIAS.find(d=>d[0]===codDia(fComp))[1].toLowerCase()+' '+fdate(fComp)}: ${compOk?`<b>${nComp} de ${vends.length}</b> vendedores lo cargaron.${nComp<vends.length?' Falta: '+vends.filter(v=>!compDe(v.cod,fComp)).map(v=>esc(nombreV(v.nombre).split(' ')[0])).join(', ')+'.':''}`:'buscando…'}</div>
     ${filas.map(f=>{ const v=f.v, h=f.hoy, s=sem(f.r);
