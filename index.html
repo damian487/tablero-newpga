@@ -276,8 +276,8 @@ function compEncolar(cod, f, o){ COMP_COLA[cod+'|'+f]={cod,f,o}; }
 function compReintentar(){ Object.entries(COMP_COLA).forEach(([k,x])=>compGuardar(x.cod,x.f,x.o).then(()=>{ delete COMP_COLA[k]; S.compEstado='ok'; if(DATA) reRender(); }).catch(()=>{})); }
 window.addEventListener('online', compReintentar);
 setInterval(()=>{ if(Object.keys(COMP_COLA).length) compReintentar(); }, 120000);
-/* 25/11: hasta el 25/11 los compromisos cargados desde Faro no llegaron al servidor (falla del sistema, no del vendedor) */
-function compFallaNota(f){ return f<='2026-11-26' ? `<div class="note" style="margin-top:8px;background:#fff6dc;border-radius:9px;padding:7px 9px">⚠️ Hasta el 25/11 hubo una falla del sistema: varios compromisos cargados desde Faro no llegaron al servidor. Si un vendedor lo cargó y acá no aparece, no es su responsabilidad: tomá como válido el reporte de Faro.</div>` : ''; }
+/* 25/11: Faro 360 intercepta /api/compromiso y lo guarda en Faro (no llega al Worker): avisar al supervisor */
+function compFallaNota(f){ return `<div class="note" style="margin-top:8px;background:#fff6dc;border-radius:9px;padding:7px 9px">ℹ️ Los compromisos que los vendedores cargan desde <b>Faro 360</b> quedan guardados en Faro (no llegan a este tablero). Para esos, el dato válido es el reporte de Faro. "Sin registro" acá no significa que no lo haya cargado.</div>`; }
 function compDe(cod, f){ const m=COMP[f]; return m&&typeof m==='object'? m[cod]||null : null; }
 function hoyStr(){ const n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); }
 /* 20/11 (pedido de los vendedores): despues del cierre del dia el tablero ya planifica el proximo dia habil,
