@@ -393,9 +393,8 @@ function render(){
   const est = gpsEstados(g||null);
   const conTags = ruta.map(c=>{
     const tags=[]; const e=est[String(c.c)];
-    if(e){ if(e.compro) tags.push({t:`✅ ${e.sinGps?'Pedido sin visita GPS':'Visitado'} · compró ${pesoC(e.venta)}`,c:'t-green',o:-2});
-      else if(e.min>=3) tags.push({t:`🟠 Visitado ${e.hora} · ${e.min} min, sin pedido`,c:'t-amber',o:-2});
-      else tags.push({t:`Pasó de largo ${e.hora}`,c:'t-grey',o:-2}); }
+    /* tiempos, paradas y "pasó de largo" del GPS quedan solo para el Supervisor (pedido 25/11) */
+    if(e&&e.compro) tags.push({t:`✅ Compró hoy · ${pesoC(e.venta)}`,c:'t-green',o:-2});
     else if(c.u===fecha) tags.push({t:'✓ Compró hoy',c:'t-green',o:-1});
     if(esDupKaf(c)) { { const kp=kafPar(c.c); tags.push({t:'🔁 P&G lo atiende el KAF'+(kp&&kp.vend?' ('+kp.vend.split(' ')[0]+')':'')+' · solo Pepsico',c:'t-grey',o:9}); } return {...c, tags, oport:0, hoy:c.u===fecha, dup:true}; }
     if(!(c.m3>0) && !(c.mes>0)) tags.push({t:'No compra P&G: abrir',c:'t-red',o:0});
@@ -461,15 +460,8 @@ function render(){
     ${v.premio?`<div class="note" style="margin:6px 2px 0">Sin la cobertura de sachets y pilas el premio se cobra al 50%.</div>`:''}`:''}
 
     <div class="sec"><h2>${unaLista?'Mis clientes':'Mi ruta del '+diaN.toLowerCase()}</h2><span class="upd">${conTags.length} clientes</span></div>
-    ${fecha===hoy?(g===undefined?`<div class="card note" style="margin:0 0 10px">🛰️ Buscando el recorrido GPS de hoy…</div>`:(gpsRes?`<div class="card" style="margin-bottom:10px">
-      <div class="row"><div class="lab">🛰️ Recorrido de hoy (GPS)</div><span class="note" style="margin:0">al ${new Date(gpsRes.act).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}</span></div>
-      <div class="mid">${gpsRes.pas} <small style="font-size:13px;color:var(--muted);font-weight:600">de ${conTags.length} visitados</small></div>
-      ${barH(conTags.length?gpsRes.pas/conTags.length:0,'warn',null)}
-      <div class="note">${gpsRes.ent} con parada de 3 min o más · <b>${gpsRes.ped} con pedido · ${pesoC(gpsRes.venta)}</b>${gpsRes.k.desde?` · salió ${horaDe(gpsRes.k.desde)}`:''}${gpsRes.k.kmAprox?` · ${gpsRes.k.kmAprox} km`:''}${gpsRes.fuera?` · ${gpsRes.fuera} paradas fuera de esta ruta`:''}</div>
-      ${gpsRes.kafN?`<div class="tag" style="margin-top:6px;display:inline-block;background:#f1ebfb;color:#5b3596">🔁 ${gpsRes.kafN} visitas a clientes que P&G lo atiende el KAF · ${gpsRes.kafMin} min solo para Pepsico</div>`:''}
-      <div class="note" style="margin-top:2px">El GPS se actualiza cada hora; la venta aparece cuando entra a Gescom (11:30 y cada hora hasta las 15:30).</div></div>`:`<div class="card note" style="margin:0 0 10px">🛰️ Todavía no hay recorrido GPS de hoy para este vendedor.</div>`)):''}
     <div class="filters" id="filt">
-      ${[['todos','Todos'],...(gpsRes?[['falta','Falta visitar']]:[]),...(DATA.planDia.compraMes?[['otras','Compran otras líneas']]:[]),['nocompro','No compraron'],['focos','Con foco'],['hoy','Compraron hoy']].map(([f,n])=>`<button data-f="${f}" aria-pressed="${S.filtro===f}">${n}</button>`).join('')}
+      ${[['todos','Todos'],...(DATA.planDia.compraMes?[['otras','Compran otras líneas']]:[]),['nocompro','No compraron'],['focos','Con foco'],['hoy','Compraron hoy']].map(([f,n])=>`<button data-f="${f}" aria-pressed="${S.filtro===f}">${n}</button>`).join('')}
     </div>
     <div id="lista"></div>
 
@@ -477,7 +469,7 @@ function render(){
     ${detalleFamilias(v,P)}
     ${detalleStock(P)}
     ${detalleRanking(v,P)}
-    <div class="note" style="margin:10px 2px 18px">Datos al ${fdate(DATA.meta&&DATA.meta.ultimaFecha||'')}${DATA.intradia&&DATA.intradia.fecha===(DATA.meta&&DATA.meta.ultimaFecha)?` · actualizado ${DATA.intradia.hhmm}hs`:''}. La venta se actualiza a las 11:30 y cada hora hasta las 15:30; el GPS, cada hora.</div>
+    <div class="note" style="margin:10px 2px 18px">Datos al ${fdate(DATA.meta&&DATA.meta.ultimaFecha||'')}${DATA.intradia&&DATA.intradia.fecha===(DATA.meta&&DATA.meta.ultimaFecha)?` · actualizado ${DATA.intradia.hhmm}hs`:''}. La venta se actualiza a las 11:30 y cada hora hasta las 15:30.</div>
   </main>
   <nav class="bottom"><div class="in">
     <div class="t"><span>${unaLista?'Hoy':'Ruta '+diaN.toLowerCase()}: ${compraronHoy}/${conTags.length} compraron</span><span>${conTags.length?Math.round(compraronHoy/conTags.length*100):0}%</span></div>
