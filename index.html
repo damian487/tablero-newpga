@@ -276,6 +276,8 @@ function compEncolar(cod, f, o){ COMP_COLA[cod+'|'+f]={cod,f,o}; }
 function compReintentar(){ Object.entries(COMP_COLA).forEach(([k,x])=>compGuardar(x.cod,x.f,x.o).then(()=>{ delete COMP_COLA[k]; S.compEstado='ok'; if(DATA) reRender(); }).catch(()=>{})); }
 window.addEventListener('online', compReintentar);
 setInterval(()=>{ if(Object.keys(COMP_COLA).length) compReintentar(); }, 120000);
+/* 25/11: hasta el 25/11 los compromisos cargados desde Faro no llegaron al servidor (falla del sistema, no del vendedor) */
+function compFallaNota(f){ return f<='2026-11-26' ? `<div class="note" style="margin-top:8px;background:#fff6dc;border-radius:9px;padding:7px 9px">⚠️ Hasta el 25/11 hubo una falla del sistema: varios compromisos cargados desde Faro no llegaron al servidor. Si un vendedor lo cargó y acá no aparece, no es su responsabilidad: tomá como válido el reporte de Faro.</div>` : ''; }
 function compDe(cod, f){ const m=COMP[f]; return m&&typeof m==='object'? m[cod]||null : null; }
 function hoyStr(){ const n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); }
 /* 20/11 (pedido de los vendedores): despues del cierre del dia el tablero ya planifica el proximo dia habil,
@@ -1713,8 +1715,8 @@ function cierreSeccion(vends, fC){
   const ok=(l,c)=>c>0?(l>=c?'c-good':l>=c*0.7?'c-warn':'c-bad'):'';
   const vRow=r=>{ const {v,x,vv,cp}=r, nL=(x.nuevos||[]).length;
     const cumplio=cp?((vv.ccc>=(+cp.ped||0))&&(nL>=(+cp.cli||0))):null;
-    return `<details class="card" style="margin-top:8px"><summary><span>${cp?(cumplio?'✅':'🟠'):'⚪'} <b>${esc(nombreV(v.nombre))}</b></span><span class="sm">${cp?`${vv.ccc}/${cp.ped} ped · ${nL}/${cp.cli} nuevos`:'sin compromiso'}</span></summary><div class="in">
-      <div class="note" style="margin:0 0 6px">${cp?`🤝 Comprometió (${esc(cp.hora)}): <b>${cp.ped} pedidos</b> y <b>${cp.cli} clientes nuevos</b>${cp.meta?` · meta ${pesoC(cp.meta)}`:''}`:'⚪ No cargó compromiso para este día.'}</div>
+    return `<details class="card" style="margin-top:8px"><summary><span>${cp?(cumplio?'✅':'🟠'):'⚪'} <b>${esc(nombreV(v.nombre))}</b></span><span class="sm">${cp?`${vv.ccc}/${cp.ped} ped · ${nL}/${cp.cli} nuevos`:'sin registro'}</span></summary><div class="in">
+      <div class="note" style="margin:0 0 6px">${cp?`🤝 Comprometió (${esc(cp.hora)}): <b>${cp.ped} pedidos</b> y <b>${cp.cli} clientes nuevos</b>${cp.meta?` · meta ${pesoC(cp.meta)}`:''}`:'⚪ Sin compromiso registrado en el servidor para este día.'}</div>
       <table><thead><tr><th></th><th class="n">${cp?'Comprometido':''}</th><th class="n">Logrado</th></tr></thead><tbody>
         <tr><td>Venta</td><td class="n">${cp&&cp.meta?pesoC(cp.meta):''}</td><td class="n ${cp&&cp.meta?ok(vv.venta,cp.meta):''}"><b>${pesoC(vv.venta)}</b></td></tr>
         <tr><td>Pedidos (clientes que compraron)</td><td class="n">${cp?cp.ped:''}</td><td class="n ${cp?ok(vv.ccc,+cp.ped):''}"><b>${vv.ccc}</b></td></tr>
@@ -1730,7 +1732,7 @@ function cierreSeccion(vends, fC){
     <div class="card">
       <div class="note" style="margin:0 0 8px">${parcial?'Se va completando con cada actualización (cada hora hasta las 15:30). ':''}Lo que el equipo salió a buscar en el Minuto de oro contra lo que trajo.</div>
       <div class="grid2">
-        <div><div class="lab">Compromisos</div><div class="mid">${T.comp} <small style="font-size:13px;color:var(--muted);font-weight:600">de ${vends.length}</small></div><div class="note" style="margin:0">vendedores lo cargaron</div></div>
+        <div><div class="lab">Compromisos</div><div class="mid">${T.comp} <small style="font-size:13px;color:var(--muted);font-weight:600">de ${vends.length}</small></div><div class="note" style="margin:0">con compromiso registrado</div></div>
         <div><div class="lab">Pedidos</div><div class="mid ${ok(T.pedL,T.pedC)}">${T.pedL} <small style="font-size:13px;color:var(--muted);font-weight:600">de ${T.pedC}</small></div><div class="note" style="margin:0">logrados / comprometidos</div></div>
         <div><div class="lab">Clientes nuevos</div><div class="mid ${ok(T.cliL,T.cliC)}">${conSnap?T.cliL:'—'} <small style="font-size:13px;color:var(--muted);font-weight:600">de ${T.cliC}</small></div><div class="note" style="margin:0">${conSnap?`todo el equipo: ${T.nue}`:'logrados / comprometidos'}</div></div>
         <div><div class="lab">Canasta 3+ marcas</div><div class="mid">${T.can} <small style="font-size:13px;color:var(--muted);font-weight:600">de ${T.cmp}</small></div><div class="note" style="margin:0">de los que compraron hoy, llevan 3 marcas o más en el mes</div></div>
@@ -1738,7 +1740,7 @@ function cierreSeccion(vends, fC){
       ${conSnap?`<div class="lab" style="margin-top:12px">Clientes a buscar</div><div class="note" style="margin:2px 0 0">El equipo trajo <b class="${ok(T.clvT,T.clv)}">${T.clvT} de ${T.clv}</b> clientes clave.</div>
         <div class="lab" style="margin-top:10px">Focos del día</div><div class="note" style="margin:2px 0 0">${fT.map(fo=>`<b>${fo.n}</b>: ${fo.tr} de ${fo.cs}`).join(' · ')}</div>`
         :(SN==='cargando'?'<div class="note" style="margin-top:10px">Buscando el plan con el que arrancó el día…</div>':'<div class="note" style="margin-top:10px">El detalle de clientes a buscar, focos y clientes nuevos arranca desde el jueves 26/11 (necesita la foto del plan del día anterior).</div>')}
-      <div class="note" style="margin-top:10px">✅ cumplió su compromiso · 🟠 no llegó · ⚪ no cargó compromiso. Tocá cada vendedor para ver el detalle.</div>
+      <div class="note" style="margin-top:10px">✅ cumplió su compromiso · 🟠 no llegó · ⚪ sin registro. Tocá cada vendedor para ver el detalle.</div>${compFallaNota(fC)}
     </div>
     ${rows.map(vRow).join('')}`;
 }
@@ -1840,7 +1842,7 @@ function renderSup(){
         <div class="note" style="margin-top:4px">No cuentan en la cobertura P&G del 3.0. En el mapa y en la ruta aparecen en violeta.</div></div>`; })()}
     ${cierreSeccion(vends, (DATA.intradia&&DATA.intradia.fecha)||fHoy)}
     <div class="sec"><h2>Mi equipo</h2><span class="upd">primero los que más necesitan ayuda</span></div>
-    <div class="card note" style="margin:0 0 10px">🤝 Compromisos para el ${fComp===hoyStr()?'día de hoy':DIAS.find(d=>d[0]===codDia(fComp))[1].toLowerCase()+' '+fdate(fComp)}: ${compOk?`<b>${nComp} de ${vends.length}</b> vendedores lo cargaron.${nComp<vends.length?' Falta: '+vends.filter(v=>!compDe(v.cod,fComp)).map(v=>esc(nombreV(v.nombre).split(' ')[0])).join(', ')+'.':''}`:'buscando…'}</div>
+    <div class="card note" style="margin:0 0 10px">🤝 Compromisos para el ${fComp===hoyStr()?'día de hoy':DIAS.find(d=>d[0]===codDia(fComp))[1].toLowerCase()+' '+fdate(fComp)}: ${compOk?`<b>${nComp} de ${vends.length}</b> vendedores con compromiso registrado.${nComp<vends.length?' Sin registro: '+vends.filter(v=>!compDe(v.cod,fComp)).map(v=>esc(nombreV(v.nombre).split(' ')[0])).join(', ')+'.':''}`:'buscando…'}${compFallaNota(fComp)}</div>
     ${filas.map(f=>{ const v=f.v, h=f.hoy, s=sem(f.r);
       const efm = f.ef&&f.ef.efectividad!=null ? Math.round(f.ef.efectividad)+'%' : '—';
       const gv = gpsEq ? (gpsEq.porVendedor||[]).find(x=>String(x.cod)===String(v.cod)) : null;
@@ -1848,7 +1850,7 @@ function renderSup(){
         <div class="top2"><div class="nm">${esc(nombreV(v.nombre))}</div>${v.objetivo?`<span class="pill t-${s==='good'?'green':s==='warn'?'amber':'red'}">proy. ${Math.round(f.r*100)}%</span>`:''}</div>
         <div class="ln"><b>${pesoC(v.mtd)}</b>${v.objetivo?` de ${pesoC(v.objetivo)}`:''} · hoy <b>${h?pesoC(h.venta):'—'}</b>${h?` (${h.efectivos}/${h.planificados} compraron)`:''}</div>
         ${v.objetivo?barH(f.pct,s,esperado,''):''}
-        ${compOk?(()=>{ const c=compDe(v.cod,fComp); return `<div class="note" style="margin-top:10px;border-radius:9px;padding:7px 9px;background:${c?'#eaf6ec':'#fdf0e6'}">${c?`🤝 Se comprometió (${esc(c.hora)}): <b>${c.ped} pedidos</b> y <b>${c.cli} clientes nuevos</b>${c.meta?' para traer '+pesoC(c.meta):''}`:'🤝 Todavía no cargó su compromiso del Minuto de oro'}</div>`; })():''}
+        ${compOk?(()=>{ const c=compDe(v.cod,fComp); return `<div class="note" style="margin-top:10px;border-radius:9px;padding:7px 9px;background:${c?'#eaf6ec':'#fdf0e6'}">${c?`🤝 Se comprometió (${esc(c.hora)}): <b>${c.ped} pedidos</b> y <b>${c.cli} clientes nuevos</b>${c.meta?' para traer '+pesoC(c.meta):''}`:'🤝 Sin compromiso registrado en el servidor'}</div>`; })():''}
         ${(()=>{ const cs=new Map(); DATA.planDia.clientes.forEach(c=>{ if(c.v===v.cod&&esDupKaf(c)) cs.set(c.c,c); }); const au=[...cs.values()].filter(c=>/autoservicio/i.test(c.canal||'')).length;
           return cs.size?`<div class="note" style="margin-top:10px;background:#f1ebfb;color:#5b3596;border-radius:9px;padding:7px 9px">🔁 <b>${cs.size}</b> clientes de su ruta (${au} autoservicios) los atiende el KAF en P&G: los visita solo por Pepsico</div>`:''; })()}
         ${gv?(()=>{ const gg=gpsVend(v.cod,hoyStr()), x=gg?rutaSplit(v.cod,gg):null;
