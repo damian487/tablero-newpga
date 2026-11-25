@@ -908,13 +908,16 @@ function minutoDeOro(v, conTags, fecha){
    La efectividad se mide sobre la ruta del dia. Lo usan el Mapa (Recorrido de hoy) y la vista Supervisor. */
 function rutaSplit(cod, gg, f){
   f=f||hoyStr(); const dc=['Do','Lu','Ma','Mi','Ju','Vi','Sa'][new Date(f+'T12:00:00').getDay()];
-  const ruta=new Set(DATA.planDia.clientes.filter(c=>c.v===String(cod)&&(c.d||'').split(' ').includes(dc)&&esVisita(c.fr,c.pv,f)).map(c=>String(c.c)));
+  const rutaC=DATA.planDia.clientes.filter(c=>c.v===String(cod)&&(c.d||'').split(' ').includes(dc)&&esVisita(c.fr,c.pv,f));
+  const ruta=new Set(rutaC.map(c=>String(c.c)));
   const ps=(gg&&gg.puntos)||[], enR=ps.filter(p=>ruta.has(String(p.clienteId))), fueraR=ps.filter(p=>!ruta.has(String(p.clienteId)));
   const ent=x=>new Set(x.filter(p=>(p.duracionMin||0)>=3).map(p=>String(p.clienteId))).size, ped=x=>new Set(x.filter(p=>p.conVenta).map(p=>String(p.clienteId))).size;
   const sinG=(gg&&gg.ventasSinGps)||[];
-  const pasoR=new Set(enR.map(p=>String(p.clienteId))).size;
+  const pasoS=new Set(enR.map(p=>String(p.clienteId))), pasoR=pasoS.size;
+  /* 25/11: listado de los clientes de la ruta del dia por los que no paso (para el supervisor) */
+  const vis=new Set(), sinVisitaL=rutaC.filter(c=>!pasoS.has(String(c.c))&&!vis.has(String(c.c))&&vis.add(String(c.c))).sort((a,b)=>(b.m3||0)-(a.m3||0));
   const pedR=ped(enR)+sinG.filter(x=>ruta.has(String(x.clienteId))).length;
-  return { ruta:ruta.size, pasoR, entR:ent(enR), pedR, efect:ruta.size?pedR/ruta.size:0, sinVisita:ruta.size-pasoR,
+  return { ruta:ruta.size, pasoR, entR:ent(enR), pedR, efect:ruta.size?pedR/ruta.size:0, sinVisita:ruta.size-pasoR, sinVisitaL,
            fuera:new Set(fueraR.map(p=>String(p.clienteId))).size, entF:ent(fueraR), pedF:ped(fueraR)+sinG.filter(x=>!ruta.has(String(x.clienteId))).length };
 }
 function gpsVend(cod, fecha){ const k=cod+'|'+fecha; if(k in GPS.v) return GPS.v[k]; if(!GPS.pend[k]){ GPS.pend[k]=1; gpsFetch(`/api/ruta-real?vendedor=${encodeURIComponent(cod)}&fecha=${fecha}`).then(j=>{ GPS.v[k]=j&&j.ok?j:false; reRender(); }); } return undefined; }
@@ -1857,7 +1860,11 @@ function renderSup(){
           if(!x||!x.ruta) return `<div class="note" style="margin-top:12px;background:var(--bg);border-radius:9px;padding:7px 9px">🛰️ Hoy: pasó <b>${gv.paso}</b> (de ${gv.cartera} de su ruta) · entró <b>${gv.entro}</b> · <b>${gv.conPedido} con pedido</b>${gv.ventaCalle?' · '+pesoC(gv.ventaCalle):''} · salió ${horaDe(gv.arranque)}${gv.sinVisita?` · <span class="c-bad">${gv.sinVisita} de la ruta sin visitar</span>`:''}</div>`;
           const s2=x.efect>=0.5?'good':(x.efect>=0.25?'warn':'bad');
           return `<div class="note" style="margin-top:12px;background:var(--bg);border-radius:9px;padding:7px 9px;line-height:1.6">🛰️ <b>Ruta de hoy: ${x.ruta}</b> · pasó ${x.pasoR} · entró ${x.entR} · <b>${x.pedR} con pedido</b> → efectividad <b class="c-${s2}">${Math.round(x.efect*100)}%</b>${x.sinVisita?` · <span class="c-bad">${x.sinVisita} sin visitar</span>`:''}<br>
-            ↪️ Fuera de ruta: ${x.fuera} (entró ${x.entF}${x.pedF?`, ${x.pedF} con pedido`:''}) · salió ${horaDe(gv.arranque)}${gv.ventaCalle?' · '+pesoC(gv.ventaCalle)+' en calle':''}${x.ruta&&!x.pasoR&&x.fuera?' · <span class="c-bad">⚠️ hoy no pasó por su ruta del día</span>':''}</div>`; })():''}
+            ↪️ Fuera de ruta: ${x.fuera} (entró ${x.entF}${x.pedF?`, ${x.pedF} con pedido`:''}) · salió ${horaDe(gv.arranque)}${gv.ventaCalle?' · '+pesoC(gv.ventaCalle)+' en calle':''}${x.ruta&&!x.pasoR&&x.fuera?' · <span class="c-bad">⚠️ hoy no pasó por su ruta del día</span>':''}
+            ${x.sinVisitaL&&x.sinVisitaL.length?`<details style="margin-top:6px"><summary class="c-bad" style="cursor:pointer;font-weight:700">Ver los ${x.sinVisitaL.length} sin visitar</summary>
+              <table style="margin-top:6px"><thead><tr><th>Cliente</th><th class="n">Últ. compra</th><th class="n">Prom./mes</th></tr></thead><tbody>
+              ${x.sinVisitaL.map(c=>`<tr><td><b>${esc(c.c)}</b> · ${esc(titulo(limpio(c.rs||'')))}${c.sg?` <span class="note">(${esc(c.sg)})</span>`:''}${c.u===hoyStr()?' <span class="c-good">· compró hoy</span>':''}</td><td class="n">${c.u?fdate(c.u):'+90 días'}</td><td class="n">${c.m3?pesoC(c.m3):'—'}</td></tr>`).join('')}
+              </tbody></table><div class="note">Ordenados por compra promedio de P&G. Entre paréntesis, la categoría del cliente.</div></details>`:''}</div>`; })():''}
         ${f.nv.dias?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">
           <span class="tag ${f.nv.sin?'t-red':'t-green'}" style="font-size:12.5px;padding:5px 10px">${f.nv.sin?'⛔':'✓'} ${f.nv.sin} ${f.nv.sin===1?'día':'días'} sin venta de ${f.nv.dias}${f.nv.racha>1?' · '+f.nv.racha+' seguidos':''}</span>
           <span class="tag t-amber" style="font-size:12.5px;padding:5px 10px">Promedio ${pesoC(f.nv.prom)}/día</span></div>`:''}
