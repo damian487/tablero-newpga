@@ -443,7 +443,7 @@ function render(){
     </div>`}
 
     <div class="grid2">
-      ${v.objetivo?`<div class="card"><div class="lab">${maniana?'El '+diaBaseN+' tenés que traer':'Hoy tenés que traer'}</div><div class="mid">${pesoC(metaBase)}</div><div class="note">${llegoObj(v)?'✅ objetivo cumplido · tu promedio diario del mes':`ritmo normal ${pesoC(v.ritmoNecesario)}/día`}</div></div>`:''}
+      ${v.objetivo?`<div class="card"><div class="lab">${maniana?'El '+diaBaseN+' tenés que traer':'Hoy tenés que traer'}</div><div class="mid">${pesoC(metaBase)}</div><div class="note">${llegoObj(v)?'✅ ¡Felicitaciones, llegaste a tu objetivo! Traé tu promedio diario hasta que termine el mes':`ritmo normal ${pesoC(v.ritmoNecesario)}/día`}</div></div>`:''}
       <div class="card"><div class="lab">Clientes que compraron</div><div class="mid">${compradores} <small style="font-size:13px;color:var(--muted);font-weight:600">de ${cartera.length}</small></div><div class="note">de tu cartera, en ${mesN}${(()=>{ const cd=cobDoble(x=>x.cod===v.cod); if(!cd.activos||v.grupo==='Mayorista') return ''; return cd.pC!=null?` · <b>${cd.otras}</b> te compraron otras líneas y P&G no`:` · <b>${Math.round(cd.pA*100)}%</b> de los ${cd.activos} que compran P&G`; })()}</div></div>
     </div>
     ${cartelesNoVenta(ventaDiaria(new Set([v.cod])),true)}
@@ -831,7 +831,7 @@ function premioDetalle(v,P,faltaObj){
   const filas=(esc.length?esc:[{de:'90',a:'99',p:32000},{de:'100',p:64000},{de:'105',p:90000},{de:'110',o:true,p:100000}]).filter(e=>e.p>0);
   const pct=v.objetivo?v.mtd/v.objetivo:0;
   const cob=(DATA.cobertura&&DATA.cobertura.planes||[]).map(pl=>{ const x=(pl.porVendedor||[]).find(y=>y.cod===v.cod); if(!x||!x.objetivo) return null; const val=(x.meses||{})[P.mes]||0; return {n:pl.id==='pilas'?'Pilas Philco':'Sachets H&S',val,obj:x.objetivo}; }).filter(Boolean);
-  return `<details class="oropr"><summary>💰 <b>Premio ${pesoC(v.premio)}</b>: ${faltaObj>0?`te faltan <b>${pesoC(faltaObj)}</b> para tu objetivo (${pesoC(faltaObj/Math.max(1,P.diasRestan))} por día)`:`<b>¡llegaste a tu objetivo!</b> (${Math.round((v.mtd||0)/v.objetivo*100)}%) Seguí con tu promedio de <b>${pesoC(promDia(v))}</b> por día`} · <u>cómo se gana</u></summary>
+  return `<details class="oropr"><summary>💰 <b>Premio ${pesoC(v.premio)}</b>: ${faltaObj>0?`te faltan <b>${pesoC(faltaObj)}</b> para tu objetivo (${pesoC(faltaObj/Math.max(1,P.diasRestan))} por día)`:`<b>¡Felicitaciones, llegaste a tu objetivo!</b> (${Math.round((v.mtd||0)/v.objetivo*100)}%) Tenés que traer tu promedio diario de <b>${pesoC(promDia(v))}</b> hasta que termine el mes`} · <u>cómo se gana</u></summary>
     <div class="premio">
       <div>Se gana según <b>cuánto de tu objetivo de venta P&G</b> (con IVA) cumplís en el mes.</div>
       <table><tr><th>Si llegás al…</th><th>Cobrás</th></tr>${filas.map(e=>`<tr class="${+e.de===100?'cien':''}"><td>${e.a?e.de+'% a '+e.a+'%':e.de+'%'+(e.o?' o más':'')}</td><td><b>$${AR.format(e.p)}</b></td></tr>`).join('')}</table>
