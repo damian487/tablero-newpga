@@ -1213,8 +1213,11 @@ function dona(items,size){ size=size||104; const tot=items.reduce((s,x)=>s+x.v,0
   const segs=items.map(x=>{ const len=x.v/tot*C, gap=items.length>1?2:0; const el=`<circle r="${r}" cx="${size/2}" cy="${size/2}" fill="none" stroke="${x.c}" stroke-width="16" stroke-dasharray="${Math.max(0,len-gap)} ${C}" stroke-dashoffset="${-off}" transform="rotate(-90 ${size/2} ${size/2})"><title>${x.l}: ${pesoC(x.v)} (${Math.round(x.v/tot*100)}%)</title></circle>`; off+=len; return el; }).join('');
   return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="flex:0 0 auto">${segs}</svg>`; }
 const leyenda=(items)=>{ const tot=items.reduce((s,x)=>s+x.v,0)||1; return `<div class="leg">${items.map(x=>`<span><i style="background:${x.c}"></i>${x.l} ${Math.round(x.v/tot*100)}%</span>`).join('')}</div>`; };
-function anillo(frac,txt,col,lab,tip){ const sz=46,r=18,C=2*Math.PI*r,f=Math.max(0,Math.min(1,frac||0));
-  return `<div class="ring" title="${tip||''}"><svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}"><circle r="${r}" cx="23" cy="23" fill="none" stroke="var(--track)" stroke-width="5"/><circle r="${r}" cx="23" cy="23" fill="none" stroke="${col}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${f*C} ${C}" transform="rotate(-90 23 23)"/><text x="23" y="26.5" text-anchor="middle" font-size="10.5" font-weight="800" fill="var(--ink)">${txt}</text></svg><b>${lab}</b></div>`; }
+function anillo(frac,txt,col,lab,tip,sub){ const sz=46,r=18,C=2*Math.PI*r,f=Math.max(0,Math.min(1,frac||0));
+  return `<div class="ring" title="${tip||''}"><svg width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}"><circle r="${r}" cx="23" cy="23" fill="none" stroke="var(--track)" stroke-width="5"/><circle r="${r}" cx="23" cy="23" fill="none" stroke="${col}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${f*C} ${C}" transform="rotate(-90 23 23)"/><text x="23" y="26.5" text-anchor="middle" font-size="10.5" font-weight="800" fill="var(--ink)">${txt}</text></svg><b>${lab}</b>${sub?`<span style="display:block;font-size:9.5px;white-space:nowrap">${sub}</span>`:''}</div>`; }
+const mill = x => ((x||0)/1e6).toLocaleString('es-AR',{maximumFractionDigits:1});
+/* objetivo con lo vendido al lado (26/11): una fila por equipo o vendedor */
+const leyendaObj=(items)=>`<div style="flex:1;min-width:0;display:grid;gap:7px">${items.map(x=>{ const p=x.v?x.m/x.v:0; return `<div style="font-size:12px"><div style="display:flex;justify-content:space-between;gap:6px"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><i style="display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;background:${x.c}"></i>${x.l}</span><b style="white-space:nowrap">${Math.round(p*100)}%</b></div><div style="color:var(--muted);font-size:11px">${pesoC(x.m)} de ${pesoC(x.v)}</div><div style="height:4px;border-radius:3px;background:var(--track);margin-top:2px"><div style="height:4px;border-radius:3px;width:${Math.min(100,p*100).toFixed(1)}%;background:${x.c}"></div></div></div>`; }).join('')}</div>`;
 const SEMC={good:'var(--good)',warn:'var(--warn)',bad:'var(--bad)'};
 const coma = x => String(x==null?'—':x).replace('.',',');
 const pila = v => nombreV(v.nombre).split(' ')[0];
@@ -1229,9 +1232,9 @@ function tableroAnillos(eq){
   const cob = {c:cd.compraron,u:cd.universo,p:Math.round(cd.pU*1000)/10};
   const mg = eq==='Todos'?K.margen:sp.margen;
   const objItems = eq==='Todos'
-    ? ['Lucy','Juan','Mayorista'].map(k=>({l:k==='Mayorista'?'Mayoristas':'Equipo '+k,v:P.vendedores.filter(v=>eqDe(v.grupo)===k).reduce((s,v)=>s+(v.objetivo||0),0),c:COL_EQ[k]}))
-    : plegar(vends.map(v=>({l:pila(v),v:v.objetivo||0})),4).map((x,i)=>({...x,c:x.c||PAL_CAT[i]}));
-  const rVenta = vends.filter(v=>v.objetivo>0).sort((a,b)=>b.pct-a.pct).map(v=>anillo(v.pct,Math.round(v.pct*100)+'%',SEMC[sem(v.tend/v.objetivo)],pila(v),`${nombreV(v.nombre)}: ${pesoC(v.mtd)} de ${pesoC(v.objetivo)} - proyecta ${pesoC(v.tend)}`));
+    ? ['Lucy','Juan','Mayorista'].map(k=>{ const vs=P.vendedores.filter(v=>eqDe(v.grupo)===k); return {l:k==='Mayorista'?'Mayoristas':'Equipo '+k,v:vs.reduce((s,v)=>s+(v.objetivo||0),0),m:vs.reduce((s,v)=>s+(v.mtd||0),0),c:COL_EQ[k]}; })
+    : (()=>{ const it=vends.filter(v=>v.objetivo>0).map(v=>({l:pila(v),v:v.objetivo,m:v.mtd||0})).sort((a,b)=>b.v-a.v); const n=4; const top=it.length<=n+1?it:[...it.slice(0,n),{l:'Otros',v:it.slice(n).reduce((s,x)=>s+x.v,0),m:it.slice(n).reduce((s,x)=>s+x.m,0),c:PAL_OTROS}]; return top.map((x,i)=>({...x,c:x.c||PAL_CAT[i]})); })();
+  const rVenta = vends.filter(v=>v.objetivo>0).sort((a,b)=>b.pct-a.pct).map(v=>anillo(v.pct,Math.round(v.pct*100)+'%',SEMC[sem(v.tend/v.objetivo)],pila(v),`${nombreV(v.nombre)}: ${pesoC(v.mtd)} de ${pesoC(v.objetivo)} - proyecta ${pesoC(v.tend)}`,`${mill(v.mtd)} / ${mill(v.objetivo)} M`));
   const rCob = vends.filter(v=>v.grupo!=='Mayorista').map(v=>({v,p:cobDoble(x=>x.cod===v.cod)})).filter(x=>x.p.universo>0).sort((a,b)=>b.p.pU-a.p.pU).map(({v,p})=>anillo(p.pU,Math.round(p.pU*100)+'%',v.objCli?SEMC[sem((v.cliMes||0)/(v.objCli*transc/hab))]:'#0b7285',pila(v),`${nombreV(v.nombre)}: ${p.compraron} de ${p.universo} clientes${v.objCli?' - objetivo '+v.objCli+' clientes':''}`));
   const rMg = vends.map(v=>({v,p:pv(v.cod)})).filter(x=>x.p.margen!=null&&x.p.venta>0).sort((a,b)=>b.p.margen-a.p.margen).map(({v,p})=>anillo(p.margen/30,coma(Math.round(p.margen*10)/10)+'%','#0b7285',pila(v),`${nombreV(v.nombre)}: margen ${coma(p.margen)}% sobre ${pesoC(p.venta)}`));
   const fam = eq==='Todos'?(DATA.porFamilia||[]):(((DATA.porEquipoMF||{})[supN[eq]]||{}).familias||[]);
@@ -1242,10 +1245,10 @@ function tableroAnillos(eq){
   return `
   <div class="ncard" style="--ac:#0b7285"><div class="nt">Objetivo del mes</div><div class="nb">$ ${AR.format(Math.round(G.objetivo||0))}</div>
     <div class="ns">${eq==='Todos'?'Toda la empresa':'Equipo '+eq} · ${vends.length} vendedores</div>
-    <div class="drow">${dona(objItems)}${leyenda(objItems)}</div></div>
+    <div class="drow">${dona(objItems)}${leyendaObj(objItems)}</div></div>
   <div class="ncard" style="--ac:#2a78d6"><div class="nt">Venta del mes</div><div class="nb">$ ${AR.format(Math.round(vendido))}</div>
     <div class="ns">${Math.round(vendido/(G.objetivo||1)*100)}% del objetivo · proyecta ${pesoC(G.tend)} (${Math.round((G.tend||0)/(G.objetivo||1)*100)}%)</div>
-    <div class="rings">${rVenta.join('')}</div><div class="note">Anillo = avance contra su objetivo. Color = cómo proyecta el cierre.</div></div>
+    <div class="rings">${rVenta.join('')}</div><div class="note">Anillo = avance contra su objetivo. Debajo: vendido / objetivo, en millones. Color = cómo proyecta el cierre.</div></div>
   <div class="ncard" style="--ac:#eb6834"><div class="nt">Cobertura</div><div class="nb">${coma(cob.p)}%</div>
     <div class="ns">${AR.format(cob.c||0)} clientes con compra de ${AR.format(cob.u||0)} · ${Math.round(cd.pC*100)}% de los que compran cualquier empresa</div>
     <div class="rings">${rCob.join('')}</div><div class="note">Color = clientes con compra contra su objetivo de clientes, al ritmo del mes.</div></div>
