@@ -1245,6 +1245,7 @@ function tableroAnillos(eq){
   return `
   <div class="ncard" style="--ac:#0b7285"><div class="nt">Objetivo del mes</div><div class="nb">$ ${AR.format(Math.round(G.objetivo||0))}</div>
     <div class="ns">${eq==='Todos'?'Toda la empresa':'Equipo '+eq} · ${vends.length} vendedores</div>
+    <div style="margin-top:6px;font-size:15px;font-weight:800;color:var(--ink)">Alcance $ ${AR.format(Math.round(G.mtd||0))} <span style="font-size:12px;font-weight:700;color:var(--muted)">· ${Math.round((G.mtd||0)/(G.objetivo||1)*100)}% · falta ${pesoC(Math.max(0,(G.objetivo||0)-(G.mtd||0)))}</span></div>
     <div class="drow">${dona(objItems)}${leyendaObj(objItems)}</div></div>
   <div class="ncard" style="--ac:#2a78d6"><div class="nt">Venta del mes</div><div class="nb">$ ${AR.format(Math.round(vendido))}</div>
     <div class="ns">${Math.round(vendido/(G.objetivo||1)*100)}% del objetivo · proyecta ${pesoC(G.tend)} (${Math.round((G.tend||0)/(G.objetivo||1)*100)}%)</div>
