@@ -1970,11 +1970,35 @@ function detalleMixEquipo(supNombre){
   </div></div></details>`;
 }
 
+/* "Qué entra" (27/11): códigos de los planes de cobertura y condiciones de los combos vigentes, por familia */
+const FAM_COMBO={pampers:'Pañales',pantene:'Cabello',hys:'Cabello',downy:'Ropa',filos:'Afeitado'};
+function queEntra(fam){
+  const hoy=hoyStr(), mes=hoy.slice(0,7), out=[];
+  const corta=t=>String(t||'').split(/ · descuento otorgado| · descuento otorgado/)[0];
+  /* el pedido se factura el día hábil siguiente: el último día de carga es el hábil anterior al vencimiento */
+  const ultCarga=h=>{ const d=new Date(h+'T12:00:00'); do{ d.setDate(d.getDate()-1); }while(d.getDay()===0||d.getDay()===6); return d.toISOString().slice(0,10); };
+  const vence=h=>h&&h.slice(0,7)===mes?` <span class="c-bad">· vence ${fdate(h)}, último día de carga ${fdate(ultCarga(h))}</span>`:'';
+  ((DATA.cobertura&&DATA.cobertura.planes)||[]).forEach(pl=>{
+    const f=pl.id==='pilas'?'Pilas':(/sachet/i.test(pl.id)?'Cabello':null); if(f!==fam) return;
+    if(!(pl.meses||[]).some(m=>m.mes>=mes)) return;
+    out.push(`<b>${esc(pl.nombre)}</b> (plan cobertura): solo suman ${Object.entries(pl.articulos||{}).map(([c,d])=>`<b>${c}</b> ${esc(d)}`).join(' · ')}`);
+  });
+  if(fam==='Afeitado'){
+    const V=DATA.venus, F=DATA.filos;
+    if(V&&V.meta&&(V.meta.meses||[]).some(m=>m>=mes)) out.push(`<b>Plan Venus</b> (puntos de venta): <b>${esc(V.meta.codigo||'')}</b> ${esc(V.meta.descripcion||'')}${vence((V.meta.meses||[]).slice(-1)[0]+'-30')}`);
+    if(F&&F.meta&&(F.meta.meses||[]).some(m=>m>=mes)) out.push(`<b>Plan Filos</b> (autoservicios): ${Object.entries(F.meta.articulos||{}).map(([c,d])=>`<b>${c}</b> ${esc(d)}`).join(' · ')}${vence((F.meta.meses||[]).slice(-1)[0]+'-30')}`);
+  }
+  ((DATA.combos&&DATA.combos.lista)||[]).forEach(c=>{
+    const f=FAM_COMBO[String(c.id).split('_')[0]]; if(f!==fam) return; if(c.hasta&&c.hasta<hoy) return; if(c.desde&&c.desde>hoy) return;
+    out.push(`<b>${esc(c.nombre)}</b>: ${esc(corta(c.condicion))}${vence(c.hasta)}`);
+  });
+  return out.length?`<div class="note" style="margin-top:4px;line-height:1.5"><span class="lab" style="display:block;margin:2px 0">Qué entra</span>${out.map(x=>`<div style="margin-bottom:3px">• ${x}</div>`).join('')}</div>`:'';
+}
 function detalleFamilias(v,P){
   const fs=(v.familias||[]).slice().sort((a,b)=>b.hoy-a.hoy); if(!fs.length) return '';
   return `<details class="card"><summary>Qué vender hoy, por familia <span class="sm">${fs.length}</span></summary><div class="in"><table>
     <thead><tr><th>Familia</th><th class="n">Hoy</th><th class="n">En el mes</th></tr></thead><tbody>
-    ${fs.map(f=>{ const st=(P.stock||[]).find(s=>s.familia===f.familia)||{}; return `<tr><td><b>${esc(f.familia)}</b>${st.acciones?`<div class="note" style="margin-top:2px">${esc(st.acciones)}</div>`:''}${st.factor<1?'<div class="note c-bad">stock limitado</div>':''}</td><td class="n"><b>${pesoC(f.hoy)}</b></td><td class="n">${pesoC(f.mtd)}</td></tr>`; }).join('')}
+    ${fs.map(f=>{ const st=(P.stock||[]).find(s=>s.familia===f.familia)||{}; return `<tr><td><b>${esc(f.familia)}</b>${st.acciones?`<div class="note" style="margin-top:2px">${esc(st.acciones)}</div>`:''}${st.factor<1?'<div class="note c-bad">stock limitado</div>':''}${queEntra(f.familia)}</td><td class="n"><b>${pesoC(f.hoy)}</b></td><td class="n">${pesoC(f.mtd)}</td></tr>`; }).join('')}
     </tbody></table></div></details>`;
 }
 function detalleStock(P){
