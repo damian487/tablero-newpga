@@ -1236,6 +1236,7 @@ function contarNumeros(root){
 }
 /* ---- piezas de la seccion Graficos estilo anillos ---- */
 const PAL_CAT=['#0b7285','#f0a91b','#d6457a','#6a5acd','#3fa34d'], PAL_OTROS='#a8b3bf';
+const PAL_V=['#0b7285','#f0a91b','#d6457a','#6a5acd','#3fa34d','#2a78d6','#eb6834','#8a5a00','#14a3a3','#9b3fb5'];
 function plegar(items,n){ items=items.filter(x=>x.v>0).sort((a,b)=>b.v-a.v); if(items.length<=n+1) return items; const resto=items.slice(n).reduce((s,x)=>s+x.v,0); return [...items.slice(0,n),{l:'Otros',v:resto,c:PAL_OTROS}]; }
 function dona(items,size){ size=size||104; const tot=items.reduce((s,x)=>s+x.v,0)||1, r=size/2-9, C=2*Math.PI*r; let off=0;
   const segs=items.map(x=>{ const len=x.v/tot*C, gap=items.length>1?2:0; const el=`<circle r="${r}" cx="${size/2}" cy="${size/2}" fill="none" stroke="${x.c}" stroke-width="16" stroke-dasharray="${Math.max(0,len-gap)} ${C}" stroke-dashoffset="${-off}" transform="rotate(-90 ${size/2} ${size/2})"><title>${x.l}: ${pesoC(x.v)} (${Math.round(x.v/tot*100)}%)</title></circle>`; off+=len; return el; }).join('');
@@ -1261,7 +1262,7 @@ function tableroAnillos(eq){
   const mg = eq==='Todos'?K.margen:sp.margen;
   const objItems = eq==='Todos'
     ? ['Lucy','Juan','Mayorista'].map(k=>{ const vs=P.vendedores.filter(v=>eqDe(v.grupo)===k); return {l:k==='Mayorista'?'Mayoristas':'Equipo '+k,v:vs.reduce((s,v)=>s+(v.objetivo||0),0),m:vs.reduce((s,v)=>s+(v.mtd||0),0),c:COL_EQ[k]}; })
-    : (()=>{ const it=vends.filter(v=>v.objetivo>0).map(v=>({l:pila(v),v:v.objetivo,m:v.mtd||0})).sort((a,b)=>b.v-a.v); const n=4; const top=it.length<=n+1?it:[...it.slice(0,n),{l:'Otros',v:it.slice(n).reduce((s,x)=>s+x.v,0),m:it.slice(n).reduce((s,x)=>s+x.m,0),c:PAL_OTROS}]; return top.map((x,i)=>({...x,c:x.c||PAL_CAT[i]})); })();
+    : vends.filter(v=>v.objetivo>0).map(v=>({l:pila(v),v:v.objetivo,m:v.mtd||0})).sort((a,b)=>b.v-a.v).map((x,i)=>({...x,c:PAL_V[i%PAL_V.length]})); /* todos los vendedores, sin "Otros" (27/11) */
   const rVenta = vends.filter(v=>v.objetivo>0).sort((a,b)=>b.pct-a.pct).map(v=>anillo(v.pct,Math.round(v.pct*100)+'%',SEMC[sem(v.tend/v.objetivo)],pila(v),`${nombreV(v.nombre)}: ${pesoC(v.mtd)} de ${pesoC(v.objetivo)} - proyecta ${pesoC(v.tend)}`,`${mill(v.mtd)} / ${mill(v.objetivo)} M`));
   const rCob = vends.filter(v=>v.grupo!=='Mayorista').map(v=>({v,p:cobDoble(x=>x.cod===v.cod)})).filter(x=>x.p.universo>0).sort((a,b)=>b.p.pU-a.p.pU).map(({v,p})=>anillo(p.pU,Math.round(p.pU*100)+'%',v.objCli?SEMC[sem((v.cliMes||0)/(v.objCli*transc/hab))]:'#0b7285',pila(v),`${nombreV(v.nombre)}: ${p.compraron} de ${p.universo} clientes${v.objCli?' - objetivo '+v.objCli+' clientes':''}`));
   const rMg = vends.map(v=>({v,p:pv(v.cod)})).filter(x=>x.p.margen!=null&&x.p.venta>0).sort((a,b)=>b.p.margen-a.p.margen).map(({v,p})=>anillo(p.margen/30,coma(Math.round(p.margen*10)/10)+'%','#0b7285',pila(v),`${nombreV(v.nombre)}: margen ${coma(p.margen)}% sobre ${pesoC(p.venta)}`));
